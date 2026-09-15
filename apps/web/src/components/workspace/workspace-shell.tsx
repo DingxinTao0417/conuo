@@ -172,6 +172,7 @@ import {
   type SettingsPane,
   type SpaceTab,
 } from "./navigation";
+import WorkspaceMobileNav from "./mobile-nav";
 import WorkspaceSidebar from "./sidebar";
 import WorkspaceTopbar from "./topbar";
 
@@ -3117,6 +3118,13 @@ export default function Workspace({
           </div>
         )}
       </main>
+      {!isReadingWorkspace && !currentNote && (
+        <WorkspaceMobileNav
+          section={section}
+          navigate={navigate}
+          openCollectionHome={openCollectionHome}
+        />
+      )}
       {modal === "restore" && (
         <BackupRestorePanel
           storageMode={storageMode}

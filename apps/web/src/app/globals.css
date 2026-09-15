@@ -3002,6 +3002,10 @@ h1 {
 .sidebar-scrim {
   display: none;
 }
+/* Phone-only; the desktop sidebar covers the same destinations. */
+.workspace-mobile-nav {
+  display: none;
+}
 @media (min-width: 1600px) {
   .content-scroll {
     padding-top: 45px;
@@ -3186,6 +3190,40 @@ h1 {
     border: 0;
     background: #0004;
     z-index: 59;
+  }
+  .workspace-mobile-nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    background: var(--bg-base-default);
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .workspace-mobile-nav button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 52px;
+    border: 0;
+    background: transparent;
+    color: var(--text-tertiary);
+    font-size: 10px;
+  }
+  .workspace-mobile-nav button.active {
+    color: var(--brand);
+  }
+  .workspace-mobile-nav button:focus-visible {
+    outline: 2px solid var(--border-brand);
+    outline-offset: -2px;
+  }
+  .content-scroll {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
   }
   .mobile-menu {
     display: inline-flex !important;

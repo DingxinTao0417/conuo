@@ -59,6 +59,19 @@ describe("Workspace primary navigation", () => {
     });
 
     const data = createEmptyWorkspace();
+    data.notes.push({
+      id: "note-a",
+      spaceId: data.spaces[0]?.id ?? "",
+      title: "梯度下降笔记",
+      content: "<p>步长与损失变化</p>",
+      kind: "note",
+      status: "accepted",
+      citations: [],
+      versions: [],
+      createdAt: "2026-09-15T09:00:00.000Z",
+      updatedAt: "2026-09-15T09:00:00.000Z",
+      deletedAt: null,
+    });
     data.importJobs = [
       {
         id: "job-running",
@@ -207,6 +220,40 @@ describe("Workspace primary navigation", () => {
     await openHash("#settings/not-a-group");
     expect(host.textContent).toContain("安装与设备");
     expect(host.textContent).not.toContain("导出学习资料");
+  });
+
+  it("offers the four phone destinations and hides them while reading", async () => {
+    const nav = () => host.querySelector<HTMLElement>('[aria-label="主要内容导航"]');
+    expect(nav()).toBeInstanceOf(HTMLElement);
+    expect([...nav()!.querySelectorAll("button")].map((button) => button.textContent)).toEqual([
+      "首页",
+      "资料",
+      "知识",
+      "问答",
+    ]);
+
+    const knowledge = [...nav()!.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === "知识",
+    )!;
+    await act(async () => knowledge.click());
+    expect(window.location.hash).toBe("#knowledge");
+    expect(
+      [...nav()!.querySelectorAll<HTMLButtonElement>("button")]
+        .find((button) => button.textContent === "知识")!
+        .getAttribute("aria-current"),
+    ).toBe("page");
+
+    // Saved writing shares the knowledge destination on phones.
+    await openHash("#notes");
+    expect(
+      [...nav()!.querySelectorAll<HTMLButtonElement>("button")]
+        .find((button) => button.textContent === "知识")!
+        .getAttribute("aria-current"),
+    ).toBe("page");
+
+    // The note editor and the reader own the bottom of the screen themselves.
+    await openHash("#note/note-a");
+    expect(nav()).toBeNull();
   });
 
   it("still resolves the task center and AI organization deep links", async () => {
