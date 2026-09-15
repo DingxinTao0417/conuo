@@ -157,6 +157,30 @@ export default function LibrarySection({
   const { filter, layout, time: timeFilter } = libraryRoute;
   const selectedTags = libraryRoute.tags ?? [];
   const filtersActive = filter !== "all" || timeFilter !== "all" || selectedTags.length > 0;
+
+  function changeSearchIntent(intent: WorkspaceSearchIntent) {
+    // Notes and knowledge pages have no question-mode equivalent.
+    if (intent === "question" && derivedLibraryFilter) replaceLibraryView({ filter: "all" });
+    setSearchIntent(intent);
+    setSelected([]);
+  }
+
+  /**
+   * The one all-library question entry. "用问题找资料" is no longer a second way
+   * in: it is offered inside this panel as a way to fill its source range, and
+   * its results hand back to the same panel.
+   */
+  function openLibraryAsk() {
+    setCrossLibraryAskPanelKey(crypto.randomUUID());
+    setCrossLibrarySearchDraft(null);
+    replaceLibraryView({ crossLibraryAsk: {} });
+  }
+
+  function findAskSourcesByQuestion() {
+    changeSearchIntent("question");
+    searchRef.current?.focus();
+  }
+
   return (
     <>
       <div className="library-directory-heading">
@@ -168,17 +192,8 @@ export default function LibrarySection({
           {activeSpace?.goal && <p>{activeSpace.goal}</p>}
         </div>
         {spaceId === "all" && libraryFiles && (
-          <button
-            className="btn"
-            disabled={crossLibraryAskBusy}
-            onClick={() => {
-              setCrossLibraryAskPanelKey(crypto.randomUUID());
-              setCrossLibrarySearchDraft(null);
-              replaceLibraryView({ crossLibraryAsk: {} });
-            }}
-          >
-            <Sparkles size={15} />
-            跨库问 AI
+          <button className="btn" disabled={crossLibraryAskBusy} onClick={openLibraryAsk}>
+            <Sparkles size={15} />问 AI
           </button>
         )}
       </div>
@@ -196,6 +211,7 @@ export default function LibrarySection({
           onActiveConversationChange={setActiveCrossLibraryConversation}
           onBusyChange={setCrossLibraryAskBusy}
           onOpenSource={openSource}
+          onFindSourcesByQuestion={findAskSourcesByQuestion}
           onInvalidInitialConversation={() => {
             setToast("这条跨库问答记录不可用，已切换为新问题。");
             replaceLibraryView({ crossLibraryAsk: {} });
@@ -220,12 +236,7 @@ export default function LibrarySection({
             setSelected([]);
         }}
         searchIntent={searchIntent}
-        onSearchIntentChange={(intent) => {
-          // Notes and knowledge pages have no question-mode equivalent.
-          if (intent === "question" && derivedLibraryFilter) replaceLibraryView({ filter: "all" });
-          setSearchIntent(intent);
-          setSelected([]);
-        }}
+        onSearchIntentChange={changeSearchIntent}
         availableTags={availableTags}
         searchRef={searchRef}
         busy={busy}

@@ -100,6 +100,12 @@ export interface CrossLibraryAskPanelProps {
   /** Lets containing entry points stay inert while this panel has an in-flight answer. */
   onBusyChange?: (busy: boolean) => void;
   onOpenSource: (sourceId: string, versionId?: string, citation?: Citation) => void;
+  /**
+   * Switches the library list into question mode so the learner can locate the
+   * sources for this range by asking, instead of scanning the list by title.
+   * The results hand back into this same panel; they never send a question.
+   */
+  onFindSourcesByQuestion?: () => void;
   onClose: () => void;
 }
 
@@ -119,6 +125,7 @@ export default function CrossLibraryAskPanel({
   onActiveConversationChange,
   onBusyChange,
   onOpenSource,
+  onFindSourcesByQuestion,
   onClose,
 }: CrossLibraryAskPanelProps) {
   const initialConversation = initialConversationId
@@ -380,14 +387,14 @@ export default function CrossLibraryAskPanel({
   );
 
   return (
-    <section className="cross-library-ask" aria-label="跨库问 AI">
+    <section className="cross-library-ask" aria-label="问 AI · 全部资料库">
       <header className="cross-library-ask-header">
         <div>
           <span className="cross-library-ask-kicker">
             <Sparkles size={15} aria-hidden="true" />
             全部资料库
           </span>
-          <h2>跨库问 AI</h2>
+          <h2>问 AI</h2>
           <p>
             明确选择 1 至 5 份资料后提问。回答只使用下方锁定的资料与版本，不会扩大到其他知识库。
           </p>
@@ -458,7 +465,20 @@ export default function CrossLibraryAskPanel({
                   : `已选择 ${selectedIds.length} / ${CROSS_LIBRARY_MAX_SOURCES} 份资料。`}
               </p>
             </div>
-            {conversation && restored?.ok && <span className="badge">范围已锁定</span>}
+            {conversation
+              ? restored?.ok && <span className="badge">范围已锁定</span>
+              : // Only a new question still has a range to fill; a saved thread
+                // keeps the exact source versions its first answer used.
+                onFindSourcesByQuestion && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={busy}
+                    onClick={onFindSourcesByQuestion}
+                  >
+                    用问题找资料
+                  </button>
+                )}
           </div>
           {unavailable && (
             <p className="cross-library-ask-warning" role="status">

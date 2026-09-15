@@ -424,4 +424,56 @@ describe("CrossLibraryAskPanel", () => {
     expect(onInvalidInitialConversation).toHaveBeenCalledOnce();
     expect(onAsk).not.toHaveBeenCalled();
   });
+
+  it("offers question search as a way to fill the range, and only while it is still editable", async () => {
+    const onFindSourcesByQuestion = vi.fn();
+    const renderWithFinder = async (initialConversationId?: string) => {
+      await act(async () => {
+        root.render(
+          createElement(CrossLibraryAskPanel, {
+            key: initialConversationId ?? "new",
+            data,
+            ...(initialConversationId ? { initialConversationId } : {}),
+            onAsk,
+            onConversationChange,
+            onActiveConversationChange,
+            onOpenSource,
+            onFindSourcesByQuestion,
+            onClose,
+          }),
+        );
+      });
+    };
+    const finder = () =>
+      [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+        (button) => button.textContent?.trim() === "用问题找资料",
+      );
+
+    await renderWithFinder();
+    expect(finder()).toBeTruthy();
+    await act(async () => finder()!.click());
+    // It only switches the library list into question mode; it never asks.
+    expect(onFindSourcesByQuestion).toHaveBeenCalledOnce();
+    expect(onAsk).not.toHaveBeenCalled();
+
+    const saved = {
+      id: "locked-thread",
+      spaceId: "all" as const,
+      title: "已锁定范围的会话",
+      scope: "cross-library-sources" as const,
+      sourceIds: ["source-one"],
+      messages: [],
+      resolved: false,
+      updatedAt: "2026-09-13T12:00:00.000Z",
+    };
+    data = { ...data, conversations: [saved] };
+    await renderWithFinder(saved.id);
+    // A saved thread's range is frozen, so there is nothing left to refill.
+    expect(finder()).toBeUndefined();
+    expect(
+      host.querySelector<HTMLInputElement>(
+        '[aria-label="选择跨库资料 梯度下降与学习率 · 示例资料"]',
+      )?.disabled,
+    ).toBe(true);
+  });
 });

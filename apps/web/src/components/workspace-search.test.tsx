@@ -352,7 +352,7 @@ describe("WorkspaceSearch external library filters", () => {
     });
 
     const askButton = [...host.querySelectorAll<HTMLButtonElement>("button")].find((button) =>
-      button.textContent?.includes("用所选资料继续提问"),
+      button.textContent?.includes("基于这些资料提问"),
     );
     await act(async () => askButton!.click());
     expect(onAskSources).toHaveBeenCalledWith({

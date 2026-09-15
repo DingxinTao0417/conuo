@@ -408,7 +408,7 @@ export default function WorkspaceSearch({
               onClick={() => onAskSources({ question: query.trim(), sourceIds: [...selectedIds] })}
             >
               <Sparkles size={15} aria-hidden="true" />
-              {askDisabled ? "当前回答生成中" : "用所选资料继续提问"}
+              {askDisabled ? "当前回答生成中" : "基于这些资料提问"}
             </button>
           </div>
           {!questionItems.length && (

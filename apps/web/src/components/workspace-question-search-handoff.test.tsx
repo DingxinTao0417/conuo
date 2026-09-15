@@ -167,6 +167,13 @@ describe("Workspace question-search handoff", () => {
     vi.unstubAllGlobals();
   });
 
+  /** The single all-library question entry that replaced "跨库问 AI". */
+  function askEntry() {
+    return [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent?.replace(/\s+/gu, "").trim() === "问AI",
+    );
+  }
+
   async function openPrefilledPanel() {
     const questionMode = [...host.querySelectorAll<HTMLButtonElement>("button")].find((button) =>
       button.textContent?.includes("用问题找资料"),
@@ -206,12 +213,10 @@ describe("Workspace question-search handoff", () => {
     expect(panelLifecycle).toMatchObject({ mounts: 1, unmounts: 0 });
   });
 
-  it("starts a fresh panel when the explicit cross-library button clears a search draft", async () => {
+  it("starts a fresh panel when the merged ask entry clears a search draft", async () => {
     await openPrefilledPanel();
 
-    const blankQuestion = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
-      (button) => button.textContent?.replace(/\s+/gu, "").trim() === "跨库问AI",
-    );
+    const blankQuestion = askEntry();
     expect(blankQuestion).toBeTruthy();
     await act(async () => blankQuestion!.click());
 
@@ -226,9 +231,7 @@ describe("Workspace question-search handoff", () => {
     expect(send).toBeTruthy();
     await act(async () => send!.click());
 
-    const blankQuestion = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
-      (button) => button.textContent?.replace(/\s+/gu, "").trim() === "跨库问AI",
-    );
+    const blankQuestion = askEntry();
     const searchHandoff = [...host.querySelectorAll<HTMLButtonElement>("button")].find((button) =>
       button.textContent?.includes("模拟选择问题资料"),
     );
@@ -241,5 +244,22 @@ describe("Workspace question-search handoff", () => {
     });
     expect(panelLifecycle).toMatchObject({ mounts: 1, unmounts: 0 });
     expect(panelLifecycle.controller?.signal.aborted).toBe(false);
+  });
+
+  it("offers exactly one all-library ask entry", async () => {
+    // The former "跨库问 AI" button and the question-mode switch were two ways
+    // into the same panel; only the merged entry opens it now.
+    const entries = [...host.querySelectorAll<HTMLButtonElement>("button")].filter(
+      (button) => button.textContent?.replace(/\s+/gu, "").trim() === "问AI",
+    );
+    expect(entries).toHaveLength(1);
+    expect(
+      [...host.querySelectorAll<HTMLButtonElement>("button")].some((button) =>
+        button.textContent?.replace(/\s+/gu, "").trim().includes("跨库问AI"),
+      ),
+    ).toBe(false);
+
+    await act(async () => entries[0]!.click());
+    expect(panelLifecycle).toMatchObject({ mounts: 1, unmounts: 0 });
   });
 });
