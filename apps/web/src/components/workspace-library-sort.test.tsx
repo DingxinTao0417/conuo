@@ -119,14 +119,27 @@ describe("Workspace library sorting", () => {
     return [...host.querySelectorAll(".source-row .source-open b")].map((item) => item.textContent);
   }
 
-  function sortControl() {
+  function viewTrigger() {
+    const trigger = host.querySelector<HTMLButtonElement>('[aria-label="资料视图设置"]');
+    expect(trigger).toBeInstanceOf(HTMLButtonElement);
+    return trigger as HTMLButtonElement;
+  }
+
+  /** Sort now lives in the view popover, so reading it means opening that menu. */
+  async function openViewMenu() {
+    const trigger = viewTrigger();
+    if (trigger.getAttribute("aria-expanded") !== "true") await act(async () => trigger.click());
+  }
+
+  async function sortControl() {
+    await openViewMenu();
     const control = host.querySelector<HTMLSelectElement>('select[aria-label="资料排序方式"]');
     expect(control).toBeInstanceOf(HTMLSelectElement);
     return control as HTMLSelectElement;
   }
 
   async function chooseSort(value: "updated" | "created" | "name") {
-    const control = sortControl();
+    const control = await sortControl();
     await act(async () => {
       control.value = value;
       control.dispatchEvent(new Event("change", { bubbles: true }));
@@ -136,7 +149,7 @@ describe("Workspace library sorting", () => {
   it("sorts immediately, preserves selection, and restores the route state", async () => {
     const first = data.sources[0]!;
     const second = data.sources[1]!;
-    expect(sortControl().value).toBe("updated");
+    expect((await sortControl()).value).toBe("updated");
     expect(visibleTitles()).toEqual([second.title, first.title]);
     expect(host.querySelector(".source-list-heading")?.textContent).toContain("更新时间");
     expect(host.querySelector(".source-list-heading")?.textContent).not.toContain("添加时间");
@@ -163,22 +176,27 @@ describe("Workspace library sorting", () => {
       window.history.replaceState(null, "", `#library/${spaceId}?sort=created`);
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    expect(sortControl().value).toBe("created");
+    expect((await sortControl()).value).toBe("created");
     expect(visibleTitles()).toEqual([first.title, second.title]);
   });
 
-  it("does not present a library sort control for relevance-ordered question search", async () => {
+  it("disables the view menu for relevance-ordered question search instead of hiding it", async () => {
+    await openViewMenu();
     const questionMode = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
       (button) => button.textContent?.trim() === "用问题找资料",
     );
     expect(questionMode).toBeInstanceOf(HTMLButtonElement);
     await act(async () => questionMode!.click());
+    // The control keeps its toolbar slot, but no source sort order is offered.
+    expect(viewTrigger().disabled).toBe(true);
+    expect(viewTrigger().title).toContain("相关度");
     expect(host.querySelector('select[aria-label="资料排序方式"]')).toBeNull();
 
     const keywordMode = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
       (button) => button.textContent?.trim() === "关键词",
     );
     await act(async () => keywordMode!.click());
-    expect(sortControl().value).toBe("updated");
+    expect(viewTrigger().disabled).toBe(false);
+    expect((await sortControl()).value).toBe("updated");
   });
 });

@@ -209,14 +209,24 @@ describe("Workspace ordinary search for notes and knowledge pages", () => {
     return found!;
   }
 
-  function select(label: string) {
+  /** The type and time filters share the toolbar's single filter popover. */
+  async function openFilterMenu() {
+    const trigger = [...host.querySelectorAll<HTMLButtonElement>("button")].find((item) =>
+      item.getAttribute("aria-label")?.startsWith("筛选资料"),
+    );
+    expect(trigger, "filter trigger").toBeInstanceOf(HTMLButtonElement);
+    if (trigger!.getAttribute("aria-expanded") !== "true") await act(async () => trigger!.click());
+  }
+
+  async function filterSelect(label: string) {
+    await openFilterMenu();
     const found = host.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`);
     expect(found, label).toBeInstanceOf(HTMLSelectElement);
     return found!;
   }
 
   async function choose(label: string, value: string) {
-    const control = select(label);
+    const control = await filterSelect(label);
     expect([...control.options].some((option) => option.value === value)).toBe(true);
     await act(async () => {
       control.value = value;
@@ -261,12 +271,12 @@ describe("Workspace ordinary search for notes and knowledge pages", () => {
 
     await query(recentNoteId);
     expect(titles()).toEqual([title(recentNoteId)]);
-    expect(select("筛选资料类型").value).toBe("note");
+    expect((await filterSelect("筛选资料类型")).value).toBe("note");
     expect(window.location.hash).toContain(`q=${recentNoteId}`);
     await act(async () =>
       host.querySelector<HTMLButtonElement>('[aria-label="清空搜索"]')!.click(),
     );
-    expect(select("筛选资料类型").value).toBe("note");
+    expect((await filterSelect("筛选资料类型")).value).toBe("note");
     expect(titles()).toHaveLength(4);
     expectDerivedView();
     expect(window.location.hash).toBe(`#library/${spaceId}?filter=note`);
@@ -323,9 +333,9 @@ describe("Workspace ordinary search for notes and knowledge pages", () => {
     await query("微积分");
     const noteRoute = window.location.hash;
     await act(async () => button("用问题找资料").click());
-    expect(select("筛选资料类型").value).toBe("all");
+    expect((await filterSelect("筛选资料类型")).value).toBe("all");
     expect(button("用问题找资料").getAttribute("aria-pressed")).toBe("true");
-    expect(select("筛选资料类型").querySelector('option[value="note"]')).toBeNull();
+    expect((await filterSelect("筛选资料类型")).querySelector('option[value="note"]')).toBeNull();
     expect(host.querySelector(".workspace-question-results")).toBeTruthy();
     expect(window.location.hash).not.toContain("filter=note");
 
@@ -334,8 +344,8 @@ describe("Workspace ordinary search for notes and knowledge pages", () => {
       window.dispatchEvent(new HashChangeEvent("hashchange"));
     });
     expect(button("关键词").getAttribute("aria-pressed")).toBe("true");
-    expect(select("筛选资料类型").value).toBe("note");
-    expect(select("按添加时间筛选资料").value).toBe("7d");
+    expect((await filterSelect("筛选资料类型")).value).toBe("note");
+    expect((await filterSelect("按添加时间筛选资料")).value).toBe("7d");
     expect(titles()).toHaveLength(2);
     expectDerivedView();
 
@@ -345,7 +355,7 @@ describe("Workspace ordinary search for notes and knowledge pages", () => {
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
     expect(button("关键词").getAttribute("aria-pressed")).toBe("true");
-    expect(select("筛选资料类型").value).toBe("knowledge");
+    expect((await filterSelect("筛选资料类型")).value).toBe("knowledge");
     expect(titles()).toEqual([title(recentKnowledgeId)]);
     expectDerivedView();
   });
@@ -363,8 +373,8 @@ describe("Workspace ordinary search for notes and knowledge pages", () => {
     );
     await act(async () => button("返回").click());
     expect(window.location.hash).toBe(returnRoute);
-    expect(select("筛选资料类型").value).toBe("note");
-    expect(select("按添加时间筛选资料").value).toBe("7d");
+    expect((await filterSelect("筛选资料类型")).value).toBe("note");
+    expect((await filterSelect("按添加时间筛选资料")).value).toBe("7d");
     expect(host.querySelector<HTMLInputElement>('[aria-label="搜索资料"]')?.value).toBe(
       recentNoteId,
     );
@@ -452,8 +462,8 @@ describe("Workspace ordinary search for notes and knowledge pages", () => {
     await act(async () =>
       host.querySelector<HTMLButtonElement>('[aria-label="清空搜索"]')!.click(),
     );
-    expect(select("筛选资料类型").value).toBe("markdown");
-    expect(select("按添加时间筛选资料").value).toBe("7d");
+    expect((await filterSelect("筛选资料类型")).value).toBe("markdown");
+    expect((await filterSelect("按添加时间筛选资料")).value).toBe("7d");
     expect(host.querySelector(".workspace-search")).toBeNull();
     expect(host.querySelectorAll(".source-row")).toHaveLength(1);
     expect(window.location.hash).toBe(`#library/${spaceId}?filter=markdown&time=7d`);

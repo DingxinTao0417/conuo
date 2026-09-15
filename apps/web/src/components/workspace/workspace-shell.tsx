@@ -318,7 +318,6 @@ export default function Workspace({
   const [knowledgeUpdateOpen, setKnowledgeUpdateOpen] = useState(false);
   const [conceptRelationsOpen, setConceptRelationsOpen] = useState(false);
   const [knowledgeEvidenceAskOpen, setKnowledgeEvidenceAskOpen] = useState(false);
-  const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [sidebar, setSidebar] = useState(false);
   const [modal, setModal] = useState<WorkspaceModal>(null);
   const [readingPositionResolutionEpoch, setReadingPositionResolutionEpoch] = useState(0);
@@ -389,7 +388,6 @@ export default function Workspace({
   });
   const [editorKey, setEditorKey] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
-  const tagFilterRef = useRef<HTMLDivElement>(null);
   const latestSources = useRef(data.sources);
   const latestLibraryViewRoute = useRef(currentLibraryViewRoute);
   const handledInvalidSourceRoute = useRef<string | null>(null);
@@ -815,7 +813,6 @@ export default function Workspace({
     setSearch("");
     setCollectionSearch("");
     setSelectedTags([]);
-    setTagFilterOpen(false);
     setSelected([]);
     setNoteSearchTarget(undefined);
     setReadingConflictPlanSnapshot(null);
@@ -947,21 +944,6 @@ export default function Workspace({
     const timer = setTimeout(() => setToast(""), 5000);
     return () => clearTimeout(timer);
   }, [toast]);
-  useEffect(() => {
-    if (!tagFilterOpen) return;
-    const closeOnOutsidePress = (event: MouseEvent) => {
-      if (!tagFilterRef.current?.contains(event.target as Node)) setTagFilterOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setTagFilterOpen(false);
-    };
-    document.addEventListener("mousedown", closeOnOutsidePress);
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("mousedown", closeOnOutsidePress);
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [tagFilterOpen]);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
@@ -1876,6 +1858,10 @@ export default function Workspace({
       setToast(error instanceof Error ? error.message : "整理建议未能保存，请重试。");
     }
     return applied;
+  }
+  function openSourceDetail(id: string) {
+    setDetailId(id);
+    setModal("details");
   }
   function openBulkRecycle(ids = selected) {
     setSelected([...new Set(ids)]);
@@ -2892,18 +2878,10 @@ export default function Workspace({
                 availableTags={availableTags}
                 derivedLibraryFilter={derivedLibraryFilter}
                 busy={busy}
-                search={search}
+                libraryRoute={currentLibraryViewRoute}
                 searchRef={searchRef}
                 searchIntent={searchIntent}
                 setSearchIntent={setSearchIntent}
-                filter={filter}
-                timeFilter={timeFilter}
-                sort={sort}
-                layout={layout}
-                selectedTags={selectedTags}
-                tagFilterRef={tagFilterRef}
-                tagFilterOpen={tagFilterOpen}
-                setTagFilterOpen={setTagFilterOpen}
                 replaceLibraryView={replaceLibraryView}
                 searchExternalFilters={searchExternalFilters}
                 selected={selected}
@@ -2918,11 +2896,10 @@ export default function Workspace({
                 setActiveCrossLibraryConversation={setActiveCrossLibraryConversation}
                 clearConversationRouteState={clearConversationRouteState}
                 setModal={setModal}
-                setDetailId={setDetailId}
+                openSourceDetail={openSourceDetail}
                 setToast={setToast}
                 openImport={openImport}
                 newNote={newNote}
-                openSpaceCreation={openSpaceCreation}
                 openExport={openExport}
                 openSource={openSource}
                 openSearchHit={openSearchHit}

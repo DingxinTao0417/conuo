@@ -1,24 +1,28 @@
+/* The search mode now lives inside the search field, so one control covers
+   "what to type" and "how it is interpreted" instead of two toolbar slots. */
+.library-search-field {
+  gap: 0;
+  padding-left: 3px;
+  max-width: 520px;
+}
 .library-search-mode {
   display: inline-flex;
   flex: 0 0 auto;
-  height: 36px;
+  gap: 2px;
+  margin-right: 9px;
   padding: 2px;
-  border: 1px solid var(--border-neutral-l1);
-  border-radius: var(--radius-8);
+  border-radius: var(--radius-6);
   background: var(--bg-base-secondary);
 }
 .library-search-mode button {
-  min-width: 72px;
-  padding: 0 11px;
+  padding: 0 9px;
+  height: 25px;
   border: 0;
-  border-radius: var(--radius-6);
+  border-radius: var(--radius-4, 4px);
   background: transparent;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 11px;
   white-space: nowrap;
-}
-.library-search-mode button:last-child {
-  min-width: 108px;
 }
 .library-search-mode button:hover {
   color: var(--text-secondary);
@@ -26,11 +30,8 @@
 }
 .library-search-mode button[aria-pressed="true"] {
   color: var(--text-brand);
-  background: var(--bg-brand-popup);
+  background: var(--bg-base-default);
   font-weight: 600;
-}
-.library-search-break {
-  display: none;
 }
 .workspace-search {
   min-width: 0;
@@ -180,31 +181,24 @@
   .library-tools {
     flex-wrap: wrap;
   }
-  .library-search-mode {
+  .library-search-field {
+    min-width: min(360px, 100%);
     height: 44px;
   }
-  .library-search-mode + .search-field {
-    min-width: min(320px, calc(100% - 278px));
-    height: 44px;
-  }
-  .library-search-break {
-    display: block;
-    flex-basis: 100%;
-    width: 0;
-    height: 0;
+  .library-search-mode button {
+    height: 34px;
   }
 }
 
 @media (max-width: 620px) {
-  .library-search-mode {
-    width: 100%;
-  }
-  .library-search-mode button {
-    flex: 1;
-  }
-  .library-search-mode + .search-field {
+  .library-search-field {
+    flex-basis: 100%;
     min-width: 0;
     height: 44px;
+  }
+  .library-search-mode button {
+    height: 34px;
+    padding: 0 7px;
   }
   .workspace-search {
     margin-top: 0;

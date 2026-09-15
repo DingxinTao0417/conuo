@@ -354,9 +354,12 @@ describe("Workspace reviewed knowledge-base backup exports", () => {
     expect(workspaceStore.update).not.toHaveBeenCalled();
   });
 
-  it("preselects the active knowledge base from both its materials and knowledge-page headers", async () => {
+  it("preselects the active knowledge base from both the materials toolbar and the knowledge-page header", async () => {
     for (const hash of ["#library/space-a", "#knowledge?space=space-a"]) {
       await render({}, hash);
+      // In the materials view this action now sits in the toolbar's ⋯ menu.
+      const more = host.querySelector<HTMLButtonElement>('[aria-label="更多资料库操作"]');
+      if (more) await act(async () => more.click());
       await click("导出此知识库");
       expectSelectedScope();
       expect(exportIO.exportWorkspace).not.toHaveBeenCalled();

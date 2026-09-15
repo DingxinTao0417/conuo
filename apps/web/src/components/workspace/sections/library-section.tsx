@@ -1,36 +1,23 @@
 "use client";
-import type { Dispatch, RefObject, SetStateAction } from "react";
-import {
-  ArrowDownToLine,
-  FolderPlus,
-  LayoutGrid,
-  Library,
-  MoreHorizontal,
-  Search,
-  Sparkles,
-  Star,
-  Tag,
-  Trash2,
-  X,
-} from "lucide-react";
+import { useCallback, useRef, useState, type RefObject } from "react";
+import { FolderPlus, Library, MoreHorizontal, Sparkles, Star, Tag, Trash2 } from "lucide-react";
 import { persistConversation } from "@/lib/conversations";
 import type { WorkspaceExportScope } from "@/lib/export-scope";
-import { isLibraryFilter, type LibraryFilter } from "@/lib/library-route";
-import { isLibrarySort, type LibrarySort } from "@/lib/library-sort";
-import { isLibraryTimeFilter, type LibraryTimeFilter } from "@/lib/library-time-filter";
+import type { LibraryRoute } from "@/lib/library-route";
 import type { SearchHit } from "@/lib/search-types";
 import { sourcePresentationStatus } from "@/lib/source-coverage";
 import type { Citation, Source, Space, WorkspaceData } from "@/lib/types";
-import { CollectionActions } from "../../collection-library";
 import WorkspaceSearch, {
   type WorkspaceSearchAskDraft,
   type WorkspaceSearchExternalFilters,
   type WorkspaceSearchIntent,
 } from "../../workspace-search";
 import type { LibraryViewPatch } from "../hooks/use-library-route";
+import { useMenuDismissal } from "../hooks/use-menu-dismissal";
 import { CrossLibraryAskPanel } from "../lazy-panels";
-import { Empty, SourceIcon, date, normalizedTag, sizeLabel, sourceStatusLabel } from "../shared";
+import { Empty, SourceIcon, date, sizeLabel, sourceStatusLabel } from "../shared";
 import type { CrossLibrarySearchDraft, WorkspaceStore, WorkspaceUser } from "../types";
+import LibraryToolbar from "./library-toolbar";
 
 export type LibrarySectionProps = {
   data: WorkspaceData;
@@ -46,18 +33,10 @@ export type LibrarySectionProps = {
   availableTags: string[];
   derivedLibraryFilter: boolean;
   busy: boolean;
-  search: string;
+  libraryRoute: LibraryRoute;
   searchRef: RefObject<HTMLInputElement | null>;
   searchIntent: WorkspaceSearchIntent;
   setSearchIntent: (intent: WorkspaceSearchIntent) => void;
-  filter: LibraryFilter;
-  timeFilter: LibraryTimeFilter;
-  sort: LibrarySort;
-  layout: "grid" | "list";
-  selectedTags: string[];
-  tagFilterRef: RefObject<HTMLDivElement | null>;
-  tagFilterOpen: boolean;
-  setTagFilterOpen: Dispatch<SetStateAction<boolean>>;
   replaceLibraryView: (patch: LibraryViewPatch) => void;
   searchExternalFilters: WorkspaceSearchExternalFilters | undefined;
   selected: string[];
@@ -71,12 +50,11 @@ export type LibrarySectionProps = {
   setCrossLibrarySearchDraft: (draft: CrossLibrarySearchDraft | null) => void;
   setActiveCrossLibraryConversation: (conversationId?: string) => void;
   clearConversationRouteState: () => void;
-  setModal: (modal: "bulk-tags" | "details") => void;
-  setDetailId: (id: string) => void;
+  setModal: (modal: "bulk-tags") => void;
+  openSourceDetail: (sourceId: string) => void;
   setToast: (message: string) => void;
   openImport: () => void;
   newNote: (kind: "note") => void;
-  openSpaceCreation: () => void;
   openExport: (scope: WorkspaceExportScope) => void;
   openSource: (sourceId: string, versionId?: string, citation?: Citation) => void;
   openSearchHit: (hit: SearchHit) => void;
@@ -86,6 +64,47 @@ export type LibrarySectionProps = {
   openOrganization: (ids: string[]) => void;
   patchSource: (source: Source, patch: Partial<Source>) => void;
 };
+
+/** The selection actions that do not fit the four primary bulk buttons. */
+function BulkActionsMenu({ onOrganize }: { onOrganize: () => void }) {
+  const [open, setOpen] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useMenuDismissal(open, container, close);
+  return (
+    <div className="library-menu bulk-bar-menu" ref={container}>
+      <button
+        type="button"
+        className="icon-btn library-menu-trigger"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="更多批量操作"
+        onClick={() => setOpen((current) => !current)}
+      >
+        <MoreHorizontal size={18} />
+      </button>
+      {open && (
+        <div
+          className="library-menu-popover library-menu-list"
+          role="group"
+          aria-label="更多批量操作"
+        >
+          <button
+            type="button"
+            className="library-menu-item"
+            onClick={() => {
+              close();
+              onOrganize();
+            }}
+          >
+            <Sparkles size={15} aria-hidden="true" />
+            整理为知识页
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function LibrarySection({
   data,
@@ -101,18 +120,10 @@ export default function LibrarySection({
   availableTags,
   derivedLibraryFilter,
   busy,
-  search,
+  libraryRoute,
   searchRef,
   searchIntent,
   setSearchIntent,
-  filter,
-  timeFilter,
-  sort,
-  layout,
-  selectedTags,
-  tagFilterRef,
-  tagFilterOpen,
-  setTagFilterOpen,
   replaceLibraryView,
   searchExternalFilters,
   selected,
@@ -127,11 +138,10 @@ export default function LibrarySection({
   setActiveCrossLibraryConversation,
   clearConversationRouteState,
   setModal,
-  setDetailId,
+  openSourceDetail,
   setToast,
   openImport,
   newNote,
-  openSpaceCreation,
   openExport,
   openSource,
   openSearchHit,
@@ -141,13 +151,14 @@ export default function LibrarySection({
   openOrganization,
   patchSource,
 }: LibrarySectionProps) {
+  // The shell keeps the visible query in the route it hands down, so the
+  // toolbar input and the filtered rows always read the same text.
+  const search = libraryRoute.query;
+  const { filter, layout, time: timeFilter } = libraryRoute;
+  const selectedTags = libraryRoute.tags ?? [];
+  const filtersActive = filter !== "all" || timeFilter !== "all" || selectedTags.length > 0;
   return (
     <>
-      <CollectionActions
-        onNewNote={() => newNote("note")}
-        onImport={openImport}
-        onNewSpace={() => openSpaceCreation()}
-      />
       <div className="library-directory-heading">
         <div>
           <h2>
@@ -156,16 +167,6 @@ export default function LibrarySection({
           </h2>
           {activeSpace?.goal && <p>{activeSpace.goal}</p>}
         </div>
-        {activeSpace && (
-          <button
-            className="btn export-library-action"
-            disabled={busy}
-            onClick={() => openExport({ kind: "space", spaceId: activeSpace.id })}
-          >
-            <ArrowDownToLine size={15} aria-hidden="true" />
-            导出此知识库
-          </button>
-        )}
         {spaceId === "all" && libraryFiles && (
           <button
             className="btn"
@@ -206,199 +207,35 @@ export default function LibrarySection({
           }}
         />
       )}
-      <div className="library-tools">
-        <div className="library-search-mode" role="group" aria-label="资料搜索方式">
-          <button
-            type="button"
-            aria-pressed={searchIntent === "keyword"}
-            onClick={() => {
-              setSearchIntent("keyword");
-              setSelected([]);
-            }}
-          >
-            关键词
-          </button>
-          <button
-            type="button"
-            aria-pressed={searchIntent === "question"}
-            onClick={() => {
-              if (derivedLibraryFilter) replaceLibraryView({ filter: "all" });
-              setSearchIntent("question");
-              setSelected([]);
-            }}
-          >
-            用问题找资料
-          </button>
-        </div>
-        <div className="search-field">
-          <Search size={16} />
-          <input
-            ref={searchRef}
-            placeholder={
-              searchIntent === "question"
-                ? "例如：哪份资料讲过学习率过高？"
-                : "搜索资料、笔记与知识页…"
-            }
-            aria-label={searchIntent === "question" ? "输入问题找资料" : "搜索资料"}
-            value={search}
-            onChange={(e) => {
-              replaceLibraryView({ query: e.target.value });
-              setSelected([]);
-            }}
-          />
-          {search && (
-            <button
-              className="icon-btn"
-              onClick={() => replaceLibraryView({ query: "" })}
-              aria-label="清空搜索"
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
-        <span className="library-search-break" aria-hidden="true" />
-        <select
-          className="field filter-select"
-          aria-label="筛选资料类型"
-          value={filter}
-          onChange={(e) => {
-            if (isLibraryFilter(e.target.value)) {
-              replaceLibraryView({ filter: e.target.value });
-              setSelected([]);
-            }
-          }}
-        >
-          <option value="all">全部类型</option>
-          <option value="starred">已收藏</option>
-          <option value="pdf">PDF</option>
-          <option value="docx">DOCX</option>
-          <option value="markdown">Markdown</option>
-          <option value="text">TXT</option>
-          <option value="web">网页</option>
-          {searchIntent === "keyword" && <option value="note">笔记</option>}
-          {searchIntent === "keyword" && <option value="knowledge">知识页</option>}
-        </select>
-        <select
-          className="field filter-select time-filter-select"
-          aria-label="按添加时间筛选资料"
-          value={timeFilter}
-          onChange={(e) => {
-            if (isLibraryTimeFilter(e.target.value)) {
-              replaceLibraryView({ time: e.target.value });
-              setSelected([]);
-            }
-          }}
-        >
-          <option value="all">全部时间</option>
-          <option value="7d">最近 7 天</option>
-          <option value="30d">最近 30 天</option>
-          <option value="365d">最近一年</option>
-        </select>
-        {searchIntent === "keyword" && !derivedLibraryFilter && (
-          <select
-            className="field filter-select sort-filter-select"
-            aria-label="资料排序方式"
-            value={sort}
-            onChange={(event) => {
-              if (isLibrarySort(event.target.value))
-                replaceLibraryView({ sort: event.target.value });
-            }}
-          >
-            <option value="updated">最近更新</option>
-            <option value="created">最近添加</option>
-            <option value="name">名称</option>
-          </select>
-        )}
-        <div className="tag-filter" ref={tagFilterRef}>
-          <button
-            type="button"
-            className={`btn tag-filter-trigger${selectedTags.length ? " is-active" : ""}`}
-            aria-haspopup="dialog"
-            aria-expanded={tagFilterOpen}
-            aria-label={
-              selectedTags.length ? `筛选资料标签，已选 ${selectedTags.length} 项` : "筛选资料标签"
-            }
-            onClick={() => setTagFilterOpen((open) => !open)}
-          >
-            <Tag size={14} aria-hidden="true" />
-            标签{selectedTags.length ? ` ${selectedTags.length}` : ""}
-          </button>
-          {tagFilterOpen && (
-            <section className="tag-filter-popover" role="dialog" aria-label="按标签筛选资料">
-              <div className="tag-filter-popover-heading">
-                <div>
-                  <strong>筛选标签</strong>
-                  <p>仅显示同时具有所选标签的资料。</p>
-                </div>
-                {selectedTags.length > 0 && (
-                  <button
-                    type="button"
-                    className="text-button"
-                    aria-label="清除已选标签"
-                    onClick={() => {
-                      replaceLibraryView({ tags: [] });
-                      setSelected([]);
-                    }}
-                  >
-                    清除
-                  </button>
-                )}
-              </div>
-              {availableTags.length ? (
-                <div className="tag-filter-options" role="group" aria-label="当前范围可用标签">
-                  {availableTags.map((tag) => {
-                    const checked = selectedTags.some(
-                      (selectedTag) => normalizedTag(selectedTag) === normalizedTag(tag),
-                    );
-                    return (
-                      <label className="tag-filter-option" key={normalizedTag(tag)}>
-                        <input
-                          type="checkbox"
-                          aria-label={`标签 ${tag}`}
-                          checked={checked}
-                          onChange={(event) => {
-                            const nextTags = event.currentTarget.checked
-                              ? [...selectedTags, tag]
-                              : selectedTags.filter(
-                                  (selectedTag) =>
-                                    normalizedTag(selectedTag) !== normalizedTag(tag),
-                                );
-                            replaceLibraryView({ tags: nextTags });
-                            setSelected([]);
-                          }}
-                        />
-                        <span>{tag}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="tag-filter-empty">当前范围还没有可用标签。</p>
-              )}
-            </section>
-          )}
-        </div>
-        {searchIntent === "keyword" && !derivedLibraryFilter && (
-          <div className="view-switch">
-            <button
-              aria-label="列表视图"
-              aria-pressed={layout === "list"}
-              className="icon-btn"
-              onClick={() => replaceLibraryView({ layout: "list" })}
-            >
-              <Library size={16} />
-            </button>
-            <button
-              aria-label="卡片视图"
-              aria-pressed={layout === "grid"}
-              className="icon-btn"
-              onClick={() => replaceLibraryView({ layout: "grid" })}
-            >
-              <LayoutGrid size={16} />
-            </button>
-          </div>
-        )}
-      </div>
+      <LibraryToolbar
+        // An account or cache boundary drops transient review state elsewhere;
+        // remounting closes any popover that belonged to the previous session.
+        key={`${store.token}:${user?.id ?? "local"}`}
+        route={libraryRoute}
+        onChange={(patch) => {
+          replaceLibraryView(patch);
+          // Narrowing the list would silently keep hidden sources selected;
+          // reordering or relayouting shows the same set, so it keeps it.
+          if ("filter" in patch || "time" in patch || "tags" in patch || "query" in patch)
+            setSelected([]);
+        }}
+        searchIntent={searchIntent}
+        onSearchIntentChange={(intent) => {
+          // Notes and knowledge pages have no question-mode equivalent.
+          if (intent === "question" && derivedLibraryFilter) replaceLibraryView({ filter: "all" });
+          setSearchIntent(intent);
+          setSelected([]);
+        }}
+        availableTags={availableTags}
+        searchRef={searchRef}
+        busy={busy}
+        canExportLibrary={Boolean(activeSpace)}
+        onExportLibrary={() => {
+          if (activeSpace) openExport({ kind: "space", spaceId: activeSpace.id });
+        }}
+        onImport={openImport}
+        onNewNote={() => newNote("note")}
+      />
       {(search.trim() || derivedLibraryFilter) && (
         <WorkspaceSearch
           key={`${store.token}:${spaceId}`}
@@ -431,14 +268,11 @@ export default function LibrarySection({
             <FolderPlus size={14} />
             关联空间
           </button>
-          <button className="btn" onClick={() => openOrganization(selected)}>
-            <Sparkles size={14} />
-            整理为知识页
-          </button>
           <button className="btn" onClick={() => openBulkRecycle()}>
             <Trash2 size={14} />
             移入回收站
           </button>
+          <BulkActionsMenu onOrganize={() => openOrganization(selected)} />
           <button className="text-button" onClick={() => setSelected([])}>
             取消选择
           </button>
@@ -497,10 +331,7 @@ export default function LibrarySection({
                 <button
                   className="icon-btn"
                   aria-label={`管理 ${s.title}`}
-                  onClick={() => {
-                    setDetailId(s.id);
-                    setModal("details");
-                  }}
+                  onClick={() => openSourceDetail(s.id)}
                 >
                   <MoreHorizontal size={18} />
                 </button>
@@ -510,20 +341,16 @@ export default function LibrarySection({
         ) : (
           <Empty
             icon={<Library size={32} />}
-            title={
-              search || filter !== "all" || timeFilter !== "all" || selectedTags.length
-                ? "没有找到匹配的资料"
-                : "这里等待着你的第一份资料"
-            }
+            title={search || filtersActive ? "没有找到匹配的资料" : "这里等待着你的第一份资料"}
             text={
               search
                 ? "换一个关键词，或在其他学习空间中查找。"
-                : filter !== "all" || timeFilter !== "all" || selectedTags.length
+                : filtersActive
                   ? "调整资料类型、添加时间或标签筛选，看看其他资料。"
                   : "把文件和网页收集在一起，再慢慢读懂。"
             }
             action={
-              filter !== "all" || timeFilter !== "all" || selectedTags.length ? (
+              filtersActive ? (
                 <button
                   className="btn"
                   onClick={() => {

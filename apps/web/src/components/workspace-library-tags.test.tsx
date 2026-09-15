@@ -119,6 +119,20 @@ describe("Workspace library tag filters", () => {
     return control as HTMLInputElement;
   }
 
+  /** Type, time and tags now share one filter popover in the toolbar. */
+  function filterTrigger(activeCount = 0) {
+    const label = activeCount ? `筛选资料，已应用 ${activeCount} 项` : "筛选资料";
+    return host.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);
+  }
+
+  async function openFilterMenu() {
+    const trigger = [...host.querySelectorAll<HTMLButtonElement>("button")].find((button) =>
+      button.getAttribute("aria-label")?.startsWith("筛选资料"),
+    );
+    expect(trigger, "filter trigger").toBeInstanceOf(HTMLButtonElement);
+    if (trigger!.getAttribute("aria-expanded") !== "true") await act(async () => trigger!.click());
+  }
+
   function visibleTitles() {
     return [...host.querySelectorAll(".source-row .source-open b")].map((item) => item.textContent);
   }
@@ -128,10 +142,9 @@ describe("Workspace library tag filters", () => {
     const second = data.sources[1]!;
     expect(visibleTitles()).toEqual([first.title, second.title]);
 
-    const trigger = host.querySelector<HTMLButtonElement>('[aria-label="筛选资料标签"]');
-    expect(trigger).toBeInstanceOf(HTMLButtonElement);
-    await act(async () => trigger!.click());
-    expect(host.querySelector('[role="dialog"][aria-label="按标签筛选资料"]')).toBeTruthy();
+    expect(filterTrigger()).toBeInstanceOf(HTMLButtonElement);
+    await openFilterMenu();
+    expect(host.querySelector('[role="dialog"][aria-label="筛选资料"]')).toBeTruthy();
     expect(host.textContent).toContain("仅显示同时具有所选标签的资料");
 
     await act(async () => tagControl("机器学习").click());
@@ -151,8 +164,7 @@ describe("Workspace library tag filters", () => {
   });
 
   it("drops tags that do not exist after the library scope changes", async () => {
-    const trigger = host.querySelector<HTMLButtonElement>('[aria-label="筛选资料标签"]');
-    await act(async () => trigger!.click());
+    await openFilterMenu();
     await act(async () => tagControl("机器学习").click());
     expect(window.location.hash).toContain("tag=");
 
@@ -165,13 +177,14 @@ describe("Workspace library tag filters", () => {
       window.dispatchEvent(new HashChangeEvent("hashchange"));
     });
 
-    expect(host.querySelector('[aria-label="筛选资料标签"]')).toBeTruthy();
+    expect(filterTrigger()).toBeTruthy();
     expect(window.location.hash).toBe("#library/inbox");
   });
 
   it("filters by a rolling creation window and restores it from browser history", async () => {
     const first = data.sources[0]!;
     const second = data.sources[1]!;
+    await openFilterMenu();
     const control = host.querySelector<HTMLSelectElement>(
       'select[aria-label="按添加时间筛选资料"]',
     );
@@ -183,6 +196,7 @@ describe("Workspace library tag filters", () => {
     });
     expect(visibleTitles()).toEqual([first.title]);
     expect(window.location.hash).toBe(`#library/${spaceId}?time=7d`);
+    expect(filterTrigger(1)).toBeTruthy();
 
     await act(async () => {
       window.history.replaceState(null, "", `#library/${spaceId}?time=365d`);
@@ -222,17 +236,16 @@ describe("Workspace library tag filters", () => {
     expect(window.location.hash).toBe(
       `#library/${hydratedSpaceId}?tag=%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0`,
     );
-    expect(host.querySelector('[aria-label="筛选资料标签，已选 1 项"]')).toBeTruthy();
+    expect(filterTrigger(1)).toBeTruthy();
     expect(visibleTitles()).toEqual([hydrated.sources[0]!.title]);
   });
 
-  it("closes the tag dialog with Escape while keeping its selected state", async () => {
-    const trigger = host.querySelector<HTMLButtonElement>('[aria-label="筛选资料标签"]');
-    await act(async () => trigger!.click());
+  it("closes the filter dialog with Escape while keeping its selected state", async () => {
+    await openFilterMenu();
     await act(async () => tagControl("机器学习").click());
     await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
 
-    expect(host.querySelector('[role="dialog"][aria-label="按标签筛选资料"]')).toBeNull();
-    expect(host.querySelector('[aria-label="筛选资料标签，已选 1 项"]')).toBeTruthy();
+    expect(host.querySelector('[role="dialog"][aria-label="筛选资料"]')).toBeNull();
+    expect(filterTrigger(1)).toBeTruthy();
   });
 });

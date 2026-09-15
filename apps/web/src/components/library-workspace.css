@@ -249,7 +249,7 @@
 
 @media (max-width: 1199px) {
   .library-workspace .filter-select,
-  .library-workspace .tag-filter-trigger {
+  .library-workspace .library-menu-trigger {
     min-height: 44px;
   }
 
