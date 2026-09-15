@@ -3,8 +3,6 @@ import {
   ArrowUpRight,
   BookOpen,
   ChevronRight,
-  FolderOpen,
-  Library,
   Plus,
   Sparkles,
   StickyNote,
@@ -31,7 +29,6 @@ export type HomeSectionProps = {
   navigate: (section: "library" | "questions") => void;
   openImport: () => void;
   openSpaceCreation: (intent?: "browse" | "import") => void;
-  chooseSpace: (id: string) => void;
   openSource: (id: string) => void;
   openNote: (id: string) => void;
   openConversation: (conversation: Conversation) => void;
@@ -51,7 +48,6 @@ export default function HomeSection({
   navigate,
   openImport,
   openSpaceCreation,
-  chooseSpace,
   openSource,
   openNote,
   openConversation,
@@ -69,23 +65,6 @@ export default function HomeSection({
           <Plus size={16} />
           导入资料
         </button>
-      </div>
-      <div className="overview-strip">
-        <div>
-          <Library size={18} />
-          <b>{visibleSources.length}</b>
-          <span>份学习资料</span>
-        </div>
-        <div>
-          <StickyNote size={18} />
-          <b>{scopedNotes.filter((n) => n.kind === "note").length}</b>
-          <span>篇自己的理解</span>
-        </div>
-        <div>
-          <BookOpen size={18} />
-          <b>{scopedNotes.filter((n) => n.kind === "knowledge").length}</b>
-          <span>个知识页</span>
-        </div>
       </div>
       <div className="section-heading">
         <h2>继续学习</h2>
@@ -212,65 +191,29 @@ export default function HomeSection({
           暂时没有待解决的问题。阅读时提出一个问题，它会保留在这里。
         </div>
       )}
-      <div className="home-columns">
-        <div>
-          <div className="section-heading">
-            <h2>学习空间</h2>
-            <button className="text-button" onClick={() => openSpaceCreation()}>
-              <Plus size={14} />
-              新建
-            </button>
-          </div>
-          {data.spaces.filter((s) => !s.archived).length ? (
-            <div className="space-cards">
-              {data.spaces
-                .filter((s) => !s.archived)
-                .map((s) => (
-                  <button key={s.id} className="space-card" onClick={() => chooseSpace(s.id)}>
-                    <span className="space-folder" style={{ color: s.color }}>
-                      <FolderOpen size={22} />
-                    </span>
-                    <div>
-                      <b>{s.name}</b>
-                      <p>
-                        {s.goal ||
-                          `${data.sources.filter((x) => !x.deletedAt && x.spaceIds.includes(s.id)).length} 份资料`}
-                      </p>
-                    </div>
-                    <ChevronRight size={15} />
-                  </button>
-                ))}
-            </div>
-          ) : (
-            <div className="empty-small">按主题创建一个空间，让相关资料聚在一起。</div>
-          )}
-        </div>
-        <div>
-          <div className="section-heading">
-            <h2>最近的笔记</h2>
-            <button className="text-button" onClick={() => newNote("note")}>
-              <Plus size={14} />
-              写笔记
-            </button>
-          </div>
-          {scopedNotes.length ? (
-            <div className="space-cards">
-              {scopedNotes.slice(0, 3).map((n) => (
-                <button className="space-card" key={n.id} onClick={() => openNote(n.id)}>
-                  <StickyNote size={20} />
-                  <div>
-                    <b>{n.title}</b>
-                    <p>{plain(n.content).slice(0, 55) || "写下你的第一个想法"}</p>
-                  </div>
-                  <ChevronRight size={15} />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-small">读到有启发的地方，就把自己的理解写下来。</div>
-          )}
-        </div>
+      <div className="section-heading">
+        <h2>最近的笔记</h2>
+        <button className="text-button" onClick={() => newNote("note")}>
+          <Plus size={14} />
+          写笔记
+        </button>
       </div>
+      {scopedNotes.length ? (
+        <div className="recent-note-grid">
+          {scopedNotes.slice(0, 3).map((n) => (
+            <button className="space-card" key={n.id} onClick={() => openNote(n.id)}>
+              <StickyNote size={20} />
+              <div>
+                <b>{n.title}</b>
+                <p>{plain(n.content).slice(0, 55) || "写下你的第一个想法"}</p>
+              </div>
+              <ChevronRight size={15} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-small">读到有启发的地方，就把自己的理解写下来。</div>
+      )}
     </>
   );
 }

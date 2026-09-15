@@ -680,38 +680,6 @@ h1 {
   flex: 1;
   min-width: 0;
 }
-.overview-strip {
-  display: flex;
-  align-items: center;
-  background: #fafafa;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 22px 26px;
-  margin-bottom: 32px;
-}
-.overview-strip > div {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-left: 24px;
-  border-left: 1px solid #e6e6e6;
-}
-.overview-strip > div:first-child {
-  padding-left: 0;
-  border: 0;
-}
-.overview-strip svg {
-  color: #999;
-}
-.overview-strip b {
-  font-size: 22px;
-  font-weight: 550;
-}
-.overview-strip span {
-  font-size: 11px;
-  color: #888;
-}
 .section-heading {
   display: flex;
   align-items: center;
@@ -856,10 +824,10 @@ h1 {
   gap: 10px;
   justify-content: center;
 }
-.home-columns {
+.recent-note-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 30px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 .pending-question-heading {
   margin-top: 4px;
@@ -910,11 +878,6 @@ h1 {
 .pending-question-card > svg:last-child {
   color: #aaa;
 }
-.space-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 .space-card {
   display: flex;
   align-items: center;
@@ -946,12 +909,6 @@ h1 {
 }
 .space-card > svg {
   color: #999;
-}
-.space-folder {
-  padding: 10px;
-  background: #f6f5fb;
-  border-radius: 7px;
-  display: flex;
 }
 .empty-small {
   color: #999;
@@ -2995,18 +2952,8 @@ h1 {
   .continue-card {
     padding: 16px;
   }
-  .overview-strip {
-    padding: 18px;
-  }
-  .overview-strip > div {
-    padding-left: 15px;
+  .recent-note-grid {
     gap: 8px;
-  }
-  .overview-strip span {
-    font-size: 10px;
-  }
-  .home-columns {
-    gap: 18px;
   }
   .note-paper {
     margin: 20px;
@@ -3064,25 +3011,9 @@ h1 {
     padding-top: 10px;
     grid-column: 2;
   }
-  .home-columns {
+  .recent-note-grid {
     grid-template-columns: 1fr;
-    gap: 28px;
-  }
-  .overview-strip {
-    padding: 15px 12px;
-  }
-  .overview-strip > div {
-    flex-wrap: wrap;
-    gap: 5px;
-  }
-  .overview-strip svg {
-    width: 15px;
-  }
-  .overview-strip b {
-    font-size: 19px;
-  }
-  .overview-strip span {
-    width: 100%;
+    gap: 8px;
   }
   .topbar {
     padding: 0 16px;
@@ -3271,9 +3202,6 @@ h1 {
   }
   .eyebrow {
     font-size: 10px;
-  }
-  .overview-strip {
-    margin-bottom: 27px;
   }
   .welcome-card {
     padding: 32px 16px 26px;

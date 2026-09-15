@@ -2833,7 +2833,6 @@ export default function Workspace({
                 navigate={navigate}
                 openImport={openImport}
                 openSpaceCreation={openSpaceCreation}
-                chooseSpace={chooseSpace}
                 openSource={openSource}
                 openNote={openNote}
                 openConversation={openConversation}
