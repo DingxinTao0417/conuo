@@ -18,7 +18,6 @@ export type WorkspaceSidebarProps = {
   currentSource: Source | undefined;
   currentNote: Note | undefined;
   pinnedSources: Source[];
-  activeTaskCount: number;
   navigate: (section: Section) => void;
   openCollectionHome: () => void;
   chooseSpace: (id: string) => void;
@@ -40,7 +39,6 @@ export default function WorkspaceSidebar({
   currentSource,
   currentNote,
   pinnedSources,
-  activeTaskCount,
   navigate,
   openCollectionHome,
   chooseSpace,
@@ -80,7 +78,6 @@ export default function WorkspaceSidebar({
               {key === "library" && (
                 <span className="nav-count">{data.sources.filter((s) => !s.deletedAt).length}</span>
               )}
-              {key === "tasks" && <span className="nav-count">{activeTaskCount || ""}</span>}
             </button>
           ))}
         </nav>

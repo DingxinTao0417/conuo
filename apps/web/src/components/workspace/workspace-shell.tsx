@@ -2048,7 +2048,6 @@ export default function Workspace({
         currentSource={currentSource}
         currentNote={currentNote}
         pinnedSources={pinnedSources}
-        activeTaskCount={activeTaskCount}
         navigate={navigate}
         openCollectionHome={openCollectionHome}
         chooseSpace={chooseSpace}
@@ -2071,9 +2070,11 @@ export default function Workspace({
             activeSpace={activeSpace}
             currentSource={currentSource}
             currentNote={currentNote}
+            activeTaskCount={activeTaskCount}
             setSidebar={setSidebar}
             openCollectionHome={openCollectionHome}
             openAllSourcesSearch={openAllSourcesSearch}
+            navigate={navigate}
             setModal={setModal}
           />
         )}

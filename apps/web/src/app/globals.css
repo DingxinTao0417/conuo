@@ -386,6 +386,7 @@ svg {
   flex-shrink: 0;
 }
 .topbar-search-trigger,
+.topbar-tasks,
 .topbar-account {
   display: inline-flex;
   align-items: center;
@@ -398,16 +399,35 @@ svg {
   line-height: 1;
   white-space: nowrap;
 }
+.topbar-tasks {
+  gap: 5px;
+  padding: 0 7px;
+}
+.topbar-tasks.has-pending {
+  color: var(--brand);
+}
+.topbar-task-count {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--brand);
+  color: white;
+  font-size: 9px;
+  font-weight: 600;
+  text-align: center;
+}
 .topbar-search-trigger {
   gap: 7px;
   padding: 0 8px;
 }
 .topbar-search-trigger:hover,
+.topbar-tasks:hover,
 .topbar-account:hover {
   background: var(--bg-base-tertiary);
   color: var(--text-default);
 }
 .topbar-search-trigger:focus-visible,
+.topbar-tasks:focus-visible,
 .topbar-account:focus-visible,
 .space-context-tabs button:focus-visible {
   outline: 2px solid var(--border-brand);

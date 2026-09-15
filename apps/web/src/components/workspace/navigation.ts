@@ -1,4 +1,4 @@
-import { BookOpen, History, LayoutGrid, Library, Sparkles, StickyNote, Tag } from "lucide-react";
+import { BookOpen, LayoutGrid, Library, Sparkles, StickyNote } from "lucide-react";
 
 /** Top-level workspace views. Everything else (reader, note page, modals) layers on top. */
 export type Section =
@@ -21,15 +21,20 @@ export const spaceTabs = [
 ] as const;
 export type SpaceTab = (typeof spaceTabs)[number][0];
 
-/** Primary sidebar navigation entries, in display order. */
+/**
+ * Primary sidebar navigation entries, in display order.
+ *
+ * `organize` and `tasks` are deliberately absent: AI organization is reached
+ * from the knowledge library's "从资料生成" flow and from the task center, and
+ * the task center itself is a topbar action with a pending-work badge. Both
+ * still resolve as `#organize` / `#tasks` routes, so existing links keep working.
+ */
 export const sections = [
   ["home", "学习概览", LayoutGrid],
   ["library", "资料库", Library],
   ["questions", "我的问答", Sparkles],
   ["notes", "我的笔记", StickyNote],
   ["knowledge", "知识页", BookOpen],
-  ["organize", "AI 整理", Tag],
-  ["tasks", "任务中心", History],
 ] as const;
 
 export const labels: Record<Section, string> = {

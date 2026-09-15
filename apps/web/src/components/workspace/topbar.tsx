@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Cloud,
   History,
+  ListChecks,
   Loader2,
   Menu,
   Search,
@@ -26,9 +27,12 @@ export type WorkspaceTopbarProps = {
   activeSpace: Space | undefined;
   currentSource: Source | undefined;
   currentNote: Note | undefined;
+  /** Import and AI-organization work still running, shown as a task badge. */
+  activeTaskCount: number;
   setSidebar: (open: boolean) => void;
   openCollectionHome: () => void;
   openAllSourcesSearch: () => void;
+  navigate: (section: "tasks") => void;
   setModal: (modal: "account") => void;
 };
 
@@ -45,9 +49,11 @@ export default function WorkspaceTopbar({
   activeSpace,
   currentSource,
   currentNote,
+  activeTaskCount,
   setSidebar,
   openCollectionHome,
   openAllSourcesSearch,
+  navigate,
   setModal,
 }: WorkspaceTopbarProps) {
   return (
@@ -108,6 +114,16 @@ export default function WorkspaceTopbar({
           )}
           <span>{saveLabel}</span>
         </span>
+        <button
+          type="button"
+          className={`topbar-tasks${activeTaskCount ? " has-pending" : ""}`}
+          onClick={() => navigate("tasks")}
+          aria-label={activeTaskCount ? `任务中心，${activeTaskCount} 项正在进行` : "任务中心"}
+          title="任务中心"
+        >
+          <ListChecks size={16} />
+          {activeTaskCount > 0 && <span className="topbar-task-count">{activeTaskCount}</span>}
+        </button>
         <button
           className="topbar-account"
           onClick={() => setModal("account")}
