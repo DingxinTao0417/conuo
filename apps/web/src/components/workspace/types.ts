@@ -8,3 +8,11 @@ export type WorkspaceStorageMode = "hybrid" | "cloud";
 
 /** A question hand-off from workspace search into the cross-library ask panel. */
 export type CrossLibrarySearchDraft = WorkspaceSearchAskDraft & { id: string };
+
+/** A search hit to highlight inside the note editor once the matching revision is open. */
+export type NoteSearchTarget = {
+  noteId: string;
+  revision: number;
+  updatedAt: string;
+  text: string;
+};
