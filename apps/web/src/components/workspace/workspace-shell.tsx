@@ -30,15 +30,10 @@ import {
   formatLibraryRoute,
   normalizeLibraryTags,
   parseLibraryRoute,
-  type LibraryFilter,
   type LibraryRoute,
 } from "@/lib/library-route";
-import {
-  isCreatedWithinLibraryRange,
-  libraryCreatedRange,
-  type LibraryTimeFilter,
-} from "@/lib/library-time-filter";
-import { defaultLibrarySort, sortLibrarySources, type LibrarySort } from "@/lib/library-sort";
+import { isCreatedWithinLibraryRange, libraryCreatedRange } from "@/lib/library-time-filter";
+import { defaultLibrarySort, sortLibrarySources } from "@/lib/library-sort";
 import {
   formatWorkspaceSectionRoute,
   isScopedWorkspaceSection,
@@ -102,7 +97,7 @@ import {
 } from "@/lib/excerpt-to-knowledge";
 import CollectionLibrary from "../collection-library";
 import "../library-workspace.css";
-import type { WorkspaceSearchAskDraft, WorkspaceSearchIntent } from "../workspace-search";
+import type { WorkspaceSearchAskDraft } from "../workspace-search";
 import type { RecoverableDraftItem } from "../recoverable-drafts-panel";
 import type { SearchHit } from "@/lib/search-types";
 import { knowledgeBlocks } from "@/lib/knowledge-update";
@@ -167,6 +162,7 @@ import {
 } from "./lazy-panels";
 import type { CrossLibrarySearchDraft, NoteSearchTarget, WorkspaceModal } from "./types";
 import { useExportFlow } from "./hooks/use-export-flow";
+import { useLibraryRoute } from "./hooks/use-library-route";
 import NotePage from "./note-page/note-page";
 import { labels, spaceTabs, type Section, type SpaceTab } from "./navigation";
 import WorkspaceSidebar from "./sidebar";
@@ -248,11 +244,35 @@ export default function Workspace({
     anonymousMigration?.kind === "pending" || anonymousMigration?.kind === "migrating";
   const cloudConfigured = isCloudConfigured();
   const [section, setSection] = useState<Section>("home");
-  const [spaceId, setSpaceId] = useState("all");
+  const {
+    spaceId,
+    setSpaceId,
+    libraryFiles,
+    setLibraryFiles,
+    crossLibraryAsk,
+    setCrossLibraryAsk,
+    search,
+    setSearch,
+    searchIntent,
+    setSearchIntent,
+    collectionSearch,
+    setCollectionSearch,
+    filter,
+    setFilter,
+    timeFilter,
+    setTimeFilter,
+    sort,
+    setSort,
+    selectedTags,
+    setSelectedTags,
+    layout,
+    setLayout,
+    currentLibraryViewRoute,
+    applyRoute: applyLibraryRoute,
+    replaceLibraryView,
+  } = useLibraryRoute();
   const [questionHistoryFilter, setQuestionHistoryFilter] = useState<QuestionHistoryFilter>("all");
   const [knowledgeFilter, setKnowledgeFilter] = useState<KnowledgeLibraryFilter>("all");
-  const [libraryFiles, setLibraryFiles] = useState(false);
-  const [crossLibraryAsk, setCrossLibraryAsk] = useState<{ conversationId?: string } | null>(null);
   const [crossLibrarySearchDraft, setCrossLibrarySearchDraft] =
     useState<CrossLibrarySearchDraft | null>(null);
   const [crossLibraryAskPanelKey, setCrossLibraryAskPanelKey] = useState("cross-library-ask");
@@ -289,15 +309,7 @@ export default function Workspace({
   const [knowledgeUpdateOpen, setKnowledgeUpdateOpen] = useState(false);
   const [conceptRelationsOpen, setConceptRelationsOpen] = useState(false);
   const [knowledgeEvidenceAskOpen, setKnowledgeEvidenceAskOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [searchIntent, setSearchIntent] = useState<WorkspaceSearchIntent>("keyword");
-  const [collectionSearch, setCollectionSearch] = useState("");
-  const [filter, setFilter] = useState<LibraryFilter>("all");
-  const [timeFilter, setTimeFilter] = useState<LibraryTimeFilter>("all");
-  const [sort, setSort] = useState<LibrarySort>(defaultLibrarySort);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
-  const [layout, setLayout] = useState<"grid" | "list">("list");
   const [sidebar, setSidebar] = useState(false);
   const [modal, setModal] = useState<WorkspaceModal>(null);
   const [readingPositionResolutionEpoch, setReadingPositionResolutionEpoch] = useState(0);
@@ -370,31 +382,6 @@ export default function Workspace({
   const searchRef = useRef<HTMLInputElement>(null);
   const tagFilterRef = useRef<HTMLDivElement>(null);
   const latestSources = useRef(data.sources);
-  const currentLibraryViewRoute = useMemo<LibraryRoute>(
-    () => ({
-      spaceId,
-      files: libraryFiles,
-      filter,
-      time: timeFilter,
-      sort,
-      layout,
-      query: libraryFiles ? search : collectionSearch,
-      ...(selectedTags.length ? { tags: selectedTags } : {}),
-      ...(crossLibraryAsk ? { crossLibraryAsk } : {}),
-    }),
-    [
-      collectionSearch,
-      crossLibraryAsk,
-      filter,
-      layout,
-      libraryFiles,
-      search,
-      selectedTags,
-      sort,
-      spaceId,
-      timeFilter,
-    ],
-  );
   const latestLibraryViewRoute = useRef(currentLibraryViewRoute);
   const handledInvalidSourceRoute = useRef<string | null>(null);
   const pendingSearchFocus = useRef(false);
@@ -691,17 +678,7 @@ export default function Workspace({
     (route: LibraryRoute) => {
       clearConversationRouteState();
       setSection("library");
-      setSpaceId(route.spaceId);
-      setLibraryFiles(route.files);
-      setFilter(route.filter);
-      if (route.filter === "note" || route.filter === "knowledge") setSearchIntent("keyword");
-      setTimeFilter(route.time);
-      setSort(route.sort);
-      setLayout(route.layout);
-      setSelectedTags(normalizeLibraryTags(route.tags));
-      setSearch(route.files ? route.query : "");
-      setCollectionSearch(route.files ? "" : route.query);
-      setCrossLibraryAsk(route.crossLibraryAsk ?? null);
+      applyLibraryRoute(route);
       setCrossLibrarySearchDraft(null);
       setComparisonRoute(null);
       setComparisonTargetId("");
@@ -713,13 +690,11 @@ export default function Workspace({
       setSidebar(false);
     },
     [
+      applyLibraryRoute,
       clearConversationRouteState,
       setComparisonTargetId,
       setCrossLibrarySearchDraft,
-      setSearch,
-      setSearchIntent,
       setSelected,
-      setSpaceId,
     ],
   );
 
@@ -750,43 +725,6 @@ export default function Workspace({
     },
     [applyLibraryRouteState, setDetailId, setModal, setPendingNoteCitation, setToast],
   );
-
-  function replaceLibraryView(
-    patch: Partial<
-      Pick<
-        LibraryRoute,
-        "filter" | "time" | "sort" | "layout" | "query" | "tags" | "crossLibraryAsk"
-      >
-    >,
-  ) {
-    const next: LibraryRoute = {
-      spaceId,
-      files: libraryFiles,
-      filter,
-      time: timeFilter,
-      sort,
-      layout,
-      query: libraryFiles ? search : collectionSearch,
-      ...(selectedTags.length ? { tags: selectedTags } : {}),
-      ...(crossLibraryAsk ? { crossLibraryAsk } : {}),
-      ...patch,
-    };
-    setFilter(next.filter);
-    if (next.filter === "note" || next.filter === "knowledge") setSearchIntent("keyword");
-    setTimeFilter(next.time);
-    setSort(next.sort);
-    setLayout(next.layout);
-    setSelectedTags(normalizeLibraryTags(next.tags));
-    if (next.files) {
-      setSearch(next.query);
-      setCollectionSearch("");
-    } else {
-      setCollectionSearch(next.query);
-      setSearch("");
-    }
-    setCrossLibraryAsk(next.crossLibraryAsk ?? null);
-    window.history.replaceState(null, "", formatLibraryRoute(next));
-  }
 
   function setActiveCrossLibraryConversation(
     conversationId?: string,
@@ -873,7 +811,15 @@ export default function Workspace({
     setNoteSearchTarget(undefined);
     setReadingConflictPlanSnapshot(null);
     setToast("");
-  }, [accountDeletionState, accountAccessVerificationFailed, store.token, resetExport]);
+  }, [
+    accountDeletionState,
+    accountAccessVerificationFailed,
+    store.token,
+    resetExport,
+    setCollectionSearch,
+    setSearch,
+    setSelectedTags,
+  ]);
   useLayoutEffect(() => {
     const previous = sourcePurgeContext.current;
     const current = {
@@ -969,9 +915,16 @@ export default function Workspace({
     clearConversationRouteState,
     layout,
     modal,
+    setCollectionSearch,
     setComparisonTargetId,
+    setCrossLibraryAsk,
+    setFilter,
+    setLibraryFiles,
     setSearch,
     setSelected,
+    setSelectedTags,
+    setSort,
+    setTimeFilter,
     spaceId,
   ]);
 
@@ -1162,6 +1115,17 @@ export default function Workspace({
     ready,
     recoverUnavailableSourceRoute,
     restoreRecognizedContentTarget,
+    setCollectionSearch,
+    setCrossLibraryAsk,
+    setFilter,
+    setLayout,
+    setLibraryFiles,
+    setSearch,
+    setSearchIntent,
+    setSelectedTags,
+    setSort,
+    setSpaceId,
+    setTimeFilter,
   ]);
   function navigate(
     next: Section,
@@ -1538,7 +1502,9 @@ export default function Workspace({
       data,
       setComparisonTargetId,
       setConversationToInspectId,
+      setCrossLibraryAsk,
       setKnowledgeEvidenceAskOpen,
+      setLibraryFiles,
       setModal,
       setPendingNoteCitation,
       setSpaceId,
@@ -1561,7 +1527,7 @@ export default function Workspace({
     setSection("questions");
     setModal(null);
     setConversationRouteIssue("这条问答记录不可用或不属于当前账号。");
-  }, [setConversationToInspectId, setModal]);
+  }, [setConversationToInspectId, setCrossLibraryAsk, setModal]);
 
   useEffect(() => {
     if (!conversationRouteId) {

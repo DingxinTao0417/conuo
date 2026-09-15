@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { persistConversation } from "@/lib/conversations";
 import type { WorkspaceExportScope } from "@/lib/export-scope";
-import { isLibraryFilter, type LibraryFilter, type LibraryRoute } from "@/lib/library-route";
+import { isLibraryFilter, type LibraryFilter } from "@/lib/library-route";
 import { isLibrarySort, type LibrarySort } from "@/lib/library-sort";
 import { isLibraryTimeFilter, type LibraryTimeFilter } from "@/lib/library-time-filter";
 import type { SearchHit } from "@/lib/search-types";
@@ -27,13 +27,10 @@ import WorkspaceSearch, {
   type WorkspaceSearchExternalFilters,
   type WorkspaceSearchIntent,
 } from "../../workspace-search";
+import type { LibraryViewPatch } from "../hooks/use-library-route";
 import { CrossLibraryAskPanel } from "../lazy-panels";
 import { Empty, SourceIcon, date, normalizedTag, sizeLabel, sourceStatusLabel } from "../shared";
 import type { CrossLibrarySearchDraft, WorkspaceStore, WorkspaceUser } from "../types";
-
-export type LibraryViewPatch = Partial<
-  Pick<LibraryRoute, "filter" | "time" | "sort" | "layout" | "query" | "tags" | "crossLibraryAsk">
->;
 
 export type LibrarySectionProps = {
   data: WorkspaceData;
