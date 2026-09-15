@@ -1,0 +1,138 @@
+"use client";
+import {
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  Cloud,
+  History,
+  Loader2,
+  Menu,
+  Search,
+} from "lucide-react";
+import type { Note, Source, Space } from "@/lib/types";
+import { labels, type Section } from "./navigation";
+import type { WorkspaceStore, WorkspaceUser } from "./types";
+
+export type WorkspaceTopbarProps = {
+  user: WorkspaceUser;
+  status: WorkspaceStore["status"];
+  cloudConfigured: boolean;
+  cloudReadOnly: boolean;
+  saveLabel: string;
+  section: Section;
+  isLibraryWorkspace: boolean;
+  isCollectionHome: boolean;
+  libraryTitle: string;
+  activeSpace: Space | undefined;
+  currentSource: Source | undefined;
+  currentNote: Note | undefined;
+  setSidebar: (open: boolean) => void;
+  openCollectionHome: () => void;
+  openAllSourcesSearch: () => void;
+  setModal: (modal: "account") => void;
+};
+
+export default function WorkspaceTopbar({
+  user,
+  status,
+  cloudConfigured,
+  cloudReadOnly,
+  saveLabel,
+  section,
+  isLibraryWorkspace,
+  isCollectionHome,
+  libraryTitle,
+  activeSpace,
+  currentSource,
+  currentNote,
+  setSidebar,
+  openCollectionHome,
+  openAllSourcesSearch,
+  setModal,
+}: WorkspaceTopbarProps) {
+  return (
+    <header className="topbar">
+      <button
+        className="icon-btn mobile-menu"
+        aria-label="打开导航"
+        onClick={() => setSidebar(true)}
+      >
+        <Menu size={19} />
+      </button>
+      {isLibraryWorkspace ? (
+        <>
+          {section === "library" && !isCollectionHome && (
+            <button
+              className="icon-btn library-back"
+              aria-label="返回全部知识库"
+              title="返回全部知识库"
+              onClick={openCollectionHome}
+            >
+              <ArrowLeft size={18} />
+            </button>
+          )}
+          <h1
+            className="collection-home-title"
+            title={section === "library" ? libraryTitle : labels[section]}
+          >
+            {section === "library" ? libraryTitle : labels[section]}
+          </h1>
+        </>
+      ) : (
+        <div className="breadcrumbs">
+          <span>{activeSpace?.name || "我的知识库"}</span>
+          <ChevronRight size={13} />
+          <b>{currentSource?.title || currentNote?.title || labels[section]}</b>
+        </div>
+      )}
+      <div className="topbar-end">
+        <button
+          className="topbar-search-trigger"
+          onClick={openAllSourcesSearch}
+          aria-label={activeSpace ? `搜索当前空间：${activeSpace.name}` : "搜索资料"}
+          title={activeSpace ? `搜索当前空间：${activeSpace.name}` : "搜索资料"}
+        >
+          <Search size={16} />
+          <span>{activeSpace ? "搜索当前空间" : "搜索资料"}</span>
+          <kbd>Ctrl K</kbd>
+        </button>
+        <span className={`save-status save-${cloudReadOnly ? "readonly" : status}`} role="status">
+          {status === "saving" || status === "loading" ? (
+            <Loader2 size={14} className="spin" />
+          ) : status === "cloud" || cloudReadOnly ? (
+            <Cloud size={14} />
+          ) : status === "local" ? (
+            <Check size={14} />
+          ) : (
+            <History size={14} />
+          )}
+          <span>{saveLabel}</span>
+        </span>
+        <button
+          className="topbar-account"
+          onClick={() => setModal("account")}
+          disabled={status === "saving"}
+          aria-label={
+            user && cloudConfigured
+              ? `账号与云端保存：${user.email}`
+              : cloudConfigured
+                ? "登录以连接云端"
+                : "本机工作区"
+          }
+          title={
+            user && cloudConfigured
+              ? "账号与云端保存"
+              : cloudConfigured
+                ? "登录以连接云端"
+                : "本机工作区"
+          }
+        >
+          <span className="topbar-avatar">{user?.email.slice(0, 1).toUpperCase() || "C"}</span>
+          <span className="topbar-account-label">
+            {user && cloudConfigured ? user.email : cloudConfigured ? "登录" : "本机"}
+          </span>
+        </button>
+      </div>
+    </header>
+  );
+}
