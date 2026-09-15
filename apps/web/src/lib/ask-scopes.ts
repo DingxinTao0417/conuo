@@ -16,6 +16,7 @@ export type AskScope =
   | "document"
   | "document-notes"
   | "sources"
+  | "comparison"
   | "note-evidence"
   | "space"
   | "cross-library";
@@ -25,6 +26,7 @@ export const askScopeServerScope: Record<AskScope, Scope> = {
   document: "document",
   "document-notes": "document-notes",
   sources: "sources",
+  comparison: "sources",
   "note-evidence": "sources",
   space: "space",
   "cross-library": "cross-library-sources",
@@ -35,6 +37,7 @@ export const askScopeLabels: Record<AskScope, string> = {
   document: "当前资料",
   "document-notes": "此资料 + 我的笔记",
   sources: "选定资料",
+  comparison: "对照的两份资料",
   "note-evidence": "本页引用的资料",
   space: "当前学习空间",
   "cross-library": "跨知识库固定资料",
@@ -60,6 +63,9 @@ export const readerAskScopes: DocumentAskScope[] = [
 export function documentAskScopeOf(scope: Scope): DocumentAskScope {
   return scope === "cross-library-sources" ? "document-notes" : scope;
 }
+
+/** Side-by-side reading is locked to the two source versions on screen. */
+export const comparisonAskScopes: AskScope[] = ["comparison"];
 
 /** A knowledge page may only ask about the original sources it already cites. */
 export const noteAskScopes: AskScope[] = ["note-evidence"];

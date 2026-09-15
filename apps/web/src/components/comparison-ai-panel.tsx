@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   ArrowUp,
   ArrowUpRight,
@@ -31,6 +31,7 @@ import type {
   Source,
   Space,
 } from "@/lib/types";
+import { useAskConversation } from "./ai/use-ask-conversation";
 import { citationProblem } from "./reader-utils";
 import "./comparison-ai-panel.css";
 
@@ -226,23 +227,32 @@ export default function ComparisonAskPanel({
         .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
     [conversations, route],
   );
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(
-    () => initialConversationId ?? null,
-  );
-  const [newConversation, setNewConversation] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [stopping, setStopping] = useState(false);
-  const [answerDraft, setAnswerDraft] = useState<AnswerResult | null>(null);
-  const [answerPhase, setAnswerPhase] = useState<keyof typeof phaseLabels>("retrieving");
-  const [error, setError] = useState("");
-  const controller = useRef<AbortController | null>(null);
-  const manuallyStoppedController = useRef<AbortController | null>(null);
-  const answerDraftRef = useRef<AnswerResult | null>(null);
+  // The panel keeps its own presentation, but shares the request lifecycle with
+  // every other question surface so stop, abort and late-event handling behave
+  // identically here.
+  const ask = useAskConversation();
+  const {
+    input,
+    setInput,
+    busy,
+    stopping,
+    answerDraft,
+    answerPhase,
+    error,
+    setError,
+    historyOpen,
+    setHistoryOpen,
+    selectedConversationId,
+    setSelectedConversationId,
+    newConversation,
+    setNewConversation,
+    questionInput: inputRef,
+    reset: resetAsk,
+    running: askRunning,
+    stop,
+  } = ask;
   const activeIdentity = useRef(identity);
   const consumedInitialConversationId = useRef<string | null>(null);
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const activeConversationId =
     selectedConversationId && history.some((item) => item.id === selectedConversationId)
@@ -254,27 +264,12 @@ export default function ComparisonAskPanel({
   const messages = conversation?.messages || [];
   const sources = [leftSource, rightSource];
 
-  function replaceAnswerDraft(value: AnswerResult | null) {
-    answerDraftRef.current = value;
-    setAnswerDraft(value);
-  }
-
-  useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
     if (activeIdentity.current === identity) return;
-    controller.current?.abort();
     activeIdentity.current = identity;
     consumedInitialConversationId.current = null;
-    setSelectedConversationId(null);
-    setNewConversation(false);
-    setHistoryOpen(false);
-    setInput("");
-    setBusy(false);
-    setStopping(false);
-    setError("");
-    replaceAnswerDraft(null);
-    manuallyStoppedController.current = null;
-  }, [identity]);
+    resetAsk();
+  }, [identity, resetAsk]);
   useEffect(() => {
     if (!initialConversationId) {
       consumedInitialConversationId.current = null;
@@ -289,31 +284,20 @@ export default function ComparisonAskPanel({
     consumedInitialConversationId.current = initialConversationId;
     setSelectedConversationId(initialConversationId);
     setNewConversation(false);
-  }, [history, initialConversationId]);
+  }, [history, initialConversationId, setNewConversation, setSelectedConversationId]);
   useEffect(() => {
     const frame = requestAnimationFrame(() => inputRef.current?.focus());
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [inputRef]);
 
-  function beginNewConversation() {
-    setNewConversation(true);
-    setSelectedConversationId(null);
-    setHistoryOpen(false);
-    setInput("");
-    setError("");
+  function startNewConversation() {
+    ask.beginNewConversation();
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
-  function stop() {
-    if (!controller.current) return;
-    manuallyStoppedController.current = controller.current;
-    setStopping(true);
-    controller.current.abort(new DOMException("已停止", "AbortError"));
-  }
-
-  async function ask() {
+  async function send() {
     const question = input.trim();
-    if (!question || busy || controller.current) return;
+    if (!question || busy || askRunning()) return;
     if (unavailableReason) {
       setError(unavailableReason);
       return;
@@ -349,14 +333,6 @@ export default function ComparisonAskPanel({
     setSelectedConversationId(next.id);
     setNewConversation(false);
     setInput("");
-    setError("");
-    replaceAnswerDraft(null);
-    setAnswerPhase("retrieving");
-    setBusy(true);
-    setStopping(false);
-    manuallyStoppedController.current = null;
-    const requestController = new AbortController();
-    controller.current = requestController;
     const attempt: AnswerAttempt = {
       id: crypto.randomUUID(),
       questionMessageId: questionMessage.id,
@@ -374,81 +350,55 @@ export default function ComparisonAskPanel({
       status: "completed",
     };
 
-    try {
-      const answer = await onAsk(
-        {
-          requestId: attempt.id,
-          question,
-          ...(userContext.length ? { userContext } : {}),
-        },
-        requestController.signal,
-        (event) => {
-          if (
-            requestController.signal.aborted ||
-            controller.current !== requestController ||
-            activeIdentity.current !== identity
-          )
-            return;
-          if (event.type === "draft") replaceAnswerDraft(event.answer);
-          else setAnswerPhase(event.phase);
-        },
-      );
-      if (requestController.signal.aborted) throw new DOMException("已停止", "AbortError");
-      if (activeIdentity.current !== identity)
-        throw new Error("对照资料已变化，本次回答未保存。请重新确认两份资料后再提问。");
-      const response: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: answer.content,
-        citations: answer.citations,
-        mode: answer.mode,
-        attempt,
-        createdAt: new Date().toISOString(),
-      };
+    const publish = (message: Message) =>
       onConversationChange({
         ...next,
-        messages: [...next.messages, response],
-        updatedAt: response.createdAt,
+        messages: [...next.messages, message],
+        updatedAt: message.createdAt,
       });
-    } catch (cause) {
-      const stoppedByUser = manuallyStoppedController.current === requestController;
-      const partial =
-        stoppedByUser && answerDraftRef.current?.content.trim() ? answerDraftRef.current : null;
-      const message = stoppedByUser
-        ? partial
-          ? "已停止生成，以上内容尚未完成或核验。"
-          : "回答已停止，问题已保留。"
-        : cause instanceof Error
-          ? cause.message
-          : "暂时无法回答，请稍后重试。";
-      const response: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: partial?.content ?? "",
-        citations: partial?.citations ?? [],
-        ...(partial ? { mode: partial.mode } : {}),
-        attempt: { ...attempt, status: stoppedByUser ? "stopped" : "failed" },
-        error: message,
-        createdAt: new Date().toISOString(),
-      };
-      if (activeIdentity.current === identity) {
-        onConversationChange({
-          ...next,
-          messages: [...next.messages, response],
-          updatedAt: response.createdAt,
+    // A learner can swap either document while an answer is running. Anything
+    // that arrives afterwards belongs to the previous pair, so it is dropped
+    // rather than saved into the thread now on screen.
+    const owns = () => activeIdentity.current === identity;
+
+    await ask.run({
+      accepts: owns,
+      dispatch: (signal, onProgress) =>
+        onAsk(
+          {
+            requestId: attempt.id,
+            question,
+            ...(userContext.length ? { userContext } : {}),
+          },
+          signal,
+          onProgress,
+        ),
+      onAnswer: (answer) => {
+        if (!owns()) return;
+        publish({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: answer.content,
+          citations: answer.citations,
+          mode: answer.mode,
+          attempt,
+          createdAt: new Date().toISOString(),
         });
-        setError(message);
-      }
-    } finally {
-      if (controller.current === requestController) {
-        controller.current = null;
-        setBusy(false);
-        setStopping(false);
-        replaceAnswerDraft(null);
-        if (manuallyStoppedController.current === requestController)
-          manuallyStoppedController.current = null;
-      }
-    }
+      },
+      onFailure: ({ message, stoppedByUser, partial }) => {
+        if (!owns()) return;
+        publish({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: partial?.content ?? "",
+          citations: partial?.citations ?? [],
+          ...(partial ? { mode: partial.mode } : {}),
+          attempt: { ...attempt, status: stoppedByUser ? "stopped" : "failed" },
+          error: message,
+          createdAt: new Date().toISOString(),
+        });
+      },
+    });
   }
 
   return (
@@ -475,7 +425,7 @@ export default function ComparisonAskPanel({
             className="icon-btn"
             aria-label="新建对话"
             disabled={busy || !!unavailableReason}
-            onClick={beginNewConversation}
+            onClick={startNewConversation}
           >
             <Plus size={18} aria-hidden="true" />
           </button>
@@ -608,7 +558,7 @@ export default function ComparisonAskPanel({
         className="comparison-ai-composer"
         onSubmit={(event) => {
           event.preventDefault();
-          void ask();
+          void send();
         }}
       >
         {error && <p className="comparison-ai-form-error">{error}</p>}
@@ -624,7 +574,7 @@ export default function ComparisonAskPanel({
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
                 event.preventDefault();
-                void ask();
+                void send();
               }
             }}
           />

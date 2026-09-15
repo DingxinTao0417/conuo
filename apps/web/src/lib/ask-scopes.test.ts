@@ -3,6 +3,7 @@ import { answerRequestFromSnapshot } from "./answer-request";
 import {
   askScopeLabels,
   askScopeServerScope,
+  comparisonAskScopes,
   isSingleDocumentAskScope,
   libraryAskScopes,
   noteAskScopes,
@@ -73,6 +74,7 @@ describe("ask scope enum", () => {
       "document",
       "document-notes",
       "sources",
+      "comparison",
       "note-evidence",
       "space",
       "cross-library",
@@ -88,9 +90,11 @@ describe("ask scope enum", () => {
     expect([...produced].sort()).toEqual([...allServerScopes].sort());
   });
 
-  it("derives a knowledge page's evidence range from the ordinary sources scope", () => {
-    // The page's own citations are a bounded source list, not a new API range.
+  it("derives the pre-bounded ranges from the ordinary sources scope", () => {
+    // A knowledge page's citations and a comparison's two documents are both
+    // bounded source lists the app computes, not new API ranges.
     expect(serverScopeFor("note-evidence")).toBe("sources");
+    expect(serverScopeFor("comparison")).toBe("sources");
     expect(serverScopeFor("sources")).toBe("sources");
   });
 
@@ -102,6 +106,7 @@ describe("ask scope enum", () => {
       "sources",
       "space",
     ]);
+    expect(comparisonAskScopes).toEqual(["comparison"]);
     expect(noteAskScopes).toEqual(["note-evidence"]);
     expect(libraryAskScopes).toEqual(["cross-library"]);
     expect(readerAskScopes.filter(isSingleDocumentAskScope)).toEqual([
