@@ -73,6 +73,25 @@
   }
 }
 
+.note-evidence-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 0;
+  font-size: 11px;
+  color: #404040;
+}
+.note-evidence-source > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.note-evidence-source small {
+  margin-left: auto;
+  color: #999;
+  white-space: nowrap;
+}
 .note-panel-header {
   display: flex;
   align-items: center;

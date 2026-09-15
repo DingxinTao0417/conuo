@@ -50,6 +50,6 @@ export const LegacyBrowserRecoveryPanel = dynamic(
 export const CrossLibraryAskPanel = dynamic(() => import("../cross-library-ask-panel"), {
   ssr: false,
 });
-export const KnowledgeEvidenceAskPanel = dynamic(() => import("../knowledge-evidence-ask-panel"), {
+export const NoteAskPanel = dynamic(() => import("./note-page/note-ask-panel"), {
   ssr: false,
 });

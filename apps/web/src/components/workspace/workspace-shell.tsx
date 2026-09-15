@@ -152,19 +152,14 @@ import {
   BackupRestorePanel,
   ComparisonReader,
   ConceptRelationsPanel,
-  KnowledgeEvidenceAskPanel,
   KnowledgeUpdatePanel,
   LegacyBrowserRecoveryPanel,
+  NoteAskPanel,
   OrganizationPanel,
   Reader,
   TaskCenterPanel,
 } from "./lazy-panels";
-import type {
-  CrossLibrarySearchDraft,
-  NotePanel,
-  NoteSearchTarget,
-  WorkspaceModal,
-} from "./types";
+import type { CrossLibrarySearchDraft, NotePanel, NoteSearchTarget, WorkspaceModal } from "./types";
 import { useExportFlow } from "./hooks/use-export-flow";
 import { useLibraryRoute } from "./hooks/use-library-route";
 import NotePage from "./note-page/note-page";
@@ -2175,7 +2170,7 @@ export default function Workspace({
         }}
       />
     ) : currentNote && currentNote.kind === "knowledge" && notePanel === "ask" ? (
-      <KnowledgeEvidenceAskPanel
+      <NoteAskPanel
         key={`${user?.id || "local"}:${currentNote.id}`}
         data={data}
         note={currentNote}
@@ -2184,7 +2179,7 @@ export default function Workspace({
           update((workspace) => persistConversation(workspace, conversation))
         }
         onOpenSource={openSource}
-        onBack={() => openNotePanel(null)}
+        onClose={() => openNotePanel(null)}
       />
     ) : null;
 

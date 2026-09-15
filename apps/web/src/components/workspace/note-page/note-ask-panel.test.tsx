@@ -3,11 +3,10 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import KnowledgeEvidenceAskPanel, {
-  type KnowledgeEvidenceAskPanelProps,
-} from "./knowledge-evidence-ask-panel";
 import { createDemoWorkspace } from "@/lib/seed";
+import { serverScopeFor } from "@/lib/ask-scopes";
 import type { Citation, Note, Source, WorkspaceData } from "@/lib/types";
+import NoteAskPanel, { type NoteAskPanelProps } from "./note-ask-panel";
 
 function citation(source: Source): Citation {
   const chunk = source.chunks[0]!;
@@ -46,26 +45,28 @@ function setText(element: HTMLTextAreaElement, value: string) {
   element.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-describe("KnowledgeEvidenceAskPanel", () => {
+describe("NoteAskPanel", () => {
   let host: HTMLDivElement;
   let root: Root;
   let data: WorkspaceData;
   let note: Note;
-  let onAsk: ReturnType<typeof vi.fn<KnowledgeEvidenceAskPanelProps["onAsk"]>>;
-  let onConversationChange: ReturnType<
-    typeof vi.fn<KnowledgeEvidenceAskPanelProps["onConversationChange"]>
-  >;
+  let onAsk: ReturnType<typeof vi.fn<NoteAskPanelProps["onAsk"]>>;
+  let onConversationChange: ReturnType<typeof vi.fn<NoteAskPanelProps["onConversationChange"]>>;
 
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
     data = createDemoWorkspace();
     note = acceptedKnowledgePage(data);
-    onAsk = vi.fn<KnowledgeEvidenceAskPanelProps["onAsk"]>(async () => ({
+    onAsk = vi.fn<NoteAskPanelProps["onAsk"]>(async () => ({
       content: "原文检索结果。",
       citations: [citation(data.sources[0]!)],
       mode: "extractive",
     }));
-    onConversationChange = vi.fn<KnowledgeEvidenceAskPanelProps["onConversationChange"]>();
+    onConversationChange = vi.fn<NoteAskPanelProps["onConversationChange"]>();
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -80,24 +81,24 @@ describe("KnowledgeEvidenceAskPanel", () => {
   async function render() {
     await act(async () => {
       root.render(
-        createElement(KnowledgeEvidenceAskPanel, {
+        createElement(NoteAskPanel, {
           data,
           note,
           onAsk,
           onConversationChange,
           onOpenSource: vi.fn(),
-          onBack: vi.fn(),
+          onClose: vi.fn(),
         }),
       );
     });
   }
 
+  const composer = () =>
+    host.querySelector<HTMLTextAreaElement>('textarea[aria-label="基于原始依据提问"]')!;
+
   it("sends only the accepted page's fixed original source range, never its body", async () => {
     await render();
-    const field = host.querySelector<HTMLTextAreaElement>(
-      'textarea[aria-label="基于原始依据提问"]',
-    )!;
-    await act(async () => setText(field, "学习率为什么会让损失振荡？"));
+    await act(async () => setText(composer(), "学习率为什么会让损失振荡？"));
 
     await act(async () => {
       host.querySelector<HTMLButtonElement>('[aria-label="发送问题"]')!.click();
@@ -128,9 +129,16 @@ describe("KnowledgeEvidenceAskPanel", () => {
     await render();
 
     expect(host.textContent).toContain("没有可用于问答的原始资料");
-    expect(
-      host.querySelector<HTMLTextAreaElement>('textarea[aria-label="基于原始依据提问"]')?.disabled,
-    ).toBe(true);
+    expect(composer().disabled).toBe(true);
     expect(host.querySelector<HTMLButtonElement>('[aria-label="发送问题"]')?.disabled).toBe(true);
+  });
+
+  it("offers the page's own range as the only option and never a wider one", async () => {
+    await render();
+
+    // A single allowed range is stated, not offered in a picker that could be widened.
+    expect(host.querySelector(".reader-scope select")).toBeNull();
+    expect(host.querySelector(".reader-scope-fixed")?.textContent).toContain("本页引用的资料");
+    expect(serverScopeFor("note-evidence")).toBe("sources");
   });
 });

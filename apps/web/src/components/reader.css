@@ -985,6 +985,16 @@
   padding: 4px 0;
   cursor: pointer;
 }
+/* A surface with exactly one allowed range states it instead of offering a
+   picker, so the range stays visible without implying it can be widened. */
+.reader-scope-fixed {
+  margin: 0;
+}
+.reader-scope-fixed strong {
+  color: #404040;
+  font-size: 12px;
+  font-weight: 500;
+}
 .reader-source-picker {
   margin: 10px 0 0;
   padding: 9px 10px;

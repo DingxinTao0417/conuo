@@ -46,6 +46,8 @@ export interface AskPanelSurface {
   title: string;
   description: string;
   placeholder: string;
+  /** Accessible name of the composer; defaults to the generic reader wording. */
+  composerLabel?: string;
   footnote: string;
   historyTitle: string;
   historyEmpty: string;
@@ -66,6 +68,11 @@ export interface AskPanelScope {
   detail?: ReactNode;
   /** Prevents sending and is announced next to the composer. */
   blockedMessage?: string;
+  /**
+   * Also disables the composer. Use it when the range cannot come back on its
+   * own; a reader waiting for a source to finish parsing keeps typing instead.
+   */
+  blocksComposer?: boolean;
   /** A non-blocking note, such as how many sources are excluded. */
   notice?: ReactNode;
   /** Host chrome below the range warning, such as "allow this source for AI". */
@@ -74,8 +81,9 @@ export interface AskPanelScope {
 
 export interface AskPanelConversation {
   current?: Conversation;
-  history: readonly Conversation[];
-  onSelect: (conversation: Conversation) => void;
+  /** Omitted on surfaces that keep no saved threads; the control disappears. */
+  history?: readonly Conversation[];
+  onSelect?: (conversation: Conversation) => void;
   onToggleResolved?: (conversation: Conversation) => void;
   onNew?: () => void;
   /** Replaces "正在探索这个问题" for surfaces with a different framing. */
@@ -174,7 +182,11 @@ export default function AskPanel({
   const eligibilityId = surface.eligibilityId ?? `${surface.id}-eligibility`;
   const knowledgePages = answerActions?.knowledgePages ?? [];
   const singleScope = scope.options.length <= 1;
-  const composerDisabled = busy || composer.readOnly || Boolean(composer.disabledMessage);
+  const composerDisabled =
+    busy ||
+    composer.readOnly ||
+    Boolean(composer.disabledMessage) ||
+    Boolean(blocked && scope.blocksComposer);
 
   return (
     <aside
@@ -191,15 +203,17 @@ export default function AskPanel({
           </div>
           <strong>{surface.title}</strong>
           <div className="reader-tool-spacer" />
-          <button
-            className="icon-btn"
-            aria-label="对话历史"
-            aria-expanded={historyOpen}
-            disabled={busy}
-            onClick={() => setHistoryOpen(!historyOpen)}
-          >
-            <History size={16} />
-          </button>
+          {conversation.history && (
+            <button
+              className="icon-btn"
+              aria-label="对话历史"
+              aria-expanded={historyOpen}
+              disabled={busy}
+              onClick={() => setHistoryOpen(!historyOpen)}
+            >
+              <History size={16} />
+            </button>
+          )}
           {conversation.onNew && (
             <button
               className="icon-btn"
@@ -247,7 +261,7 @@ export default function AskPanel({
         )}
         {scope.footer}
       </header>
-      {historyOpen && (
+      {historyOpen && conversation.history && (
         <div className="reader-history">
           <h3>{surface.historyTitle}</h3>
           {conversation.history.length ? (
@@ -255,7 +269,7 @@ export default function AskPanel({
               <button
                 className={conversation.current?.id === item.id ? "reader-active" : ""}
                 key={item.id}
-                onClick={() => conversation.onSelect(item)}
+                onClick={() => conversation.onSelect?.(item)}
               >
                 <MessageSquare size={15} />
                 <span>{item.title}</span>
@@ -705,7 +719,7 @@ export default function AskPanel({
         <div className="reader-input-box">
           <textarea
             ref={questionInput}
-            aria-label="向资料提问"
+            aria-label={surface.composerLabel ?? "向资料提问"}
             aria-describedby={blocked ? eligibilityId : undefined}
             value={input}
             disabled={composerDisabled}
