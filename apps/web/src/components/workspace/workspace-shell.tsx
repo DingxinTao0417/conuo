@@ -159,7 +159,12 @@ import {
   Reader,
   TaskCenterPanel,
 } from "./lazy-panels";
-import type { CrossLibrarySearchDraft, NoteSearchTarget, WorkspaceModal } from "./types";
+import type {
+  CrossLibrarySearchDraft,
+  NotePanel,
+  NoteSearchTarget,
+  WorkspaceModal,
+} from "./types";
 import { useExportFlow } from "./hooks/use-export-flow";
 import { useLibraryRoute } from "./hooks/use-library-route";
 import NotePage from "./note-page/note-page";
@@ -201,6 +206,11 @@ function currentLibraryReturnRoute(hash: string): LibraryRoute {
 
 function replaceWithLibraryRoute(route: LibraryRoute): void {
   window.history.replaceState(null, "", formatLibraryRoute(route));
+}
+
+/** `#note/<id>/<view>` restores which AI review was open beside the page. */
+function notePanelFromRouteView(view: string | undefined): NotePanel {
+  return view === "relations" || view === "update" || view === "ask" ? view : null;
 }
 
 const comparisonUnavailableCopy: Record<ComparisonSourcesUnavailableReason, string> = {
@@ -314,9 +324,7 @@ export default function Workspace({
     ready,
     storageMode === "cloud" ? webReviewDraftStore : undefined,
   );
-  const [knowledgeUpdateOpen, setKnowledgeUpdateOpen] = useState(false);
-  const [conceptRelationsOpen, setConceptRelationsOpen] = useState(false);
-  const [knowledgeEvidenceAskOpen, setKnowledgeEvidenceAskOpen] = useState(false);
+  const [notePanel, setNotePanel] = useState<NotePanel>(null);
   const [sidebar, setSidebar] = useState(false);
   const [modal, setModal] = useState<WorkspaceModal>(null);
   const [readingPositionResolutionEpoch, setReadingPositionResolutionEpoch] = useState(0);
@@ -445,20 +453,11 @@ export default function Workspace({
       ready,
       data,
       noteId:
-        knowledgeUpdateOpen && !sourceId && currentNote?.kind === "knowledge"
+        notePanel === "update" && !sourceId && currentNote?.kind === "knowledge"
           ? currentNote.id
           : null,
     };
-  }, [
-    store.token,
-    user?.id,
-    localCacheMode,
-    ready,
-    data,
-    knowledgeUpdateOpen,
-    sourceId,
-    currentNote,
-  ]);
+  }, [store.token, user?.id, localCacheMode, ready, data, notePanel, sourceId, currentNote]);
   useLayoutEffect(
     () => () => {
       knowledgeWithdrawalContext.current = null;
@@ -973,9 +972,7 @@ export default function Workspace({
       setCrossLibraryAsk(null);
       setCrossLibrarySearchDraft(null);
       setPendingNoteCitation(undefined);
-      setKnowledgeUpdateOpen(type === "note" && view === "update");
-      setConceptRelationsOpen(type === "note" && view === "relations");
-      setKnowledgeEvidenceAskOpen(false);
+      setNotePanel(type === "note" ? notePanelFromRouteView(view) : null);
       if (nextConversationRoute) {
         setQuestionHistoryFilter("all");
         setConversationRouteId(nextConversationRoute.conversationId);
@@ -1133,10 +1130,8 @@ export default function Workspace({
     const currentLibraryTags = selectedTags;
     const currentLibraryTime = timeFilter;
     const currentLibrarySort = sort;
-    setKnowledgeUpdateOpen(false);
+    setNotePanel(null);
     setReaderReturnTarget(null);
-    setConceptRelationsOpen(false);
-    setKnowledgeEvidenceAskOpen(false);
     setComparisonRoute(null);
     setComparisonTargetId("");
     clearConversationRouteState();
@@ -1236,9 +1231,7 @@ export default function Workspace({
     if (section === "library" && !sourceId)
       latestLibraryViewRoute.current = currentLibraryViewRoute;
     const nextReturnTarget = returnTarget ?? (sourceId ? readerReturnTarget : null);
-    setKnowledgeUpdateOpen(false);
-    setConceptRelationsOpen(false);
-    setKnowledgeEvidenceAskOpen(false);
+    setNotePanel(null);
     setComparisonRoute(null);
     setComparisonTargetId("");
     setCrossLibraryAsk(null);
@@ -1304,7 +1297,7 @@ export default function Workspace({
     }
     setComparisonRoute(route);
     setReaderReturnTarget(null);
-    setKnowledgeEvidenceAskOpen(false);
+    setNotePanel(null);
     setCrossLibraryAsk(null);
     setSourceId(null);
     setSourceVersionId(null);
@@ -1329,10 +1322,8 @@ export default function Workspace({
         : null,
     );
     setNoteSearchTarget(target);
-    setKnowledgeUpdateOpen(false);
+    setNotePanel(null);
     setReaderReturnTarget(null);
-    setConceptRelationsOpen(false);
-    setKnowledgeEvidenceAskOpen(false);
     setComparisonRoute(null);
     setComparisonTargetId("");
     setCrossLibraryAsk(null);
@@ -1349,18 +1340,14 @@ export default function Workspace({
       noteLibraryReturn.userId === (user?.id ?? null)
     ) {
       const route = noteLibraryReturn.route;
-      setKnowledgeUpdateOpen(false);
-      setConceptRelationsOpen(false);
-      setKnowledgeEvidenceAskOpen(false);
+      setNotePanel(null);
       setNoteSearchTarget(undefined);
       applyLibraryRouteState(route);
       window.history.pushState(null, "", formatLibraryRoute(route));
       return;
     }
     if (note.kind === "knowledge" && section === "knowledge") {
-      setKnowledgeUpdateOpen(false);
-      setConceptRelationsOpen(false);
-      setKnowledgeEvidenceAskOpen(false);
+      setNotePanel(null);
       setNoteId(null);
       setNoteSearchTarget(undefined);
       window.history.pushState(
@@ -1389,9 +1376,7 @@ export default function Workspace({
         }
       };
 
-      setKnowledgeUpdateOpen(false);
-      setConceptRelationsOpen(false);
-      setKnowledgeEvidenceAskOpen(false);
+      setNotePanel(null);
       setComparisonTargetId("");
       setPendingNoteCitation(undefined);
       setNoteId(null);
@@ -1501,7 +1486,6 @@ export default function Workspace({
       setComparisonTargetId,
       setConversationToInspectId,
       setCrossLibraryAsk,
-      setKnowledgeEvidenceAskOpen,
       setLibraryFiles,
       setModal,
       setPendingNoteCitation,
@@ -1623,14 +1607,19 @@ export default function Workspace({
       );
     }
   }
-  function openKnowledgeUpdate(id: string) {
-    setConceptRelationsOpen(false);
+  /**
+   * Opens one of the knowledge page's AI reviews beside its body, or closes the
+   * open one. All three are routed, so a learner can share or reopen the exact
+   * review they were in; `null` returns to the page itself.
+   */
+  function openNotePanel(panel: NotePanel, id = noteId) {
+    if (!id) return;
     setReaderReturnTarget(null);
     setNoteId(id);
     setSourceId(null);
-    setKnowledgeUpdateOpen(true);
+    setNotePanel(panel);
     setSidebar(false);
-    window.history.pushState(null, "", `#note/${id}/update`);
+    window.history.pushState(null, "", panel ? `#note/${id}/${panel}` : `#note/${id}`);
   }
   function returnFromReader() {
     const target = readerReturnTarget;
@@ -1661,21 +1650,13 @@ export default function Workspace({
         setSourceId(null);
         setSourceVersionId(null);
         setNoteId(note.id);
-        setKnowledgeUpdateOpen(true);
+        setNotePanel("update");
         window.history.back();
         return;
       }
     }
     setReaderReturnTarget(null);
     navigate("library");
-  }
-  function openConceptRelations(id: string) {
-    setKnowledgeUpdateOpen(false);
-    setConceptRelationsOpen(true);
-    setNoteId(id);
-    setSourceId(null);
-    setSidebar(false);
-    window.history.pushState(null, "", `#note/${id}/relations`);
   }
   function changeRelations(change: (workspace: WorkspaceData) => WorkspaceData, message: string) {
     let saved = false;
@@ -2038,6 +2019,175 @@ export default function Workspace({
     navigate("library", { spaceId: "all", files: false });
   }
 
+  const notePanelContent =
+    currentNote && currentNote.kind === "knowledge" && notePanel === "relations" ? (
+      <ConceptRelationsPanel
+        key={`${user?.id || "local"}:${currentNote.id}`}
+        data={data}
+        noteId={currentNote.id}
+        status={store.organizationStatus}
+        onRefreshStatus={store.refreshOrganizationStatus}
+        onGenerate={store.organize}
+        onAccept={(jobId, proposalId, patch) =>
+          changeRelations(
+            (workspace) => acceptRelationProposal(workspace, jobId, proposalId, patch),
+            "已保存知识关系，AI 来源标记与原文依据保留。",
+          )
+        }
+        onIgnore={(jobId, proposalId) =>
+          changeRelations(
+            (workspace) => ignoreRelationProposal(workspace, jobId, proposalId),
+            "已忽略关系建议。",
+          )
+        }
+        onSave={(input, existing) =>
+          changeRelations(
+            (workspace) => saveConceptRelation(workspace, input, existing),
+            "知识关系已保存。",
+          )
+        }
+        onDelete={(id, revision) =>
+          changeRelations(
+            (workspace) => deleteConceptRelation(workspace, id, revision),
+            "关系已删除，可在关系面板恢复。",
+          )
+        }
+        onRestore={(id, revision) =>
+          changeRelations(
+            (workspace) => restoreConceptRelation(workspace, id, revision),
+            "关系记录已恢复；请核对当前页面与来源状态。",
+          )
+        }
+        onRetry={store.retryOrganization}
+        onCheck={store.checkOrganization}
+        onStop={store.stopOrganization}
+        onDismiss={(jobId) =>
+          changeRelations(
+            (workspace) => dismissOrganizationJob(workspace, jobId),
+            "已收起关系建议，已保存关系保留。",
+          )
+        }
+        onOpenNote={openNote}
+        onOpenCitation={(citation) => {
+          openSource(citation.sourceId, citation.versionId, citation);
+        }}
+        onBack={() => openNotePanel(null)}
+      />
+    ) : currentNote && currentNote.kind === "knowledge" && notePanel === "update" ? (
+      <KnowledgeUpdatePanel
+        key={`${user?.id || "local"}:${store.token}:${localCacheMode}:${currentNote.id}`}
+        withdrawalContextKey={`${user?.id || "local"}:${store.token}:${localCacheMode}`}
+        data={data}
+        noteId={currentNote.id}
+        status={store.organizationStatus}
+        onRefreshStatus={store.refreshOrganizationStatus}
+        onGenerate={store.organize}
+        onApply={(jobId, changes) => {
+          if (
+            !reviewOrganization(
+              (workspace) => applyKnowledgeUpdate(workspace, jobId, changes),
+              "已应用所选修改，并保留应用前的正文与引用版本。",
+            )
+          )
+            throw new Error("修改未应用，请检查当前页面或来源是否已经变化。");
+          knowledgeUpdateDrafts.removeChanges(
+            currentNote.id,
+            jobId,
+            changes.map((change) => change.changeId),
+          );
+        }}
+        onIgnore={(jobId, changeId) => {
+          if (
+            !reviewOrganization(
+              (workspace) => ignoreKnowledgeChange(workspace, jobId, changeId),
+              "已忽略这项修改，正文保持不变。",
+            )
+          )
+            throw new Error("建议未能忽略，请刷新当前状态。");
+          knowledgeUpdateDrafts.removeChanges(currentNote.id, jobId, [changeId]);
+        }}
+        onWithdraw={async (jobId, fingerprint, selections) => {
+          const expectedContext = {
+            token: store.token,
+            userId: user?.id ?? null,
+            localCacheMode,
+            noteId: currentNote.id,
+          };
+          const belongsHere = () => {
+            const current = knowledgeWithdrawalContext.current;
+            return Boolean(
+              current?.ready &&
+              current.token === expectedContext.token &&
+              current.userId === expectedContext.userId &&
+              current.localCacheMode === expectedContext.localCacheMode &&
+              current.noteId === expectedContext.noteId,
+            );
+          };
+          try {
+            await persistKnowledgeUpdateWithdrawal({
+              getContext: () => knowledgeWithdrawalContext.current,
+              expectedContext,
+              jobId,
+              fingerprint,
+              selections,
+              updateDurably,
+            });
+            if (!belongsHere()) return;
+            knowledgeUpdateDrafts.change(currentNote.id, jobId, null);
+            setToast(
+              storageMode === "cloud"
+                ? "撤回已保存到云端，并保留恢复前的完整版本。"
+                : "撤回已保存到此浏览器，并保留恢复前的完整版本。云端同步状态请查看顶部提示。",
+            );
+          } catch (cause) {
+            if (belongsHere())
+              setToast(
+                cause instanceof Error ? cause.message : "撤回尚未保存，请检查顶部提示后重试。",
+              );
+            throw cause;
+          }
+        }}
+        onRetry={store.retryOrganization}
+        onCheck={store.checkOrganization}
+        onStop={store.stopOrganization}
+        onDismiss={(jobId) => {
+          if (
+            !reviewOrganization(
+              (workspace) => dismissOrganizationJob(workspace, jobId),
+              "已收起这次更新建议，已接受的内容保留。",
+            )
+          )
+            throw new Error("更新建议未能收起，请刷新当前状态。");
+          knowledgeUpdateDrafts.change(currentNote.id, jobId, null);
+        }}
+        reviewDrafts={knowledgeUpdateDrafts.draftsFor(currentNote.id)}
+        reviewDraftSaveStatus={knowledgeUpdateDrafts.status}
+        onRetryReviewDraftSave={knowledgeUpdateDrafts.retry}
+        onReviewDraftChange={(jobId, draft) =>
+          knowledgeUpdateDrafts.change(currentNote.id, jobId, draft)
+        }
+        onBack={() => openNotePanel(null)}
+        onOpenCitation={(citation) => {
+          openSource(citation.sourceId, citation.versionId, citation, undefined, {
+            kind: "knowledge-update",
+            noteId: currentNote.id,
+          });
+        }}
+      />
+    ) : currentNote && currentNote.kind === "knowledge" && notePanel === "ask" ? (
+      <KnowledgeEvidenceAskPanel
+        key={`${user?.id || "local"}:${currentNote.id}`}
+        data={data}
+        note={currentNote}
+        onAsk={(request, signal) => store.ask(request, signal)}
+        onConversationChange={(conversation) =>
+          update((workspace) => persistConversation(workspace, conversation))
+        }
+        onOpenSource={openSource}
+        onBack={() => openNotePanel(null)}
+      />
+    ) : null;
+
   return (
     <div
       className={`app-shell${isLibraryWorkspace ? " library-workspace" : ""}${isReadingWorkspace ? " reader-shell" : ""}${comparisonRoute ? " comparison-shell" : ""}${isCollectionHome ? " collection-home" : ""}`}
@@ -2242,8 +2392,7 @@ export default function Workspace({
             !comparisonRoute &&
             !currentSource &&
             currentNote?.kind === "knowledge" &&
-            !conceptRelationsOpen &&
-            knowledgeUpdateOpen
+            notePanel === "update"
           ) && (
             <div className="notice notice-warning" role="alert" aria-label="本机审核草稿保存提示">
               <span>{knowledgeUpdateDrafts.status.message}</span>
@@ -2631,180 +2780,6 @@ export default function Workspace({
             onCitationConsumed={() => setPendingNoteCitation(undefined)}
             initialConversationId={pendingConversationId ?? undefined}
           />
-        ) : currentNote && currentNote.kind === "knowledge" && conceptRelationsOpen ? (
-          <div className="content-scroll">
-            <ConceptRelationsPanel
-              key={`${user?.id || "local"}:${currentNote.id}`}
-              data={data}
-              noteId={currentNote.id}
-              status={store.organizationStatus}
-              onRefreshStatus={store.refreshOrganizationStatus}
-              onGenerate={store.organize}
-              onAccept={(jobId, proposalId, patch) =>
-                changeRelations(
-                  (workspace) => acceptRelationProposal(workspace, jobId, proposalId, patch),
-                  "已保存知识关系，AI 来源标记与原文依据保留。",
-                )
-              }
-              onIgnore={(jobId, proposalId) =>
-                changeRelations(
-                  (workspace) => ignoreRelationProposal(workspace, jobId, proposalId),
-                  "已忽略关系建议。",
-                )
-              }
-              onSave={(input, existing) =>
-                changeRelations(
-                  (workspace) => saveConceptRelation(workspace, input, existing),
-                  "知识关系已保存。",
-                )
-              }
-              onDelete={(id, revision) =>
-                changeRelations(
-                  (workspace) => deleteConceptRelation(workspace, id, revision),
-                  "关系已删除，可在关系面板恢复。",
-                )
-              }
-              onRestore={(id, revision) =>
-                changeRelations(
-                  (workspace) => restoreConceptRelation(workspace, id, revision),
-                  "关系记录已恢复；请核对当前页面与来源状态。",
-                )
-              }
-              onRetry={store.retryOrganization}
-              onCheck={store.checkOrganization}
-              onStop={store.stopOrganization}
-              onDismiss={(jobId) =>
-                changeRelations(
-                  (workspace) => dismissOrganizationJob(workspace, jobId),
-                  "已收起关系建议，已保存关系保留。",
-                )
-              }
-              onOpenNote={openNote}
-              onOpenCitation={(citation) => {
-                openSource(citation.sourceId, citation.versionId, citation);
-              }}
-              onBack={() => openNote(currentNote.id)}
-            />
-          </div>
-        ) : currentNote && currentNote.kind === "knowledge" && knowledgeUpdateOpen ? (
-          <div className="content-scroll">
-            <KnowledgeUpdatePanel
-              key={`${user?.id || "local"}:${store.token}:${localCacheMode}:${currentNote.id}`}
-              withdrawalContextKey={`${user?.id || "local"}:${store.token}:${localCacheMode}`}
-              data={data}
-              noteId={currentNote.id}
-              status={store.organizationStatus}
-              onRefreshStatus={store.refreshOrganizationStatus}
-              onGenerate={store.organize}
-              onApply={(jobId, changes) => {
-                if (
-                  !reviewOrganization(
-                    (workspace) => applyKnowledgeUpdate(workspace, jobId, changes),
-                    "已应用所选修改，并保留应用前的正文与引用版本。",
-                  )
-                )
-                  throw new Error("修改未应用，请检查当前页面或来源是否已经变化。");
-                knowledgeUpdateDrafts.removeChanges(
-                  currentNote.id,
-                  jobId,
-                  changes.map((change) => change.changeId),
-                );
-              }}
-              onIgnore={(jobId, changeId) => {
-                if (
-                  !reviewOrganization(
-                    (workspace) => ignoreKnowledgeChange(workspace, jobId, changeId),
-                    "已忽略这项修改，正文保持不变。",
-                  )
-                )
-                  throw new Error("建议未能忽略，请刷新当前状态。");
-                knowledgeUpdateDrafts.removeChanges(currentNote.id, jobId, [changeId]);
-              }}
-              onWithdraw={async (jobId, fingerprint, selections) => {
-                const expectedContext = {
-                  token: store.token,
-                  userId: user?.id ?? null,
-                  localCacheMode,
-                  noteId: currentNote.id,
-                };
-                const belongsHere = () => {
-                  const current = knowledgeWithdrawalContext.current;
-                  return Boolean(
-                    current?.ready &&
-                    current.token === expectedContext.token &&
-                    current.userId === expectedContext.userId &&
-                    current.localCacheMode === expectedContext.localCacheMode &&
-                    current.noteId === expectedContext.noteId,
-                  );
-                };
-                try {
-                  await persistKnowledgeUpdateWithdrawal({
-                    getContext: () => knowledgeWithdrawalContext.current,
-                    expectedContext,
-                    jobId,
-                    fingerprint,
-                    selections,
-                    updateDurably,
-                  });
-                  if (!belongsHere()) return;
-                  knowledgeUpdateDrafts.change(currentNote.id, jobId, null);
-                  setToast(
-                    storageMode === "cloud"
-                      ? "撤回已保存到云端，并保留恢复前的完整版本。"
-                      : "撤回已保存到此浏览器，并保留恢复前的完整版本。云端同步状态请查看顶部提示。",
-                  );
-                } catch (cause) {
-                  if (belongsHere())
-                    setToast(
-                      cause instanceof Error
-                        ? cause.message
-                        : "撤回尚未保存，请检查顶部提示后重试。",
-                    );
-                  throw cause;
-                }
-              }}
-              onRetry={store.retryOrganization}
-              onCheck={store.checkOrganization}
-              onStop={store.stopOrganization}
-              onDismiss={(jobId) => {
-                if (
-                  !reviewOrganization(
-                    (workspace) => dismissOrganizationJob(workspace, jobId),
-                    "已收起这次更新建议，已接受的内容保留。",
-                  )
-                )
-                  throw new Error("更新建议未能收起，请刷新当前状态。");
-                knowledgeUpdateDrafts.change(currentNote.id, jobId, null);
-              }}
-              reviewDrafts={knowledgeUpdateDrafts.draftsFor(currentNote.id)}
-              reviewDraftSaveStatus={knowledgeUpdateDrafts.status}
-              onRetryReviewDraftSave={knowledgeUpdateDrafts.retry}
-              onReviewDraftChange={(jobId, draft) =>
-                knowledgeUpdateDrafts.change(currentNote.id, jobId, draft)
-              }
-              onBack={() => openNote(currentNote.id)}
-              onOpenCitation={(citation) => {
-                openSource(citation.sourceId, citation.versionId, citation, undefined, {
-                  kind: "knowledge-update",
-                  noteId: currentNote.id,
-                });
-              }}
-            />
-          </div>
-        ) : currentNote && currentNote.kind === "knowledge" && knowledgeEvidenceAskOpen ? (
-          <div className="content-scroll">
-            <KnowledgeEvidenceAskPanel
-              key={`${user?.id || "local"}:${currentNote.id}`}
-              data={data}
-              note={currentNote}
-              onAsk={(request, signal) => store.ask(request, signal)}
-              onConversationChange={(conversation) =>
-                update((workspace) => persistConversation(workspace, conversation))
-              }
-              onOpenSource={openSource}
-              onBack={() => setKnowledgeEvidenceAskOpen(false)}
-            />
-          </div>
         ) : currentNote ? (
           <NotePage
             data={data}
@@ -2816,12 +2791,12 @@ export default function Workspace({
             noteSearchTarget={noteSearchTarget}
             knowledgeEvidence={knowledgeEvidence}
             acceptanceReason={acceptanceReason}
+            notePanel={notePanel}
+            panel={notePanelContent}
+            openNotePanel={openNotePanel}
             closeNote={closeNote}
             patchNote={patchNote}
             reviewOrganization={reviewOrganization}
-            openConceptRelations={openConceptRelations}
-            openKnowledgeUpdate={openKnowledgeUpdate}
-            setKnowledgeEvidenceAskOpen={setKnowledgeEvidenceAskOpen}
             setModal={setModal}
             openSource={openSource}
           />

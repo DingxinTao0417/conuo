@@ -1,0 +1,106 @@
+/*
+ * The knowledge page keeps its body visible while an AI panel is open, so a
+ * learner can read the page and its relations, update review or source-grounded
+ * answers side by side instead of switching between three full-screen views.
+ */
+.note-page {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.note-page-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.note-page-main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+.note-side-panel {
+  flex: 0 0 var(--note-panel-width, 420px);
+  width: var(--note-panel-width, 420px);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: #fff;
+  border-left: 1px solid var(--border);
+}
+.note-side-panel[data-note-panel="relations"],
+.note-side-panel[data-note-panel="update"] {
+  --note-panel-width: 520px;
+}
+.note-side-panel > .content-scroll {
+  padding: 0;
+}
+.note-side-panel > .content-scroll > * {
+  max-width: none;
+}
+
+/*
+ * Below 1200px the shell already gives the sidebar its own track, and the note
+ * body needs the rest. The panel floats over the page instead of creating a
+ * third column that would squeeze the text to an unreadable width.
+ */
+@media (max-width: 1199px) {
+  .note-side-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
+    z-index: 6;
+    width: min(var(--note-panel-width, 420px), 100%);
+    flex-basis: auto;
+    box-shadow: -18px 0 42px rgb(17 17 17 / 16%);
+  }
+  .note-side-panel[data-note-panel="relations"],
+  .note-side-panel[data-note-panel="update"] {
+    --note-panel-width: 560px;
+  }
+}
+@media (max-width: 620px) {
+  .note-side-panel {
+    width: 100%;
+    --note-panel-width: 100%;
+  }
+  .note-side-panel[data-note-panel="relations"],
+  .note-side-panel[data-note-panel="update"] {
+    --note-panel-width: 100%;
+  }
+}
+
+.note-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+.note-panel-header strong {
+  font-size: 13px;
+}
+.note-panel-header .grow {
+  flex: 1;
+}
+.note-panel-body {
+  flex: 1;
+  min-height: 0;
+}
+/* The shared AskPanel is absolutely sized inside the reader; here it simply
+   fills the remaining panel height. */
+.note-side-panel .reader-ai {
+  position: static;
+  width: auto;
+  height: auto;
+  flex: 1;
+  min-height: 0;
+  border-left: 0;
+}

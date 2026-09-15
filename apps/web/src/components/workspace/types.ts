@@ -28,6 +28,13 @@ export type WorkspaceModal =
   | "sync-conflict"
   | null;
 
+/**
+ * The knowledge page's right-hand AI panel. One union instead of three
+ * independent booleans, so the panels cannot be open at the same time and the
+ * body is never replaced by one of them.
+ */
+export type NotePanel = "relations" | "update" | "ask" | null;
+
 /** A question hand-off from workspace search into the cross-library ask panel. */
 export type CrossLibrarySearchDraft = WorkspaceSearchAskDraft & { id: string };
 
