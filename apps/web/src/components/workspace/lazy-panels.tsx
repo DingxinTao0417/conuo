@@ -8,7 +8,9 @@ import { Loader2 } from "lucide-react";
  *
  * Several workspace tests mock `next/dynamic` and identify a panel by the
  * position of its `dynamic()` call (ConceptRelations = 1, KnowledgeUpdate = 2,
- * Organization = 3, TaskCenter = 4, OrganizationHistoryControl = 5, Reader = 6, …).
+ * Organization = 3, TaskCenter = 4, OrganizationHistoryControl = 5, Reader = 6,
+ * ComparisonReader = 7, NoteEditor = 8, Account = 9, BackupRestore = 10,
+ * LegacyBrowserRecovery = 11, CrossLibraryAsk = 12, NoteAsk = 13).
  * Do not reorder or split these declarations without updating those tests.
  */
 export const ConceptRelationsPanel = dynamic(() => import("../concept-relations-panel"), {
