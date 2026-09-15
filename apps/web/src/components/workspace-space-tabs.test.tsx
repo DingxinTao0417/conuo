@@ -197,6 +197,26 @@ describe("Workspace space tabs", () => {
     return button as HTMLButtonElement;
   }
 
+  /** Source details are a side panel now; ⋯ opens it directly on the basic tab. */
+  async function openDetailPanel(title: string) {
+    const manage = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.getAttribute("aria-label") === `管理 ${title}`,
+    );
+    expect(manage, `manage ${title}`).toBeInstanceOf(HTMLButtonElement);
+    await act(async () => manage!.click());
+    const panel = host.querySelector<HTMLElement>('[aria-label="资料详情"]');
+    expect(panel).toBeInstanceOf(HTMLElement);
+    return panel!;
+  }
+
+  async function openDetailTab(label: string) {
+    const tab = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+      (item) => item.textContent?.trim() === label,
+    );
+    expect(tab, `detail tab ${label}`).toBeInstanceOf(HTMLButtonElement);
+    await act(async () => tab!.click());
+  }
+
   it("keeps Overview, Materials, Knowledge, and Questions in the current learning space", async () => {
     expect(host.textContent).toContain("库内资料");
     expect(tab("资料").getAttribute("aria-current")).toBe("page");
@@ -333,13 +353,8 @@ describe("Workspace space tabs", () => {
     const source = (workspaceStore.data as ReturnType<typeof createDemoWorkspace>).sources.find(
       (item) => item.spaceIds.includes(spaceId),
     )!;
-    const manage = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
-      (button) => button.getAttribute("aria-label") === `管理 ${source.title}`,
-    );
-    expect(manage).toBeInstanceOf(HTMLButtonElement);
-
-    await act(async () => manage!.click());
-    await act(async () => buttonByText("查看已识别内容").click());
+    await openDetailPanel(source.title);
+    await openDetailTab("已识别内容");
 
     expect(host.textContent).toContain("资料可用范围");
     expect(host.textContent).toContain("原文已识别");
@@ -376,12 +391,8 @@ describe("Workspace space tabs", () => {
     const source = (workspaceStore.data as ReturnType<typeof createDemoWorkspace>).sources.find(
       (item) => item.spaceIds.includes(spaceId),
     )!;
-    const manage = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
-      (button) => button.getAttribute("aria-label") === `管理 ${source.title}`,
-    )!;
-
-    await act(async () => manage.click());
-    await act(async () => buttonByText("查看已识别内容").click());
+    await openDetailPanel(source.title);
+    await openDetailTab("已识别内容");
     await act(async () =>
       host.querySelector<HTMLButtonElement>(".recognized-content-chunk")!.click(),
     );
@@ -405,12 +416,8 @@ describe("Workspace space tabs", () => {
       (item) => item.spaceIds.includes(spaceId),
     )!;
     const originalVersionId = source.versionId;
-    const manage = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
-      (button) => button.getAttribute("aria-label") === `管理 ${source.title}`,
-    )!;
-
-    await act(async () => manage.click());
-    await act(async () => buttonByText("查看已识别内容").click());
+    await openDetailPanel(source.title);
+    await openDetailTab("已识别内容");
     await act(async () =>
       host.querySelector<HTMLButtonElement>(".recognized-content-chunk")!.click(),
     );
@@ -436,12 +443,8 @@ describe("Workspace space tabs", () => {
   it("returns safely to the library when the recognized source is no longer available", async () => {
     const data = workspaceStore.data as ReturnType<typeof createDemoWorkspace>;
     const source = data.sources.find((item) => item.spaceIds.includes(spaceId))!;
-    const manage = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
-      (button) => button.getAttribute("aria-label") === `管理 ${source.title}`,
-    )!;
-
-    await act(async () => manage.click());
-    await act(async () => buttonByText("查看已识别内容").click());
+    await openDetailPanel(source.title);
+    await openDetailTab("已识别内容");
     await act(async () =>
       host.querySelector<HTMLButtonElement>(".recognized-content-chunk")!.click(),
     );
@@ -543,20 +546,27 @@ describe("Workspace space tabs", () => {
     workspaceStore = { ...workspaceStore, data };
     await act(async () => root.render(createElement(Workspace)));
 
-    const manage = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
-      (button) => button.getAttribute("aria-label") === `管理 ${source.title}`,
-    );
-    await act(async () => manage!.click());
+    await openDetailPanel(source.title);
 
+    // The basic tab keeps the four facts a learner acts on; the rest stay one
+    // disclosure away instead of being dropped.
     const metadata = host.querySelector<HTMLElement>('[aria-label="资料元数据"]');
     expect(metadata).toBeInstanceOf(HTMLElement);
     expect(metadata!.textContent).toContain("资料类型PDF");
-    expect(metadata!.textContent).toContain("导入来源本机文件上传");
     expect(metadata!.textContent).toContain("导入时间");
     expect(metadata!.textContent).toContain("2026");
     expect(metadata!.textContent).toContain("阅读状态上次读到第 4 / 12 页");
     expect(metadata!.textContent).toContain("AI 状态已允许，可用于问答与整理");
     expect(host.textContent).toContain("资料名称由你维护，AI 整理不会自动改名");
+
+    const moreInfo = host.querySelector<HTMLElement>("#source-detail-more-info");
+    expect(moreInfo?.hidden).toBe(true);
+    await act(async () => buttonByText("更多信息").click());
+    expect(moreInfo?.hidden).toBe(false);
+    const extra = host.querySelector<HTMLElement>('[aria-label="更多资料信息"]');
+    expect(extra!.textContent).toContain("导入来源本机文件上传");
+    expect(extra!.textContent).toContain("处理状态");
+    expect(extra!.textContent).toContain("文件大小");
   });
 
   it("keeps partial parsing and an AI opt-out separate from usable original text", async () => {
@@ -572,12 +582,8 @@ describe("Workspace space tabs", () => {
     workspaceStore = { ...workspaceStore, data };
     await act(async () => root.render(createElement(Workspace)));
 
-    const manage = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
-      (button) => button.getAttribute("aria-label") === `管理 ${source.title}`,
-    );
-    expect(manage).toBeInstanceOf(HTMLButtonElement);
-    await act(async () => manage!.click());
-    await act(async () => buttonByText("查看已识别内容").click());
+    await openDetailPanel(source.title);
+    await openDetailTab("已识别内容");
 
     expect(host.textContent).toContain("部分原文已识别");
     expect(host.textContent).toContain("AI 使用已关闭");

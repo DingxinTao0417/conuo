@@ -129,14 +129,13 @@ import {
   restoreConceptRelation,
 } from "@/lib/concept-relations";
 import { inboxSpace, isUntouchedStarterWorkspace, normalizedTag, plain } from "./shared";
-import RecognizedContentPanel from "./panels/recognized-content-panel";
+import SourceDetailPanel, { type SourceDetailTab } from "./panels/source-detail-panel";
 import AnonymousWorkspaceMigrationNotice from "./anonymous-workspace-migration-notice";
 import { ReadingProgressConflictModal } from "./modals/reading-progress-conflict-modal";
 import SyncConflictModal from "./modals/sync-conflict-modal";
 import ConversationHistoryModal from "./modals/conversation-history-modal";
 import DeleteSpaceModal from "./modals/delete-space-modal";
 import { ImportModal } from "./modals/import-modal";
-import SourceDetailsModal from "./modals/source-details-modal";
 import ExportResultModal from "./modals/export-result-modal";
 import SpaceCreationModal from "./modals/space-creation-modal";
 import ComparisonSourceModal from "./modals/comparison-source-modal";
@@ -346,6 +345,7 @@ export default function Workspace({
   });
   const [conversationToInspectId, setConversationToInspectId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailTab, setDetailTab] = useState<SourceDetailTab>("basic");
   const [selected, setSelected] = useState<string[]>([]);
   const bulkWriteIdentity = useMemo(
     () => ({
@@ -404,15 +404,16 @@ export default function Workspace({
         return false;
       }
       setDetailId(source.id);
+      setModal("details");
       if (source.versionId !== target.versionId) {
-        setModal("details");
+        setDetailTab("basic");
         setToast("这份资料已有新版本，刚才的已识别内容未重新打开；请在当前资料详情中重新核对。");
         return true;
       }
-      setModal("recognized-content");
+      setDetailTab("recognized");
       return true;
     },
-    [setDetailId, setModal, setToast],
+    [setDetailId, setDetailTab, setModal, setToast],
   );
   const activeSpace = data.spaces.find((s) => s.id === spaceId);
   const currentSource = data.sources.find((s) => s.id === sourceId && !s.deletedAt);
@@ -1010,7 +1011,9 @@ export default function Workspace({
         setSidebar(false);
       } else if (type === "source" && id) {
         clearConversationRouteState();
-        setModal((current) => (current === "recognized-content" ? null : current));
+        // A source route replaces the library behind the panel, so the panel
+        // closes unless the reader-return handler has just reopened it.
+        setModal((current) => (current === "details" ? null : current));
         setComparisonRoute(null);
         setSourceId(id);
         setSourceVersionId(view === "version" ? (version ?? "") : null);
@@ -1861,6 +1864,7 @@ export default function Workspace({
   }
   function openSourceDetail(id: string) {
     setDetailId(id);
+    setDetailTab("basic");
     setModal("details");
   }
   function openBulkRecycle(ids = selected) {
@@ -3095,6 +3099,36 @@ export default function Workspace({
           </div>
         )}
       </main>
+      {modal === "details" && detail && !isReadingWorkspace && !currentNote && (
+        <SourceDetailPanel
+          key={detail.id}
+          detail={detail}
+          data={data}
+          tab={detailTab}
+          onTabChange={setDetailTab}
+          onClose={() => setModal(null)}
+          patchSource={patchSource}
+          reviewOrganization={reviewOrganization}
+          openOrganization={openOrganization}
+          openBulkRecycle={openBulkRecycle}
+          downloadOriginal={downloadOriginal}
+          onOpenSource={(citation) => {
+            setModal(null);
+            // Reading from the recognized-content tab is a task to come back
+            // to; opening a source from the basic tab is ordinary reading.
+            if (!citation && detailTab !== "recognized") {
+              openSource(detail.id);
+              return;
+            }
+            openSource(detail.id, detail.versionId, citation, undefined, {
+              kind: "recognized-content",
+              sourceId: detail.id,
+              versionId: detail.versionId,
+              libraryRoute: currentLibraryReturnRoute(location.hash),
+            });
+          }}
+        />
+      )}
       {!isReadingWorkspace && !currentNote && (
         <WorkspaceMobileNav
           section={section}
@@ -3312,35 +3346,6 @@ export default function Workspace({
               onClose={() => setModal(null)}
             />
           </div>
-        </Modal>
-      )}
-      {modal === "details" && detail && (
-        <SourceDetailsModal
-          detail={detail}
-          data={data}
-          setModal={setModal}
-          patchSource={patchSource}
-          reviewOrganization={reviewOrganization}
-          openOrganization={openOrganization}
-          openBulkRecycle={openBulkRecycle}
-          downloadOriginal={downloadOriginal}
-        />
-      )}
-      {modal === "recognized-content" && detail && (
-        <Modal title="已识别内容" wide onClose={() => setModal("details")}>
-          <RecognizedContentPanel
-            source={detail}
-            onBack={() => setModal("details")}
-            onOpenSource={(citation) => {
-              setModal(null);
-              openSource(detail.id, detail.versionId, citation, undefined, {
-                kind: "recognized-content",
-                sourceId: detail.id,
-                versionId: detail.versionId,
-                libraryRoute: currentLibraryReturnRoute(location.hash),
-              });
-            }}
-          />
         </Modal>
       )}
       {modal === "bulk-tags" && (

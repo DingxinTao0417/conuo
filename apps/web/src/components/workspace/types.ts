@@ -11,8 +11,8 @@ export type WorkspaceModal =
   | "import"
   | "space"
   | "account"
+  /** The source detail side panel; its open tab lives in `detailTab`. */
   | "details"
-  | "recognized-content"
   | "history"
   | "compare-source"
   | "bulk-tags"

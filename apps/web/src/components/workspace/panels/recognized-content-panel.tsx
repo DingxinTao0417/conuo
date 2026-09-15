@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeft, FileText, ShieldCheck } from "lucide-react";
+import { FileText, ShieldCheck } from "lucide-react";
 import type { Chunk, Citation, Source } from "@/lib/types";
 import {
   sourceCaptureScopeNotice,
@@ -75,13 +75,16 @@ function recognizedChunkPreview(text: string) {
   return normalized.length > 220 ? `${normalized.slice(0, 220)}…` : normalized;
 }
 
+/**
+ * One tab of the source detail panel: what of the original text is actually
+ * available. Navigation and source actions belong to the panel's own header
+ * and footer, so this renders only the coverage explanation and the excerpts.
+ */
 export default function RecognizedContentPanel({
   source,
-  onBack,
   onOpenSource,
 }: {
   source: Source;
-  onBack: () => void;
   onOpenSource: (citation?: Citation) => void;
 }) {
   const state = recognizedContentState(source);
@@ -183,16 +186,6 @@ export default function RecognizedContentPanel({
           </div>
         )}
       </section>
-
-      <div className="modal-actions recognized-content-actions">
-        <button type="button" className="btn" onClick={onBack}>
-          <ArrowLeft size={14} />
-          返回资料详情
-        </button>
-        <button type="button" className="btn btn-primary" onClick={() => onOpenSource()}>
-          打开资料
-        </button>
-      </div>
     </div>
   );
 }

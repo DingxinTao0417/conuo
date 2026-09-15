@@ -2785,17 +2785,6 @@ h1 {
   align-items: center;
   font-weight: 400;
 }
-.detail-meta {
-  background: #fafafa;
-  padding: 13px;
-  border-radius: 7px;
-  font-size: 11px;
-  color: #999;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow-wrap: anywhere;
-}
 .source-meta-list {
   display: grid;
   gap: 8px;
@@ -2988,9 +2977,6 @@ h1 {
 }
 .recognized-content-empty p {
   margin: 0;
-}
-.recognized-content-actions {
-  margin-top: 2px;
 }
 .error-text {
   color: #bf5145;

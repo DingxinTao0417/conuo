@@ -1,6 +1,6 @@
 "use client";
 import { FileText } from "lucide-react";
-import type { Source, Space, WorkspaceData } from "@/lib/types";
+import type { Source, SourceVersion, Space, WorkspaceData } from "@/lib/types";
 import { sourceCoverageLabel } from "@/lib/source-coverage";
 
 export const statusLabel = {
@@ -11,7 +11,8 @@ export const statusLabel = {
   failed: "解析失败",
   "link-only": "仅链接",
 };
-export const sourceStatusLabel = (source: Source) =>
+/** Retained versions carry their own processing state, so they read the same way. */
+export const sourceStatusLabel = (source: Source | SourceVersion) =>
   sourceCoverageLabel(source) || statusLabel[source.status];
 
 export const plain = (html: string) =>

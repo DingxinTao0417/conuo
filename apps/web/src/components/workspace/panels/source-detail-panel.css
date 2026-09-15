@@ -1,0 +1,228 @@
+/* Docked details: a third column beside the sidebar and the content area, so
+   the source list keeps its rows and scroll position while a source is
+   reviewed. On a phone the same markup becomes a full detail page. */
+.source-detail-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 360px;
+  width: 360px;
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  background: #fff;
+  overflow: hidden;
+}
+
+.source-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  height: 53px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.source-detail-header > div {
+  display: grid;
+  min-width: 0;
+}
+
+.source-detail-header span {
+  color: #999;
+  font-size: 10px;
+}
+
+.source-detail-header strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-detail-back-icon {
+  display: none;
+}
+
+.source-detail-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 18px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.source-detail-tabs button {
+  padding: 11px 2px 9px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: #888;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.source-detail-tabs button[aria-selected="true"] {
+  border-color: var(--brand);
+  color: var(--brand);
+  font-weight: 500;
+}
+
+.source-detail-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 17px;
+  padding: 18px 16px;
+  overflow: auto;
+}
+
+.source-detail-body > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.source-detail-body > label small {
+  color: #999;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.source-detail-body > .checkbox-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.source-detail-body .source-meta-list {
+  padding: 13px;
+  border-radius: 7px;
+  background: #fafafa;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.source-detail-more-info-toggle {
+  align-self: flex-start;
+}
+
+/* The embedded recognized-content panel already owns its own spacing. */
+.source-detail-body .recognized-content-panel {
+  gap: 14px;
+  padding: 0;
+}
+
+.source-detail-versions ol {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.source-detail-versions li {
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.source-detail-versions strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.source-detail-versions span {
+  color: #625c6d;
+  font-size: 11px;
+}
+
+.source-detail-versions small {
+  color: #999;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.source-detail-versions-summary,
+.source-detail-versions-hint {
+  margin: 0;
+  color: #777;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.source-detail-versions-hint {
+  margin-top: 12px;
+}
+
+.source-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.source-detail-actions .btn-primary {
+  flex: 1;
+}
+
+.source-detail-actions .library-menu-popover {
+  top: auto;
+  bottom: calc(100% + 7px);
+}
+
+.library-menu-item-danger {
+  color: #bf5145;
+}
+
+.library-menu-item-danger:hover:not(:disabled) {
+  background: #fdf3f2;
+}
+
+@media (max-width: 1024px) {
+  .source-detail-panel {
+    flex-basis: 316px;
+    width: 316px;
+  }
+}
+
+/* The design's phone layout opens details as its own page rather than a
+   cramped column; the list is restored when the page is dismissed. */
+@media (max-width: 620px) {
+  .source-detail-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    flex-basis: auto;
+    width: 100%;
+    border-left: 0;
+  }
+
+  .source-detail-header {
+    height: 52px;
+  }
+
+  .source-detail-back-icon {
+    display: block;
+  }
+
+  .source-detail-close-icon {
+    display: none;
+  }
+
+  .source-detail-tabs button {
+    flex: 1;
+    min-height: 44px;
+  }
+
+  .source-detail-actions {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
