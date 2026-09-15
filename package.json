@@ -1,0 +1,19 @@
+{
+  "name": "conuo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @conuo/web",
+    "build": "npm run build --workspace @conuo/web",
+    "start": "npm run start --workspace @conuo/web",
+    "lint": "npm run lint --workspace @conuo/web",
+    "typecheck": "npm run typecheck --workspace @conuo/web",
+    "test": "npm run test --workspace @conuo/web"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

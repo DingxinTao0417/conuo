@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/internal/source-purge-cleanup",
+      "schedule": "17 3 * * *"
+    },
+    {
+      "path": "/api/internal/original-upload-cleanup",
+      "schedule": "20 3 * * *"
+    },
+    {
+      "path": "/api/internal/account-deletion-cleanup",
+      "schedule": "22 3 * * *"
+    }
+  ]
+}

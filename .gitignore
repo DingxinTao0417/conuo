@@ -1,2 +1,31 @@
 # Local design files
 /conuo-design/
+
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+/apps/web/public/pdf.worker.min.mjs
+/apps/web/public/conuo-logo.png
+
+# Local configuration and secrets
+.env*
+!.env.example
+.vercel/
+*.log
+.DS_Store
+Thumbs.db
+
+# Supabase CLI cache
+supabase/.temp/
+
+# Local test and processing artifacts
+work/
+test-results/
+playwright-report/
+__pycache__/
+.pytest_cache/
+.venv/
