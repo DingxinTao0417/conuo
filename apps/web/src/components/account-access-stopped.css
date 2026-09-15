@@ -1,0 +1,66 @@
+.account-access-stopped {
+  width: min(560px, calc(100% - 48px));
+  box-sizing: border-box;
+  margin: 64px auto;
+  padding: 28px;
+  border: 1px solid var(--border-neutral-l1);
+  border-radius: var(--radius-12);
+  background: var(--bg-base-default);
+  color: var(--text-secondary);
+  display: grid;
+  gap: 18px;
+  overflow-wrap: anywhere;
+}
+.account-access-stopped-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-12);
+  background: var(--bg-brand-popup);
+  color: var(--text-brand);
+}
+.account-access-stopped h2 {
+  margin: 0 0 12px;
+  color: var(--text-default);
+  font-size: 18px;
+  font-weight: 600;
+}
+.account-access-stopped p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.account-access-stopped p:last-child {
+  margin-bottom: 0;
+}
+.account-access-stopped-warning {
+  padding: 12px;
+  border-radius: var(--radius-8);
+  background: #fff8ed;
+  color: #8a5700;
+}
+.account-access-stopped-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.account-access-stopped-actions .btn {
+  min-height: 36px;
+}
+@media (max-width: 1024px) {
+  .account-access-stopped-actions .btn {
+    min-height: 40px;
+  }
+}
+@media (max-width: 640px) {
+  .account-access-stopped {
+    width: calc(100% - 32px);
+    margin: 32px auto;
+    padding: 20px;
+  }
+  .account-access-stopped-actions .btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}

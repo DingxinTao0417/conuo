@@ -1,0 +1,195 @@
+.export-backup-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px 24px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.export-backup-panel p {
+  margin: 0;
+}
+.export-backup-panel h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+.export-backup-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.export-backup-picker > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-default);
+}
+.export-backup-picker select {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-neutral-l2);
+  border-radius: 6px;
+  background: var(--bg-base-default);
+  font: inherit;
+  color: var(--text-default);
+}
+.export-backup-preview {
+  border: 1px solid var(--border-neutral-l1);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.export-backup-preview dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 18px;
+  margin: 14px 0;
+}
+.export-backup-preview dt {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.export-backup-preview dd {
+  margin: 0;
+  color: var(--text-default);
+  font-size: 20px;
+  line-height: 1.4;
+}
+.export-backup-records,
+.export-backup-note {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+.export-backup-records + .export-backup-records {
+  margin-top: 6px;
+}
+.export-backup-details {
+  border: 1px solid var(--border-neutral-l1);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.export-backup-details summary {
+  cursor: pointer;
+  color: var(--text-default);
+  font-weight: 500;
+}
+.export-backup-details p {
+  margin-top: 8px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+.export-backup-details ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 160px;
+  overflow: auto;
+}
+.export-backup-details li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 0;
+}
+.export-backup-details li + li {
+  border-top: 1px solid var(--border-neutral-l1);
+}
+.export-backup-details li strong {
+  color: var(--text-default);
+  font-size: 12px;
+  font-weight: 500;
+}
+.export-backup-details li span {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+.export-backup-warning {
+  padding: 10px 12px;
+  border: 1px solid #eedece;
+  border-radius: 6px;
+  background: #fffaf3;
+  color: #8a602c;
+  font-size: 12px;
+}
+.export-backup-warning button {
+  margin-top: 8px;
+}
+.export-backup-error {
+  color: #b34653;
+}
+.export-backup-progress {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-brand);
+}
+.export-backup-progress svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.export-backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  position: sticky;
+  bottom: -24px;
+  z-index: 1;
+  padding: 12px 0 24px;
+  margin-bottom: -24px;
+  background: var(--bg-base-default);
+  border-top: 1px solid var(--border-neutral-l1);
+}
+.export-library-action {
+  flex-shrink: 0;
+}
+@media (max-width: 1024px) {
+  .export-backup-details summary {
+    min-height: 40px;
+    padding: 8px 0;
+  }
+  .export-backup-modal .modal-header .icon-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .export-backup-panel .btn,
+  .export-backup-picker select,
+  .export-library-action {
+    min-height: 40px;
+  }
+}
+@media (max-width: 620px) {
+  .export-backup-details summary {
+    min-height: 44px;
+  }
+  .export-backup-modal .modal-header .icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .export-backup-panel {
+    padding: 16px;
+    gap: 14px;
+  }
+  .export-backup-preview dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .export-backup-panel .btn,
+  .export-backup-picker select,
+  .export-library-action {
+    min-height: 44px;
+  }
+  .export-backup-actions .btn-primary {
+    flex: 1;
+  }
+  .export-backup-actions {
+    bottom: -16px;
+    padding-bottom: 16px;
+    margin-bottom: -16px;
+  }
+}

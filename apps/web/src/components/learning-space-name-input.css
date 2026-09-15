@@ -1,0 +1,37 @@
+.learning-space-name-field {
+  min-width: 0;
+}
+
+.learning-space-name-conflict {
+  margin-top: var(--spacer-8);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.learning-space-name-conflict > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacer-8);
+  margin-top: var(--spacer-4);
+}
+
+.learning-space-name-conflict button {
+  min-height: 32px;
+  font-size: 12px;
+}
+
+@media (max-width: 1024px) {
+  .learning-space-name-field > input,
+  .learning-space-name-conflict button {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 620px) {
+  .learning-space-name-field > input,
+  .learning-space-name-conflict button {
+    min-height: 44px;
+  }
+}

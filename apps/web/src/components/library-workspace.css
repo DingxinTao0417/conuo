@@ -1,0 +1,409 @@
+.library-workspace .sidebar {
+  background: var(--bg-base-secondary);
+}
+
+.library-workspace .nav-item.active,
+.library-workspace .space-list .space-active {
+  background: var(--bg-brand-popup);
+  color: var(--text-brand);
+}
+
+.library-workspace .nav-item.active::before {
+  content: none;
+}
+
+.library-workspace .topbar {
+  height: 64px;
+  border-bottom: 0;
+}
+
+.library-workspace .collection-home-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-workspace .library-back {
+  flex: 0 0 30px;
+  margin-left: -4px;
+}
+
+.library-workspace .content-scroll {
+  padding: 8px 24px 60px;
+}
+
+.library-workspace .content-scroll > * {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.library-workspace .content-scroll > .collection-actions {
+  max-width: 940px;
+}
+
+.library-workspace .library-directory-heading,
+.library-workspace .document-library-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 20px;
+  min-width: 0;
+  min-height: 34px;
+  margin-bottom: 18px;
+}
+
+.library-workspace .library-directory-heading {
+  margin-top: 44px;
+}
+
+.library-workspace .document-library-heading {
+  margin-top: 8px;
+}
+
+.library-workspace .library-directory-heading h2,
+.library-workspace .document-library-heading h2 {
+  min-width: 0;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.library-workspace .library-directory-heading p,
+.library-workspace .document-library-heading p {
+  flex: 1 1 240px;
+  min-width: 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.library-workspace .library-tools {
+  padding-bottom: 16px;
+}
+
+.library-workspace .sort-filter-select {
+  width: 116px;
+}
+
+.library-workspace .source-list:not(.source-grid) {
+  border-color: var(--border-neutral-l1);
+  border-radius: var(--radius-6);
+}
+
+.library-workspace .source-list-heading {
+  background: color-mix(in srgb, var(--bg-base-secondary) 64%, var(--bg-base-default));
+  color: var(--text-tertiary);
+}
+
+.library-workspace .content-scroll > .note-search {
+  max-width: 420px;
+  margin-bottom: 22px;
+}
+
+.library-workspace .note-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 290px));
+  gap: 18px;
+}
+
+.library-workspace .note-card {
+  min-width: 0;
+  min-height: 208px;
+  padding: 20px;
+  border-color: var(--border-neutral-l1);
+  border-radius: var(--radius-8);
+}
+
+.library-workspace .note-card:hover {
+  border-color: var(--border-brand);
+}
+
+.library-workspace .note-card h3 {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 621px) {
+  .library-workspace .source-list:not(.source-grid) .source-row {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+}
+
+/* The design's compact tablet rail keeps the current library in the top bar
+   while preserving every navigation target as a 44px icon control. */
+@media (min-width: 621px) and (max-width: 1024px) {
+  .library-workspace .sidebar,
+  .reader-shell .sidebar {
+    width: 68px;
+    flex-basis: 68px;
+    align-items: stretch;
+    padding: 12px 8px 8px;
+  }
+
+  .library-workspace .brand,
+  .reader-shell .brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .library-workspace .brand > span,
+  .reader-shell .brand > span,
+  .library-workspace .nav-item-label,
+  .reader-shell .nav-item-label,
+  .library-workspace .nav-heading > span,
+  .reader-shell .nav-heading > span,
+  .library-workspace .local-hint > span,
+  .reader-shell .local-hint > span,
+  .library-workspace .user-button > span:nth-child(2),
+  .reader-shell .user-button > span:nth-child(2),
+  .library-workspace .user-button > svg,
+  .reader-shell .user-button > svg {
+    display: none;
+  }
+
+  .library-workspace .pinned-source-section,
+  .reader-shell .pinned-source-section {
+    display: none;
+  }
+
+  .library-workspace .nav-item,
+  .reader-shell .nav-item,
+  .library-workspace .user-button,
+  .reader-shell .user-button {
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+
+  .library-workspace .nav-item,
+  .reader-shell .nav-item {
+    gap: 0;
+  }
+
+  .library-workspace .nav-item.active::before,
+  .reader-shell .nav-item.active::before {
+    display: none;
+  }
+
+  .library-workspace .nav-count,
+  .reader-shell .nav-count {
+    position: absolute;
+    top: 3px;
+    right: 2px;
+    min-width: 14px;
+    padding: 0 3px;
+    background: var(--bg-base-default);
+    color: var(--text-tertiary);
+    font-size: 9px;
+    line-height: 14px;
+  }
+
+  .library-workspace .nav-heading,
+  .reader-shell .nav-heading {
+    justify-content: center;
+    min-height: 44px;
+    margin-top: 8px;
+  }
+
+  .library-workspace .nav-heading .icon-btn,
+  .reader-shell .nav-heading .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .library-workspace .space-list .nav-item,
+  .reader-shell .space-list .nav-item {
+    min-height: 36px;
+  }
+
+  .library-workspace .space-list .space-dot,
+  .reader-shell .space-list .space-dot {
+    width: 10px;
+    height: 10px;
+    margin: 0;
+  }
+
+  .library-workspace .sidebar-bottom,
+  .reader-shell .sidebar-bottom {
+    padding-top: 8px;
+  }
+
+  .library-workspace .local-hint,
+  .reader-shell .local-hint {
+    justify-content: center;
+    min-height: 40px;
+    padding: 0;
+  }
+
+  .library-workspace .user-button,
+  .reader-shell .user-button {
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 1199px) {
+  .library-workspace .filter-select,
+  .library-workspace .tag-filter-trigger {
+    min-height: 44px;
+  }
+
+  .library-workspace .view-switch .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .library-workspace .sidebar {
+    width: 224px;
+    flex-basis: 224px;
+  }
+}
+
+/* The landscape iPad reference keeps a compact 200px rail while the reader
+   retains a permanent AI pane. */
+@media (min-width: 1025px) and (max-width: 1199px) {
+  .reader-shell:not(.comparison-shell) .sidebar {
+    width: 200px;
+    flex-basis: 200px;
+  }
+
+  /* Two reading panes need more width than a single reader. Match the compact
+     rail from the supplied landscape design only while a fixed-pair comparison
+     is open; ordinary reading retains its 200px navigation. */
+  .comparison-shell .sidebar {
+    width: 68px;
+    flex-basis: 68px;
+    align-items: stretch;
+    padding: 12px 8px 8px;
+  }
+
+  .comparison-shell .brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .comparison-shell .brand > span,
+  .comparison-shell .brand small,
+  .comparison-shell .nav-item-label,
+  .comparison-shell .nav-heading > span,
+  .comparison-shell .local-hint > span,
+  .comparison-shell .user-button > span:nth-child(2),
+  .comparison-shell .user-button > svg {
+    display: none;
+  }
+
+  .comparison-shell .pinned-source-section {
+    display: none;
+  }
+
+  .comparison-shell .nav-item,
+  .comparison-shell .user-button {
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+
+  .comparison-shell .nav-item {
+    gap: 0;
+  }
+
+  .comparison-shell .nav-item.active::before {
+    display: none;
+  }
+
+  .comparison-shell .nav-count {
+    position: absolute;
+    top: 3px;
+    right: 2px;
+    min-width: 14px;
+    padding: 0 3px;
+    background: var(--bg-base-default);
+    color: var(--text-tertiary);
+    font-size: 9px;
+    line-height: 14px;
+  }
+
+  .comparison-shell .nav-heading {
+    justify-content: center;
+    min-height: 44px;
+    margin-top: 8px;
+  }
+
+  .comparison-shell .nav-heading .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .comparison-shell .space-list .nav-item {
+    min-height: 36px;
+  }
+
+  .comparison-shell .space-list .space-dot {
+    width: 10px;
+    height: 10px;
+    margin: 0;
+  }
+
+  .comparison-shell .sidebar-bottom {
+    padding-top: 8px;
+  }
+
+  .comparison-shell .local-hint {
+    justify-content: center;
+    min-height: 40px;
+    padding: 0;
+  }
+
+  .comparison-shell .user-button {
+    margin-top: 8px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .library-workspace .sidebar {
+    width: 300px;
+    flex-basis: 300px;
+  }
+}
+
+@media (max-width: 620px) {
+  .library-workspace .topbar {
+    height: 58px;
+  }
+
+  .library-workspace .content-scroll {
+    padding: 14px 20px 45px;
+  }
+
+  .library-workspace .library-directory-heading {
+    margin-top: 32px;
+  }
+
+  .library-workspace .document-library-heading {
+    align-items: flex-start;
+    gap: 14px;
+    margin-top: 0;
+  }
+
+  .library-workspace .source-list:not(.source-grid) {
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+
+  .library-workspace .content-scroll > .note-search {
+    max-width: none;
+  }
+
+  .library-workspace .note-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

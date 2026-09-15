@@ -1,0 +1,112 @@
+.web-cloud-entry {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 40px 24px;
+  background: var(--bg-base-secondary);
+}
+.web-cloud-entry-shell {
+  width: min(100%, 480px);
+  min-width: 0;
+}
+.web-cloud-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  color: var(--text-default);
+  font-size: 23px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.web-cloud-brand-name {
+  margin-left: 10px;
+  color: var(--text-tertiary);
+  font-size: 15px;
+  font-weight: 400;
+}
+.web-cloud-entry-card {
+  padding: 28px;
+  border: 1px solid var(--border-neutral-l1);
+  border-radius: var(--radius-12);
+  background: var(--bg-base-default);
+}
+.web-cloud-entry-intro {
+  margin-bottom: 24px;
+}
+.web-cloud-entry-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-brand);
+  font-size: 12px;
+}
+.web-cloud-entry-intro h1 {
+  margin: 12px 0 8px;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.web-cloud-entry-intro p,
+.web-cloud-entry-unavailable p {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.web-cloud-entry-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 0;
+  color: var(--text-secondary);
+}
+.web-cloud-entry-spinner {
+  color: var(--text-brand);
+  animation: web-cloud-entry-spin 1s linear infinite;
+}
+.web-cloud-entry-unavailable {
+  display: grid;
+  gap: 20px;
+}
+.web-cloud-entry-unavailable button {
+  min-height: 44px;
+}
+.web-cloud-login .account-panel button[aria-label="关闭账号设置"] {
+  display: none;
+}
+.web-cloud-login .account-panel input {
+  width: 100%;
+  min-width: 0;
+}
+.web-cloud-login .account-panel button {
+  min-height: 44px;
+}
+.web-cloud-entry-footer {
+  margin: 20px 0 0;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+@keyframes web-cloud-entry-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .web-cloud-entry-spinner {
+    animation: none;
+  }
+}
+@media (max-width: 480px) {
+  .web-cloud-entry {
+    padding: 24px 16px;
+  }
+  .web-cloud-entry-card {
+    padding: 24px 16px;
+  }
+  .web-cloud-entry-intro h1 {
+    font-size: 22px;
+  }
+}

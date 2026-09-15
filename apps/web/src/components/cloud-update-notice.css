@@ -1,0 +1,66 @@
+.notice.cloud-update-notice {
+  align-items: flex-start;
+  gap: var(--spacer-12);
+  background: var(--bg-base-secondary);
+  color: var(--text-secondary);
+  font-size: var(--body-sm);
+}
+
+.cloud-update-notice > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--text-brand);
+}
+
+.cloud-update-notice-error > svg {
+  color: var(--status-warning);
+}
+
+.cloud-update-notice-content {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cloud-update-notice-content strong {
+  color: var(--text-default);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.cloud-update-notice-content p {
+  margin-top: var(--spacer-4);
+  line-height: 1.6;
+}
+
+.cloud-update-notice-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.cloud-update-notice-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacer-8);
+  min-height: 32px;
+  font-size: var(--body-sm);
+}
+
+@media (max-width: 1024px) {
+  .cloud-update-notice-actions button {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 620px) {
+  .cloud-update-notice-actions {
+    flex: 1 1 100%;
+  }
+
+  .cloud-update-notice-actions button {
+    min-height: 44px;
+    padding-inline: var(--spacer-8);
+  }
+}

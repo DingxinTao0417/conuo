@@ -1,0 +1,122 @@
+.learning-continuation-card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 12px 16px;
+  align-items: start;
+  min-height: 190px;
+  padding: 22px;
+  border: 1px solid #ded9f1;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  background: linear-gradient(135deg, #fff 0%, #fbfaff 72%, #f2efff 100%);
+  box-shadow: 0 8px 24px #342d680a;
+}
+.learning-continuation-icon {
+  grid-row: 1 / span 3;
+}
+.learning-continuation-heading {
+  min-width: 0;
+}
+.learning-continuation-heading > span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.learning-continuation-heading h3 {
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.learning-continuation-heading p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  color: #797381;
+  font-size: 11px;
+}
+.learning-continuation-summary {
+  grid-column: 2;
+  display: -webkit-box;
+  overflow: hidden;
+  color: #77717c;
+  font-size: 12px;
+  line-height: 1.75;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.learning-continuation-question {
+  grid-column: 2;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e3def5;
+  border-radius: 8px;
+  background: #fff;
+  color: #786ac7;
+}
+.learning-continuation-question > div {
+  min-width: 0;
+}
+.learning-continuation-question span {
+  display: block;
+  color: #8d8793;
+  font-size: 9px;
+}
+.learning-continuation-question b {
+  display: block;
+  overflow: hidden;
+  color: #373143;
+  font-size: 12px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.learning-continuation-action {
+  grid-column: 3;
+  grid-row: 1 / span 3;
+  align-self: center;
+  min-width: 112px;
+}
+
+@media (min-width: 621px) and (max-width: 1024px) {
+  .learning-continuation-action {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 620px) {
+  .learning-continuation-card {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 11px 13px;
+    min-height: 0;
+    padding: 17px;
+  }
+  .learning-continuation-icon {
+    grid-row: 1;
+  }
+  .learning-continuation-heading h3 {
+    font-size: 15px;
+  }
+  .learning-continuation-summary,
+  .learning-continuation-question,
+  .learning-continuation-action {
+    grid-column: 1 / -1;
+  }
+  .learning-continuation-question {
+    min-height: 52px;
+  }
+  .learning-continuation-action {
+    grid-row: auto;
+    width: 100%;
+    min-height: 44px;
+  }
+}

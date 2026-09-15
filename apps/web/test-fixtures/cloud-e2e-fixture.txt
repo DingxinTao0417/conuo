@@ -1,0 +1,6 @@
+Conuo cloud E2E fixture
+
+Marker: CONUO-CLOUD-E2E-20260913
+
+This small text file contains no user information. It exists only to verify an
+owner-scoped upload, cross-session download, and cross-account denial path.

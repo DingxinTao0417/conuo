@@ -1,0 +1,129 @@
+.source-purge-dialog .modal-header h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.source-purge-dialog .modal-header .icon-btn {
+  flex-shrink: 0;
+}
+.source-purge-dialog .source-purge-modal {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.source-purge-content {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.source-purge-content h3 {
+  margin: 0;
+  color: var(--text-default);
+  font-size: 13px;
+  font-weight: 600;
+}
+.source-purge-content p {
+  margin: 0;
+}
+.source-purge-content fieldset {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border-neutral-l1);
+  border-radius: 8px;
+}
+.source-purge-content legend {
+  padding: 0 5px;
+  color: var(--text-default);
+  font-size: 12px;
+}
+.source-purge-dialog .modal-body .source-purge-candidate {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px;
+  cursor: pointer;
+}
+.source-purge-candidate input {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--text-default);
+}
+.source-purge-candidate span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.source-purge-candidate b {
+  font-size: 12px;
+  font-weight: 500;
+}
+.source-purge-dialog .source-purge-candidate small {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+.source-purge-content fieldset:disabled .source-purge-candidate {
+  cursor: default;
+  opacity: 0.65;
+}
+.source-purge-reset,
+.source-purge-legacy {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.source-purge-dialog .source-purge-confirmation input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.source-purge-dialog .source-purge-refresh {
+  align-self: flex-start;
+}
+.source-purge-dialog .modal-actions {
+  flex-wrap: wrap;
+  position: sticky;
+  bottom: -22px;
+  z-index: 1;
+  padding: 12px 0 22px;
+  margin-bottom: -22px;
+  background: var(--bg-base-default);
+  border-top: 1px solid var(--border-neutral-l1);
+}
+@media (min-width: 621px) and (max-width: 1024px) {
+  .source-purge-dialog .modal-body .source-purge-candidate,
+  .source-purge-dialog .btn,
+  .source-purge-dialog .modal-header .icon-btn,
+  .source-purge-dialog .source-purge-confirmation input {
+    min-height: 40px;
+  }
+  .source-purge-dialog .modal-header .icon-btn {
+    min-width: 40px;
+  }
+}
+@media (max-width: 620px) {
+  .source-purge-dialog .modal-body {
+    padding: 16px;
+  }
+  .source-purge-dialog .modal-actions {
+    bottom: -16px;
+    padding-bottom: 16px;
+    margin-bottom: -16px;
+  }
+  .source-purge-dialog .modal-body .source-purge-candidate,
+  .source-purge-dialog .btn,
+  .source-purge-dialog .modal-header .icon-btn,
+  .source-purge-dialog .source-purge-confirmation input {
+    min-height: 44px;
+  }
+  .source-purge-dialog .modal-header .icon-btn {
+    min-width: 44px;
+  }
+  .source-purge-dialog .modal-actions .btn {
+    flex: 1 1 120px;
+    min-width: 0;
+    white-space: normal;
+  }
+}
