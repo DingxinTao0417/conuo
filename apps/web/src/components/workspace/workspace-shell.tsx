@@ -127,7 +127,7 @@ import {
   persistKnowledgeUpdateWithdrawal,
   type KnowledgeUpdateWithdrawalOperationContext,
 } from "@/lib/knowledge-update-withdrawal-operation";
-import { reviseNote, restoreNoteVersion } from "@/lib/note-versions";
+import { reviseNote } from "@/lib/note-versions";
 import {
   acceptRelationProposal,
   ignoreRelationProposal,
@@ -135,7 +135,7 @@ import {
   deleteConceptRelation,
   restoreConceptRelation,
 } from "@/lib/concept-relations";
-import { SourceIcon, inboxSpace, normalizedTag, plain, sourceStatusLabel } from "./shared";
+import { inboxSpace, isUntouchedStarterWorkspace, normalizedTag, plain } from "./shared";
 import RecognizedContentPanel from "./panels/recognized-content-panel";
 import AnonymousWorkspaceMigrationNotice from "./anonymous-workspace-migration-notice";
 import { ReadingProgressConflictModal } from "./modals/reading-progress-conflict-modal";
@@ -144,6 +144,10 @@ import ConversationHistoryModal from "./modals/conversation-history-modal";
 import DeleteSpaceModal from "./modals/delete-space-modal";
 import { ImportModal } from "./modals/import-modal";
 import SourceDetailsModal from "./modals/source-details-modal";
+import ExportResultModal from "./modals/export-result-modal";
+import SpaceCreationModal from "./modals/space-creation-modal";
+import ComparisonSourceModal from "./modals/comparison-source-modal";
+import NoteHistoryModal from "./modals/note-history-modal";
 import HomeSection from "./sections/home-section";
 import KnowledgeSection from "./sections/knowledge-section";
 import LibrarySection from "./sections/library-section";
@@ -206,22 +210,6 @@ const comparisonUnavailableCopy: Record<ComparisonSourcesUnavailableReason, stri
   "source-not-in-space": "其中一份资料已不属于这个知识库，不能继续对照阅读。",
   "version-missing": "其中一份指定版本未保留，不能用当前版本替代它。",
 };
-
-/** A fresh workspace starts with one editable library so first import has a home. */
-function isUntouchedStarterWorkspace(data: WorkspaceData) {
-  const [starter] = data.spaces;
-  return Boolean(
-    starter &&
-    data.spaces.length === 1 &&
-    starter.name === "我的学习空间" &&
-    !starter.archived &&
-    data.sources.length === 0 &&
-    data.notes.length === 0 &&
-    data.annotations.length === 0 &&
-    data.conversations.length === 0 &&
-    (data.importJobs?.length ?? 0) === 0,
-  );
-}
 
 export default function Workspace({
   storageMode = "hybrid",
@@ -444,7 +432,7 @@ export default function Workspace({
       setModal("recognized-content");
       return true;
     },
-    [setModal, setToast],
+    [setDetailId, setModal, setToast],
   );
   const activeSpace = data.spaces.find((s) => s.id === spaceId);
   const currentSource = data.sources.find((s) => s.id === sourceId && !s.deletedAt);
@@ -711,7 +699,7 @@ export default function Workspace({
     // dialog's close button. Clear only this hidden dialog state so keyboard
     // actions such as Cmd/Ctrl+K are not left permanently blocked.
     setModal((current) => (current === "conversation-history" ? null : current));
-  }, [setModal]);
+  }, [setConversationToInspectId, setModal]);
 
   const applyLibraryRouteState = useCallback(
     (route: LibraryRoute) => {
@@ -738,7 +726,15 @@ export default function Workspace({
       setSelected([]);
       setSidebar(false);
     },
-    [clearConversationRouteState, setSelected],
+    [
+      clearConversationRouteState,
+      setComparisonTargetId,
+      setCrossLibrarySearchDraft,
+      setSearch,
+      setSearchIntent,
+      setSelected,
+      setSpaceId,
+    ],
   );
 
   const recoverUnavailableSourceRoute = useCallback(
@@ -766,7 +762,7 @@ export default function Workspace({
       );
       replaceWithLibraryRoute(returnRoute);
     },
-    [applyLibraryRouteState, setModal, setToast],
+    [applyLibraryRouteState, setDetailId, setModal, setPendingNoteCitation, setToast],
   );
 
   function replaceLibraryView(
@@ -1016,7 +1012,15 @@ export default function Workspace({
         query: "",
       }),
     );
-  }, [clearConversationRouteState, layout, modal, setSelected, spaceId]);
+  }, [
+    clearConversationRouteState,
+    layout,
+    modal,
+    setComparisonTargetId,
+    setSearch,
+    setSelected,
+    spaceId,
+  ]);
 
   useEffect(() => {
     if (!ready || modal || !pendingSearchFocus.current || !searchRef.current) return;
@@ -1577,7 +1581,15 @@ export default function Workspace({
       setConversationRouteIssue("这条问答记录不可用或不属于当前账号。");
       write();
     },
-    [data, setModal],
+    [
+      data,
+      setComparisonTargetId,
+      setConversationToInspectId,
+      setKnowledgeEvidenceAskOpen,
+      setModal,
+      setPendingNoteCitation,
+      setSpaceId,
+    ],
   );
 
   function openConversation(conversation: Conversation) {
@@ -1596,7 +1608,7 @@ export default function Workspace({
     setSection("questions");
     setModal(null);
     setConversationRouteIssue("这条问答记录不可用或不属于当前账号。");
-  }, [setModal]);
+  }, [setConversationToInspectId, setModal]);
 
   useEffect(() => {
     if (!conversationRouteId) {
@@ -3277,46 +3289,11 @@ export default function Workspace({
         </Modal>
       )}
       {modal === "export-result" && exportIssues && (
-        <Modal
-          title="备份已下载，但有原件未包含"
-          onClose={() => {
-            setModal(null);
-            setExportIssues(null);
-          }}
-        >
-          <div className="modal-body export-result-modal">
-            <p className="export-result-intro">
-              资料文字、笔记、批注、引用和其他可用原件已经写入 ZIP。以下版本的原文件未能取得，
-              不会以当前版本或其他文件代替。
-            </p>
-            <ul className="export-issue-list">
-              {exportIssues.map((issue) => (
-                <li key={issue.sourceId + ":" + issue.versionId + ":" + issue.code}>
-                  <strong>
-                    {issue.title}
-                    {issue.versionState === "historical" ? " · 历史版本" : ""}
-                  </strong>
-                  <span>{issue.message}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="muted">
-              ZIP 根目录的 <code>export-issues.json</code> 和每个资料版本的{" "}
-              <code>original-status.txt</code> 保留相同的逐项说明。
-            </p>
-            <div className="modal-actions">
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  setModal(null);
-                  setExportIssues(null);
-                }}
-              >
-                知道了
-              </button>
-            </div>
-          </div>
-        </Modal>
+        <ExportResultModal
+          exportIssues={exportIssues}
+          setModal={setModal}
+          setExportIssues={setExportIssues}
+        />
       )}
       {modal === "sync-conflict" &&
         (readingConflictPlanSnapshot || store.readingProgressSyncPlan ? (
@@ -3373,83 +3350,16 @@ export default function Workspace({
           </Modal>
         ))}
       {modal === "space" && (
-        <Modal
-          title={spaceCreationIntent === "import" ? "创建知识库并导入资料" : "新建知识库"}
-          onClose={closeSpaceCreation}
-        >
-          <form
-            className="modal-body"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const f = new FormData(e.currentTarget);
-              const name = String(f.get("name") || "").trim();
-              if (!name) {
-                setToast("请填写知识库名称。");
-                const nameInput = e.currentTarget.elements.namedItem("name");
-                if (nameInput instanceof HTMLInputElement) nameInput.focus();
-                return;
-              }
-              const id = crypto.randomUUID();
-              const created = {
-                id,
-                name,
-                goal: String(f.get("goal") || "").trim(),
-                color: "#4B3FE3",
-                archived: false,
-                createdAt: new Date().toISOString(),
-              };
-              const continueToImport = spaceCreationIntent === "import";
-              update((d) => ({
-                ...d,
-                spaces:
-                  continueToImport && isUntouchedStarterWorkspace(d)
-                    ? [created]
-                    : [...d.spaces, created],
-              }));
-              setSpaceCreationIntent("browse");
-              chooseSpace(id);
-              if (continueToImport) {
-                setImportTargetSpaceId(id);
-                setModal("import");
-              } else setModal(null);
-            }}
-          >
-            <label>
-              知识库名称
-              <input
-                className="field"
-                name="name"
-                maxLength={60}
-                required
-                placeholder="例如：机器学习入门"
-                autoFocus
-                onInvalid={(e) => {
-                  e.preventDefault();
-                  setToast("请填写知识库名称。");
-                  e.currentTarget.focus();
-                }}
-              />
-            </label>
-            <label>
-              学习目标 <small>可选</small>
-              <textarea
-                className="field"
-                name="goal"
-                rows={3}
-                maxLength={300}
-                placeholder="你希望在这个主题中弄懂什么？"
-              />
-            </label>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={closeSpaceCreation}>
-                取消
-              </button>
-              <button className="btn btn-primary">
-                {spaceCreationIntent === "import" ? "创建并导入" : "创建知识库"}
-              </button>
-            </div>
-          </form>
-        </Modal>
+        <SpaceCreationModal
+          spaceCreationIntent={spaceCreationIntent}
+          update={update}
+          setToast={setToast}
+          setSpaceCreationIntent={setSpaceCreationIntent}
+          setImportTargetSpaceId={setImportTargetSpaceId}
+          setModal={setModal}
+          chooseSpace={chooseSpace}
+          closeSpaceCreation={closeSpaceCreation}
+        />
       )}
       {modal === "delete-space" && spaceToDelete && (
         <DeleteSpaceModal
@@ -3620,73 +3530,15 @@ export default function Workspace({
         </Modal>
       )}
       {modal === "compare-source" && (
-        <Modal
-          title="选择要对照的资料"
-          onClose={() => {
-            setModal(null);
-            setComparisonTargetId("");
-          }}
-        >
-          <div className="modal-body comparison-source-picker">
-            <p className="bulk-space-intro">
-              将与“{readingSource?.title || "当前资料"}”在“
-              {comparisonPickerSpace?.name || "当前知识库"}
-              ”中并排打开。进入后会固定两份资料的当前阅读版本；
-              若资料或版本已变化，系统不会替换为其他内容。
-            </p>
-            {comparisonCandidates.length ? (
-              <fieldset className="comparison-source-fieldset">
-                <legend>选择另一份资料</legend>
-                <div className="comparison-source-list" role="radiogroup" aria-label="对照资料">
-                  {comparisonCandidates.map((source) => (
-                    <label
-                      className={`comparison-source-option ${
-                        comparisonTargetId === source.id ? "selected" : ""
-                      }`}
-                      key={source.id}
-                    >
-                      <input
-                        type="radio"
-                        name="comparison-source"
-                        checked={comparisonTargetId === source.id}
-                        onChange={() => setComparisonTargetId(source.id)}
-                      />
-                      <SourceIcon source={source} />
-                      <span>
-                        <b>{source.title}</b>
-                        <small>
-                          {sourceStatusLabel(source)} · {source.filename}
-                        </small>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            ) : (
-              <p className="muted">当前知识库没有可选的另一份资料。</p>
-            )}
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  setModal(null);
-                  setComparisonTargetId("");
-                }}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={!comparisonTargetId || !comparisonCandidates.length}
-                onClick={startComparison}
-              >
-                开始对照阅读
-              </button>
-            </div>
-          </div>
-        </Modal>
+        <ComparisonSourceModal
+          readingSource={readingSource}
+          comparisonPickerSpace={comparisonPickerSpace}
+          comparisonCandidates={comparisonCandidates}
+          comparisonTargetId={comparisonTargetId}
+          setComparisonTargetId={setComparisonTargetId}
+          setModal={setModal}
+          startComparison={startComparison}
+        />
       )}
       {(modal === "bulk-spaces" || modal === "bulk-recycle") && (
         <BulkSourceActionsPanel
@@ -3734,42 +3586,12 @@ export default function Workspace({
         />
       )}
       {modal === "history" && currentNote && (
-        <Modal title="笔记历史版本" onClose={() => setModal(null)}>
-          <div className="modal-body">
-            <p className="muted">
-              编辑期间每分钟保留一个历史快照；接受更新时立即保存旧版本，最多保留 30
-              个。恢复前保留当前内容。旧记录若无引用快照，恢复时会清空引用并将知识页设为待审核。
-            </p>
-            {currentNote.versions.length ? (
-              [...currentNote.versions].reverse().map((v) => (
-                <div className="version-row" key={v.id}>
-                  <div>
-                    <b>{v.title}</b>
-                    <p>{new Date(v.savedAt).toLocaleString("zh-CN")}</p>
-                    <p>{plain(v.content).slice(0, 100)}</p>
-                  </div>
-                  <button
-                    className="btn"
-                    onClick={() => {
-                      update((d) => ({
-                        ...d,
-                        notes: d.notes.map((n) =>
-                          n.id === currentNote.id ? restoreNoteVersion(n, v.id) : n,
-                        ),
-                      }));
-                      setEditorKey((k) => k + 1);
-                      setModal(null);
-                    }}
-                  >
-                    恢复
-                  </button>
-                </div>
-              ))
-            ) : (
-              <p>还没有历史版本。</p>
-            )}
-          </div>
-        </Modal>
+        <NoteHistoryModal
+          currentNote={currentNote}
+          update={update}
+          setEditorKey={setEditorKey}
+          setModal={setModal}
+        />
       )}
       {toast && (
         <div className="toast" role="status">

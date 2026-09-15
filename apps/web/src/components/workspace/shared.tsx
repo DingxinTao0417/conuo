@@ -1,6 +1,6 @@
 "use client";
 import { FileText } from "lucide-react";
-import type { Source, Space } from "@/lib/types";
+import type { Source, Space, WorkspaceData } from "@/lib/types";
 import { sourceCoverageLabel } from "@/lib/source-coverage";
 
 export const statusLabel = {
@@ -65,5 +65,21 @@ export function Empty({
       <p>{text}</p>
       {action}
     </div>
+  );
+}
+
+/** A fresh workspace starts with one editable library so first import has a home. */
+export function isUntouchedStarterWorkspace(data: WorkspaceData) {
+  const [starter] = data.spaces;
+  return Boolean(
+    starter &&
+    data.spaces.length === 1 &&
+    starter.name === "我的学习空间" &&
+    !starter.archived &&
+    data.sources.length === 0 &&
+    data.notes.length === 0 &&
+    data.annotations.length === 0 &&
+    data.conversations.length === 0 &&
+    (data.importJobs?.length ?? 0) === 0,
   );
 }
