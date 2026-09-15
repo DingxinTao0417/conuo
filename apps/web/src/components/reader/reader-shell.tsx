@@ -60,6 +60,7 @@ import WebVersionPanel from "../web-version-panel";
 import Modal from "../modal";
 import { assertAnnotationSource, createAnnotation, updateAnnotation } from "@/lib/annotations";
 import { priorUserQuestions } from "@/lib/answer-context";
+import { answerRequestFromSnapshot } from "@/lib/answer-request";
 import { citationProblem, findQuoteRange, quoteOffsets } from "../reader-utils";
 import {
   annotationRangeResolver,
@@ -1795,29 +1796,7 @@ export default function Reader(props: ReaderProps) {
     };
     try {
       const answer = await onAsk(
-        {
-          requestId: attempt.id,
-          question,
-          ...(userContext.length ? { userContext } : {}),
-          scope: requestSnapshot.scope,
-          sourceId:
-            requestSnapshot.scope === "selection" ||
-            requestSnapshot.scope === "document" ||
-            requestSnapshot.scope === "document-notes"
-              ? requestSnapshot.sourceId
-              : undefined,
-          sourceIds: requestSnapshot.scope === "sources" ? requestSnapshot.sourceIds : [],
-          ...(requestSnapshot.sourceVersions
-            ? {
-                sourceVersions: requestSnapshot.sourceVersions.map((reference) => ({
-                  ...reference,
-                })),
-              }
-            : {}),
-          ...(requestSnapshot.comparison ? { comparison: { ...requestSnapshot.comparison } } : {}),
-          spaceId: requestSnapshot.spaceId,
-          selection: requestSnapshot.scope === "selection" ? requestSnapshot.selection : undefined,
-        },
+        answerRequestFromSnapshot(requestSnapshot, { question, requestId: attempt.id }),
         requestController.signal,
         (event) => {
           if (

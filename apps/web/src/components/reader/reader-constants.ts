@@ -1,3 +1,4 @@
+import { askScopeLabels, readerAskScopes } from "@/lib/ask-scopes";
 import { sourceCoverageLabel, sourcePresentationStatus } from "@/lib/source-coverage";
 import type {
   AnswerNoteEvidence,
@@ -7,21 +8,17 @@ import type {
   Source,
 } from "@/lib/types";
 
+// The reader's own ranges share names with their server scopes, so these two
+// exports stay a thin projection of the shared list in lib/ask-scopes.
 export const scopeLabels: Record<Scope, string> = {
-  selection: "选中段落 + 当前资料",
-  document: "当前资料",
-  "document-notes": "此资料 + 我的笔记",
-  sources: "选定资料",
-  space: "当前学习空间",
-  "cross-library-sources": "跨知识库固定资料",
+  selection: askScopeLabels.selection,
+  document: askScopeLabels.document,
+  "document-notes": askScopeLabels["document-notes"],
+  sources: askScopeLabels.sources,
+  space: askScopeLabels.space,
+  "cross-library-sources": askScopeLabels["cross-library"],
 };
-export const readerScopeOptions: Exclude<Scope, "cross-library-sources">[] = [
-  "selection",
-  "document",
-  "document-notes",
-  "sources",
-  "space",
-];
+export const readerScopeOptions = readerAskScopes as Exclude<Scope, "cross-library-sources">[];
 export const statuses: Record<Source["status"], string> = {
   saved: "已保存 · 待解析",
   parsing: "正在解析",
