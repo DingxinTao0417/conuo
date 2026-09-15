@@ -43,7 +43,6 @@ import { convertDocxToStructure, type DocxBlock } from "@/lib/docx-structure";
 import type {
   AnswerAttempt,
   Annotation,
-  AnswerResult,
   AnswerScopeSnapshot,
   Citation,
   Conversation,
@@ -74,7 +73,6 @@ import {
   type ReaderOutlineItem,
 } from "../reader-outline";
 import { findReaderSearchRanges, readerSearchRoot } from "../reader-search";
-import type { AnswerProgress } from "@/lib/answer-stream-types";
 import {
   answerScopeAvailability,
   isSourceAnswerEligible,
@@ -86,6 +84,7 @@ import {
   sourceParserCoverageNotice,
 } from "@/lib/source-coverage";
 import { selectReadingPositionAlternative } from "@/lib/reading-position-alternatives";
+import { useAskConversation } from "../ai/use-ask-conversation";
 import "../reader.css";
 import {
   AI_PANEL_DEFAULT_WIDTH,
@@ -230,17 +229,39 @@ export default function Reader(props: ReaderProps) {
   const [selectionToolbar, setSelectionToolbar] = useState<SelectionToolbarPosition | null>(null);
   const [scope, setScope] = useState<Scope>("document-notes");
   const [selectedIds, setSelectedIds] = useState<string[]>([source.id]);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [answerDraft, setAnswerDraft] = useState<AnswerResult | null>(null);
-  const [stoppingAnswer, setStoppingAnswer] = useState(false);
-  const [answerPhase, setAnswerPhase] =
-    useState<Extract<AnswerProgress, { type: "progress" }>["phase"]>("retrieving");
-  const [error, setError] = useState("");
+  const {
+    input,
+    setInput,
+    busy,
+    stopping: stoppingAnswer,
+    answerDraft,
+    answerPhase,
+    error,
+    setError,
+    historyOpen,
+    setHistoryOpen,
+    selectedConversationId: selectedConversation,
+    setSelectedConversationId: setSelectedConversation,
+    newConversation,
+    setNewConversation,
+    expandedCitationKey,
+    toggleCitationKey,
+    saveTargetMessageId,
+    setSaveTargetMessageId,
+    knowledgePageTargetId,
+    setKnowledgePageTargetId,
+    openKnowledgeSaveTarget,
+    questionInput,
+    chatEnd,
+    focusInput: focusAiInput,
+    beginNewConversation,
+    running: askRunning,
+    abort: abortAsk,
+    stop: stopAnswer,
+    reset: resetAskConversation,
+    run: runAsk,
+  } = useAskConversation();
   const [notice, setNotice] = useState("");
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const [newConversation, setNewConversation] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [webPanel, setWebPanel] = useState<"history" | "refresh" | "replace" | null>(null);
   const [sourceActionsOpen, setSourceActionsOpen] = useState(false);
   const [retainedPositionsOpen, setRetainedPositionsOpen] = useState(false);
@@ -260,9 +281,6 @@ export default function Reader(props: ReaderProps) {
   const [searchResult, setSearchResult] = useState<ReaderSearchResult | null>(null);
   const [focusedCitation, setFocusedCitation] = useState<Citation | null>(null);
   const [citationError, setCitationError] = useState("");
-  const [expandedCitationKey, setExpandedCitationKey] = useState<string | null>(null);
-  const [saveTargetMessageId, setSaveTargetMessageId] = useState<string | null>(null);
-  const [knowledgePageTargetId, setKnowledgePageTargetId] = useState("");
   const [excerptKnowledgeTarget, setExcerptKnowledgeTarget] =
     useState<ExcerptKnowledgeTarget | null>(null);
   const [excerptKnowledgePageTargetId, setExcerptKnowledgePageTargetId] = useState("");
@@ -274,15 +292,10 @@ export default function Reader(props: ReaderProps) {
   const docxStructureKey = `${source.id}:${source.versionId}`;
   const docxBlocks = docxStructure?.key === docxStructureKey ? docxStructure.blocks : null;
   const textContainer = useRef<HTMLDivElement>(null);
-  const chatEnd = useRef<HTMLDivElement>(null);
-  const questionInput = useRef<HTMLTextAreaElement>(null);
   const citationReturnButton = useRef<HTMLButtonElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const searchToggle = useRef<HTMLButtonElement>(null);
   const outlineToggle = useRef<HTMLButtonElement>(null);
-  const controller = useRef<AbortController | null>(null);
-  const answerDraftRef = useRef<AnswerResult | null>(null);
-  const manuallyStoppedController = useRef<AbortController | null>(null);
   const pendingCitation = useRef<Citation | null>(null);
   const activeSourceId = useRef(`${source.id}:${source.versionId}`);
   const consumedInitialConversationId = useRef<string | null>(null);
@@ -320,10 +333,6 @@ export default function Reader(props: ReaderProps) {
   const androidMobileVariant =
     props.mobilePlatform === "android" || (props.mobilePlatform !== "default" && androidUserAgent);
 
-  function replaceAnswerDraft(next: AnswerResult | null) {
-    answerDraftRef.current = next;
-    setAnswerDraft(next);
-  }
   useEffect(() => {
     sourceRef.current = source;
     getSourceBlobRef.current = getSourceBlob;
@@ -423,7 +432,7 @@ export default function Reader(props: ReaderProps) {
   const ineligibleCount = scopeAvailability.excludedCount;
   const askEligibilityMessage = scopeAvailability.blockedMessage;
 
-  useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => () => abortAsk(), [abortAsk]);
   useEffect(() => {
     let disposed = false;
     if (source.kind !== "docx" || !source.text) return;
@@ -461,7 +470,7 @@ export default function Reader(props: ReaderProps) {
   }, [excerptKnowledgeTarget]);
   useEffect(() => {
     if (!historical) return;
-    controller.current?.abort();
+    abortAsk();
     if (progressTimer.current) clearTimeout(progressTimer.current);
     progressTimer.current = null;
     if (readingSyncTimer.current) clearTimeout(readingSyncTimer.current);
@@ -469,7 +478,7 @@ export default function Reader(props: ReaderProps) {
     pendingReadOffset.current = null;
     pendingReadPage.current = null;
     reportPendingReading(false);
-  }, [historical]);
+  }, [abortAsk, historical]);
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       if (textContainer.current && (source.kind !== "pdf" || showText))
@@ -529,16 +538,12 @@ export default function Reader(props: ReaderProps) {
   }, [props.readingPositionRevision]);
   useEffect(() => {
     if (activeSourceId.current === `${source.id}:${source.versionId}`) return;
-    controller.current?.abort();
     activeSourceId.current = `${source.id}:${source.versionId}`;
     consumedInitialConversationId.current = null;
-    setBusy(false);
-    replaceAnswerDraft(null);
-    setStoppingAnswer(false);
-    manuallyStoppedController.current = null;
+    // Drops the in-flight request, the composer draft and the open thread so a
+    // late answer from the previous document can never land in this one.
+    resetAskConversation();
     setSelection("");
-    setSelectedConversation(null);
-    setNewConversation(false);
     setPage(source.readPage || 1);
     pageRef.current = source.readPage || 1;
     pendingReadPage.current = null;
@@ -554,8 +559,6 @@ export default function Reader(props: ReaderProps) {
     setRegionCapture(null);
     setSelectedIds([source.id]);
     setScope("document-notes");
-    setInput("");
-    setError("");
     setAnnotationDraft(null);
     setAnnotationNote("");
     setEditingAnnotationId(null);
@@ -569,14 +572,11 @@ export default function Reader(props: ReaderProps) {
     setFocusedAnnotationId(null);
     setPlainSelectionAnchor(null);
     setCitationError("");
-    setExpandedCitationKey(null);
-    setSaveTargetMessageId(null);
-    setKnowledgePageTargetId("");
     setExcerptKnowledgeTarget(null);
     setExcerptKnowledgePageTargetId("");
     setSourceActionsOpen(false);
     setRetainedPositionsOpen(false);
-  }, [source.id, source.versionId, source.pageCount, source.readPage]);
+  }, [resetAskConversation, source.id, source.versionId, source.pageCount, source.readPage]);
 
   useEffect(() => {
     if (!sourceActionsOpen) return;
@@ -638,7 +638,7 @@ export default function Reader(props: ReaderProps) {
     setSelectedIds([...initialConversation.sourceIds]);
     setAiOpen(true);
     setMobileTab("ai");
-  }, [history, props.initialConversationId]);
+  }, [history, props.initialConversationId, setNewConversation, setSelectedConversation]);
 
   useEffect(() => {
     const citation = initialCitation || pendingCitation.current;
@@ -678,7 +678,7 @@ export default function Reader(props: ReaderProps) {
 
   useEffect(() => {
     chatEnd.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [messages.length, busy, answerDraft?.content]);
+  }, [chatEnd, messages.length, busy, answerDraft?.content]);
 
   useEffect(() => {
     const capture = () => {
@@ -1233,14 +1233,6 @@ export default function Reader(props: ReaderProps) {
     setMobileTab("ai");
   }
 
-  function focusAiInput() {
-    if (typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(() => questionInput.current?.focus());
-      return;
-    }
-    questionInput.current?.focus();
-  }
-
   function prepareFollowUp(question: string) {
     setInput(question);
     openAiPanel();
@@ -1428,14 +1420,6 @@ export default function Reader(props: ReaderProps) {
     }
   }
 
-  function openKnowledgeSaveTarget(messageId: string) {
-    setSaveTargetMessageId((current) => {
-      const next = current === messageId ? null : messageId;
-      if (next) setKnowledgePageTargetId("");
-      return next;
-    });
-  }
-
   function appendAnswerToKnowledgePage(message: Message) {
     if (!onAppendToKnowledgePage) {
       setNotice("当前页面无法保存到既有知识页，请刷新后重试。");
@@ -1585,7 +1569,7 @@ export default function Reader(props: ReaderProps) {
       return;
     }
     const question = (retryQuestion?.content ?? options.question ?? input).trim();
-    if (!question || busy || controller.current) return;
+    if (!question || busy || askRunning()) return;
     const scopeSnapshot = retryAttempt
       ? {
           ...retryAttempt.scopeSnapshot,
@@ -1778,91 +1762,59 @@ export default function Reader(props: ReaderProps) {
     setSelectedConversation(next.id);
     setNewConversation(false);
     if (!retryQuestion) setInput("");
-    setError("");
-    replaceAnswerDraft(null);
-    setAnswerPhase("retrieving");
-    setBusy(true);
-    setStoppingAnswer(false);
-    manuallyStoppedController.current = null;
     setAiOpen(true);
     setMobileTab("ai");
-    const requestController = new AbortController();
-    controller.current = requestController;
     const attempt: AnswerAttempt = {
       id: crypto.randomUUID(),
       questionMessageId: questionMessage.id,
       scopeSnapshot: requestSnapshot,
       status: "completed",
     };
-    try {
-      const answer = await onAsk(
-        answerRequestFromSnapshot(requestSnapshot, { question, requestId: attempt.id }),
-        requestController.signal,
-        (event) => {
-          if (
-            requestController.signal.aborted ||
-            controller.current !== requestController ||
-            activeSourceId.current !== `${source.id}:${source.versionId}`
-          )
-            return;
-          if (event.type === "draft") replaceAnswerDraft(event.answer);
-          else setAnswerPhase(event.phase);
-        },
-      );
-      if (requestController.signal.aborted) throw new DOMException("已停止", "AbortError");
-      const response: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: answer.content,
-        citations: answer.citations,
-        ...(answer.noteEvidence?.length ? { noteEvidence: answer.noteEvidence } : {}),
-        mode: answer.mode,
-        attempt,
-        createdAt: new Date().toISOString(),
-      };
-      onConversationChange({
-        ...next,
-        messages: [...next.messages, response],
-        updatedAt: response.createdAt,
-      });
-    } catch (cause) {
-      const stoppedByUser = manuallyStoppedController.current === requestController;
-      const partial =
-        stoppedByUser && answerDraftRef.current?.content.trim() ? answerDraftRef.current : null;
-      const message = stoppedByUser
-        ? partial
-          ? "已停止生成，以上内容尚未完成或核验。"
-          : "回答已停止，问题已保留。"
-        : cause instanceof Error
-          ? cause.message
-          : "暂时无法回答，请稍后重试。";
-      const response: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: partial?.content ?? "",
-        citations: partial?.citations ?? [],
-        ...(partial?.noteEvidence?.length ? { noteEvidence: partial.noteEvidence } : {}),
-        ...(partial ? { mode: partial.mode } : {}),
-        attempt: { ...attempt, status: stoppedByUser ? "stopped" : "failed" },
-        error: message,
-        createdAt: new Date().toISOString(),
-      };
-      onConversationChange({
-        ...next,
-        messages: [...next.messages, response],
-        updatedAt: response.createdAt,
-      });
-      if (activeSourceId.current === `${source.id}:${source.versionId}`) setError(message);
-    } finally {
-      if (controller.current === requestController) {
-        controller.current = null;
-        setBusy(false);
-        replaceAnswerDraft(null);
-        setStoppingAnswer(false);
-        if (manuallyStoppedController.current === requestController)
-          manuallyStoppedController.current = null;
-      }
-    }
+    const readerIdentity = `${source.id}:${source.versionId}`;
+    await runAsk({
+      accepts: () => activeSourceId.current === readerIdentity,
+      dispatch: (signal, onProgress) =>
+        onAsk(
+          answerRequestFromSnapshot(requestSnapshot, { question, requestId: attempt.id }),
+          signal,
+          onProgress,
+        ),
+      onAnswer: (answer) => {
+        const response: Message = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: answer.content,
+          citations: answer.citations,
+          ...(answer.noteEvidence?.length ? { noteEvidence: answer.noteEvidence } : {}),
+          mode: answer.mode,
+          attempt,
+          createdAt: new Date().toISOString(),
+        };
+        onConversationChange({
+          ...next,
+          messages: [...next.messages, response],
+          updatedAt: response.createdAt,
+        });
+      },
+      onFailure: ({ message, stoppedByUser, partial }) => {
+        const response: Message = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: partial?.content ?? "",
+          citations: partial?.citations ?? [],
+          ...(partial?.noteEvidence?.length ? { noteEvidence: partial.noteEvidence } : {}),
+          ...(partial ? { mode: partial.mode } : {}),
+          attempt: { ...attempt, status: stoppedByUser ? "stopped" : "failed" },
+          error: message,
+          createdAt: new Date().toISOString(),
+        };
+        onConversationChange({
+          ...next,
+          messages: [...next.messages, response],
+          updatedAt: response.createdAt,
+        });
+      },
+    });
   }
 
   function clearSearchResults() {
@@ -2891,10 +2843,7 @@ export default function Reader(props: ReaderProps) {
                     aria-label="新建对话"
                     disabled={busy || historical}
                     onClick={() => {
-                      setNewConversation(true);
-                      setSelectedConversation(null);
-                      setError("");
-                      setInput("");
+                      beginNewConversation();
                       questionInput.current?.focus();
                     }}
                   >
@@ -3191,14 +3140,12 @@ export default function Reader(props: ReaderProps) {
                               expandedNoteEvidenceIndex={expandedNoteEvidenceIndex}
                               citationIssues={citationIssues}
                               noteEvidenceIssues={noteEvidenceIssues}
-                              onCitationToggle={(citationIndex) => {
-                                const key = citationKey(message.id, citationIndex);
-                                setExpandedCitationKey((current) => (current === key ? null : key));
-                              }}
-                              onNoteEvidenceToggle={(noteIndex) => {
-                                const key = noteEvidenceKey(message.id, noteIndex);
-                                setExpandedCitationKey((current) => (current === key ? null : key));
-                              }}
+                              onCitationToggle={(citationIndex) =>
+                                toggleCitationKey(citationKey(message.id, citationIndex))
+                              }
+                              onNoteEvidenceToggle={(noteIndex) =>
+                                toggleCitationKey(noteEvidenceKey(message.id, noteIndex))
+                              }
                             />
                           ) : (
                             <Markdown content={message.content} />
@@ -3290,12 +3237,9 @@ export default function Reader(props: ReaderProps) {
                                       cardId={citationCardId(message.id, citationIndex)}
                                       expanded={expandedCitationIndex === citationIndex}
                                       issue={citationIssues[citationIndex] || null}
-                                      onToggle={() => {
-                                        const key = citationKey(message.id, citationIndex);
-                                        setExpandedCitationKey((current) =>
-                                          current === key ? null : key,
-                                        );
-                                      }}
+                                      onToggle={() =>
+                                        toggleCitationKey(citationKey(message.id, citationIndex))
+                                      }
                                     />
                                   );
                                 })}
@@ -3314,12 +3258,9 @@ export default function Reader(props: ReaderProps) {
                                       cardId={noteEvidenceCardId(message.id, noteIndex)}
                                       expanded={expandedNoteEvidenceIndex === noteIndex}
                                       issue={noteEvidenceIssues[noteIndex] || null}
-                                      onToggle={() => {
-                                        const key = noteEvidenceKey(message.id, noteIndex);
-                                        setExpandedCitationKey((current) =>
-                                          current === key ? null : key,
-                                        );
-                                      }}
+                                      onToggle={() =>
+                                        toggleCitationKey(noteEvidenceKey(message.id, noteIndex))
+                                      }
                                     />
                                   );
                                 })}
@@ -3563,13 +3504,7 @@ export default function Reader(props: ReaderProps) {
                         type="button"
                         className="reader-send reader-stop"
                         aria-label="停止回答"
-                        onClick={() => {
-                          const active = controller.current;
-                          if (!active) return;
-                          manuallyStoppedController.current = active;
-                          setStoppingAnswer(true);
-                          active.abort();
-                        }}
+                        onClick={stopAnswer}
                       >
                         <Square size={14} fill="currentColor" />
                       </button>
