@@ -9,8 +9,6 @@ import {
   restoreArchivedSourceVersion,
 } from "@/lib/source-versions";
 import CloudUpdateNotice from "../cloud-update-notice";
-import { exportWorkspace, type ExportIssue, type ExportProgress } from "@/lib/export";
-import { workspaceExportFingerprint, type WorkspaceExportScope } from "@/lib/export-scope";
 import ExportBackupPanel from "../export-backup-panel";
 import SourcePurgeModal from "../source-purge-modal";
 import BulkSourceTagsPanel from "../bulk-source-tags-panel";
@@ -167,7 +165,8 @@ import {
   Reader,
   TaskCenterPanel,
 } from "./lazy-panels";
-import type { CrossLibrarySearchDraft, NoteSearchTarget } from "./types";
+import type { CrossLibrarySearchDraft, NoteSearchTarget, WorkspaceModal } from "./types";
+import { useExportFlow } from "./hooks/use-export-flow";
 import NotePage from "./note-page/note-page";
 import { labels, spaceTabs, type Section, type SpaceTab } from "./navigation";
 import WorkspaceSidebar from "./sidebar";
@@ -300,27 +299,7 @@ export default function Workspace({
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [layout, setLayout] = useState<"grid" | "list">("list");
   const [sidebar, setSidebar] = useState(false);
-  const [modal, setModal] = useState<
-    | "import"
-    | "space"
-    | "account"
-    | "details"
-    | "recognized-content"
-    | "history"
-    | "compare-source"
-    | "bulk-tags"
-    | "bulk-spaces"
-    | "bulk-recycle"
-    | "export"
-    | "export-result"
-    | "restore"
-    | "legacy-recovery"
-    | "delete-space"
-    | "purge-source"
-    | "conversation-history"
-    | "sync-conflict"
-    | null
-  >(null);
+  const [modal, setModal] = useState<WorkspaceModal>(null);
   const [readingPositionResolutionEpoch, setReadingPositionResolutionEpoch] = useState(0);
   const [readingConflictPlanSnapshot, setReadingConflictPlanSnapshot] =
     useState<ReadingProgressSyncPlan | null>(null);
@@ -366,20 +345,27 @@ export default function Workspace({
       bulkWriteContext.current = null;
     };
   }, [bulkWriteIdentity]);
-  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
-  const [exportIssues, setExportIssues] = useState<ExportIssue[] | null>(null);
   const [toast, setToast] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [exportScope, setExportScope] = useState<WorkspaceExportScope>({ kind: "workspace" });
-  const exportOperation = useRef<object | null>(null);
-  const exportContext = useRef<{
-    token: number;
-    userId: string | null;
-    localCacheMode: typeof localCacheMode;
-    ready: boolean;
-    data: WorkspaceData;
-  } | null>({ token: store.token, userId: user?.id ?? null, localCacheMode, ready, data });
+  const {
+    busy,
+    exporting,
+    exportProgress,
+    exportIssues,
+    setExportIssues,
+    exportScope,
+    openExport,
+    doExport,
+    reset: resetExport,
+  } = useExportFlow({
+    data,
+    store,
+    userId: user?.id ?? null,
+    localCacheMode,
+    ready,
+    storageMode,
+    setModal,
+    setToast,
+  });
   const [editorKey, setEditorKey] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const tagFilterRef = useRef<HTMLDivElement>(null);
@@ -877,7 +863,7 @@ export default function Workspace({
     // Close reviews before paint and drop account-specific transient buffers.
     // Keep the account panel mounted so its captured deletion can finish safely.
     sourcePurgeOperation.current = null;
-    exportOperation.current = null;
+    resetExport();
     setModal((current) => (current === "account" ? current : null));
     setSearch("");
     setCollectionSearch("");
@@ -886,12 +872,8 @@ export default function Workspace({
     setSelected([]);
     setNoteSearchTarget(undefined);
     setReadingConflictPlanSnapshot(null);
-    setExportIssues(null);
-    setExportProgress(null);
     setToast("");
-    setBusy(false);
-    setExporting(false);
-  }, [accountDeletionState, accountAccessVerificationFailed, store.token]);
+  }, [accountDeletionState, accountAccessVerificationFailed, store.token, resetExport]);
   useLayoutEffect(() => {
     const previous = sourcePurgeContext.current;
     const current = {
@@ -916,35 +898,6 @@ export default function Workspace({
     () => () => {
       sourcePurgeContext.current = null;
       sourcePurgeOperation.current = null;
-    },
-    [],
-  );
-  useLayoutEffect(() => {
-    const previous = exportContext.current;
-    const userId = user?.id ?? null;
-    const contextChanged =
-      previous &&
-      (previous.token !== store.token ||
-        previous.userId !== userId ||
-        previous.localCacheMode !== localCacheMode ||
-        previous.ready !== ready);
-    exportContext.current = { token: store.token, userId, localCacheMode, ready, data };
-    if (contextChanged) {
-      // Invalidate the old account's external download transaction before paint.
-      setModal((current) => (current === "export" || current === "export-result" ? null : current));
-      if (exportOperation.current) {
-        exportOperation.current = null;
-        setBusy(false);
-        setExporting(false);
-        setExportProgress(null);
-      }
-      setExportIssues(null);
-    }
-  }, [store.token, user?.id, localCacheMode, ready, data]);
-  useLayoutEffect(
-    () => () => {
-      exportContext.current = null;
-      exportOperation.current = null;
     },
     [],
   );
@@ -2064,75 +2017,6 @@ export default function Workspace({
           : ""
       }`,
     );
-  }
-  function openExport(scope: WorkspaceExportScope = { kind: "workspace" }) {
-    if (exportOperation.current) return;
-    setExportScope(scope);
-    setModal("export");
-  }
-  async function doExport(
-    state: WorkspaceData = data,
-    options?: { scope: WorkspaceExportScope; expectedFingerprint: string },
-  ): Promise<boolean> {
-    if (exportOperation.current) return false;
-    const operation = {};
-    const owner = { token: store.token, userId: user?.id ?? null, localCacheMode };
-    exportOperation.current = operation;
-    function isCurrent() {
-      const context = exportContext.current;
-      return (
-        exportOperation.current === operation &&
-        context?.ready === true &&
-        context.token === owner.token &&
-        context.userId === owner.userId &&
-        context.localCacheMode === owner.localCacheMode
-      );
-    }
-    function assertCanContinue() {
-      if (!isCurrent()) throw new Error("账号或工作区状态已变化，已停止导出，请重新核对范围。");
-    }
-    try {
-      assertCanContinue();
-      if (
-        options &&
-        workspaceExportFingerprint(exportContext.current!.data, options.scope) !==
-          options.expectedFingerprint
-      ) {
-        throw new Error("导出范围已变化，请刷新预览后再下载。");
-      }
-      setBusy(true);
-      setExporting(true);
-      setExportProgress(null);
-      setExportIssues(null);
-      const result = await exportWorkspace(state, store.sourceBlob, {
-        ...(options ? { scope: options.scope } : {}),
-        assertCanContinue,
-        onProgress: (progress) => {
-          assertCanContinue();
-          setExportProgress(progress);
-        },
-      });
-      assertCanContinue();
-      if (result.issues.length) {
-        setExportIssues(result.issues);
-        setModal("export-result");
-        setToast("备份已下载；" + result.issues.length + " 个原文件版本未包含。");
-      } else {
-        setModal((current) => (current === "export" ? null : current));
-        setToast("导出文件已准备好。");
-      }
-      return storageMode !== "cloud" || result.issues.length === 0;
-    } catch (e) {
-      if (isCurrent()) setToast(e instanceof Error ? e.message : "导出失败。");
-      return false;
-    } finally {
-      if (exportOperation.current === operation) {
-        exportOperation.current = null;
-        setBusy(false);
-        setExporting(false);
-        setExportProgress(null);
-      }
-    }
   }
   async function downloadOriginal(source: Source) {
     try {
