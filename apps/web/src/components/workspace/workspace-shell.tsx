@@ -2840,6 +2840,8 @@ export default function Workspace({
               <HomeSection
                 data={data}
                 activeSpace={activeSpace}
+                user={user}
+                busy={busy}
                 visibleSources={visibleSources}
                 scopedNotes={scopedNotes}
                 primaryContinuation={primaryContinuation}
@@ -2854,6 +2856,9 @@ export default function Workspace({
                 openNote={openNote}
                 openConversation={openConversation}
                 newNote={newNote}
+                openExport={openExport}
+                setSpaceToDeleteId={setSpaceToDeleteId}
+                setModal={setModal}
               />
             )}
             {section === "library" && spaceId === "all" && !libraryFiles && (
@@ -3106,6 +3111,7 @@ export default function Workspace({
                 openExport={openExport}
                 openOrganization={openOrganization}
                 openSpaceCreation={openSpaceCreation}
+                chooseSpace={chooseSpace}
               />
             )}
           </div>

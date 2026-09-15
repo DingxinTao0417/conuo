@@ -1751,6 +1751,13 @@ h1 {
   outline: 2px solid var(--border-brand);
   outline-offset: 2px;
 }
+.space-settings-card {
+  margin-top: 30px;
+}
+.space-settings-note {
+  margin-top: 12px;
+  font-size: 11px;
+}
 .settings-advanced {
   margin-top: 6px;
   border-top: 1px solid var(--border);

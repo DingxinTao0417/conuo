@@ -264,6 +264,51 @@ describe("Workspace space tabs", () => {
     expect(autosave?.textContent?.replace(/\s+/g, "").trim()).toBe("自动保存：已保存在此浏览器");
   });
 
+  it("manages the open learning space from its overview instead of settings", async () => {
+    const space = (workspaceStore.data as ReturnType<typeof createDemoWorkspace>).spaces[0]!;
+
+    await act(async () => tab("概览").click());
+    expect(window.location.hash).toBe(`#home?space=${spaceId}`);
+
+    const card = host.querySelector<HTMLElement>(".space-settings-card");
+    expect(card).toBeInstanceOf(HTMLElement);
+    expect(card!.querySelector(`[aria-label="空间名称 ${space.name}"]`)).toBeInstanceOf(
+      HTMLInputElement,
+    );
+    expect(card!.querySelector(`[aria-label="学习目标 ${space.name}"]`)).toBeInstanceOf(
+      HTMLInputElement,
+    );
+    const actions = [...card!.querySelectorAll("button")].map((button) =>
+      button.textContent?.trim(),
+    );
+    expect(actions).toEqual(["导出此知识库", "归档空间", "删除空间"]);
+  });
+
+  it("leaves only creation and archived spaces in the settings group", async () => {
+    const data = workspaceStore.data as ReturnType<typeof createDemoWorkspace>;
+    const space = data.spaces[0]!;
+
+    await act(async () => {
+      window.history.replaceState(null, "", "#settings/spaces");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+
+    expect(buttonByText("新建学习空间")).toBeInstanceOf(HTMLButtonElement);
+    expect(host.textContent).toContain("已归档空间");
+    expect(host.textContent).toContain("还没有归档的学习空间");
+    // An active space is no longer renamed from settings.
+    expect(host.querySelector(`[aria-label="空间名称 ${space.name}"]`)).toBeNull();
+
+    workspaceStore = {
+      ...workspaceStore,
+      data: { ...data, spaces: data.spaces.map((item) => ({ ...item, archived: true })) },
+    };
+    await act(async () => root.render(createElement(Workspace)));
+
+    expect(host.textContent).not.toContain("还没有归档的学习空间");
+    expect(buttonByText("恢复空间")).toBeInstanceOf(HTMLButtonElement);
+  });
+
   it("does not show space navigation for all libraries, inbox, or the reader", async () => {
     const navigate = async (hash: string) => {
       await act(async () => {

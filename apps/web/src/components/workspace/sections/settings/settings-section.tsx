@@ -32,6 +32,7 @@ export type SettingsSectionProps = {
   openExport: () => void;
   openOrganization: () => void;
   openSpaceCreation: () => void;
+  chooseSpace: (spaceId: string) => void;
 };
 
 export default function SettingsSection({
@@ -57,6 +58,7 @@ export default function SettingsSection({
   openExport,
   openOrganization,
   openSpaceCreation,
+  chooseSpace,
 }: SettingsSectionProps) {
   return (
     <>
@@ -114,12 +116,11 @@ export default function SettingsSection({
       {settingsPane === "spaces" && (
         <SpacesPane
           data={data}
-          user={user}
           update={update}
-          setToast={setToast}
           setSpaceToDeleteId={setSpaceToDeleteId}
           setModal={setModal}
           openSpaceCreation={openSpaceCreation}
+          chooseSpace={chooseSpace}
         />
       )}
     </>

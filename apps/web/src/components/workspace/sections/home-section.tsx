@@ -12,13 +12,17 @@ import { isCrossLibraryConversation } from "@/lib/cross-library-ask";
 import type { PrimaryLearningContinuation } from "@/lib/learning-continue";
 import { createDemoWorkspace } from "@/lib/seed";
 import type { Conversation, Note, Source, Space, WorkspaceData } from "@/lib/types";
+import type { WorkspaceExportScope } from "@/lib/export-scope";
 import LearningContinuationCard from "../../learning-continuation-card";
 import { SourceIcon, date, plain } from "../shared";
-import type { WorkspaceStore } from "../types";
+import type { WorkspaceStore, WorkspaceUser } from "../types";
+import SpaceSettingsCard from "./space-settings-card";
 
 export type HomeSectionProps = {
   data: WorkspaceData;
   activeSpace: Space | undefined;
+  user: WorkspaceUser;
+  busy: boolean;
   visibleSources: Source[];
   scopedNotes: Note[];
   primaryContinuation: PrimaryLearningContinuation | null;
@@ -33,11 +37,16 @@ export type HomeSectionProps = {
   openNote: (id: string) => void;
   openConversation: (conversation: Conversation) => void;
   newNote: (kind: "note") => void;
+  openExport: (scope: WorkspaceExportScope) => void;
+  setSpaceToDeleteId: (spaceId: string) => void;
+  setModal: (modal: "delete-space") => void;
 };
 
 export default function HomeSection({
   data,
   activeSpace,
+  user,
+  busy,
   visibleSources,
   scopedNotes,
   primaryContinuation,
@@ -52,6 +61,9 @@ export default function HomeSection({
   openNote,
   openConversation,
   newNote,
+  openExport,
+  setSpaceToDeleteId,
+  setModal,
 }: HomeSectionProps) {
   return (
     <>
@@ -213,6 +225,18 @@ export default function HomeSection({
         </div>
       ) : (
         <div className="empty-small">读到有启发的地方，就把自己的理解写下来。</div>
+      )}
+      {activeSpace && (
+        <SpaceSettingsCard
+          space={activeSpace}
+          user={user}
+          busy={busy}
+          update={update}
+          setToast={setToast}
+          openExport={openExport}
+          setSpaceToDeleteId={setSpaceToDeleteId}
+          setModal={setModal}
+        />
       )}
     </>
   );
