@@ -43,17 +43,17 @@ export default function SpacesPane({
             新建学习空间
           </button>
         </div>
-        {active.length > 0 && (
-          <div className="setting-row">
+        {active.map((space) => (
+          <div className="setting-row" key={space.id}>
             <div>
-              <b>使用中的空间（{active.length}）</b>
-              <p>{active.map((space) => space.name).join("、")}</p>
+              <b>{space.name}</b>
+              <p>{space.goal || "在该空间的概览页改名、设定学习目标、导出或删除。"}</p>
             </div>
-            <button className="btn" onClick={() => chooseSpace(active[0]!.id)}>
+            <button className="btn" onClick={() => chooseSpace(space.id)}>
               打开空间
             </button>
           </div>
-        )}
+        ))}
       </div>
       <div className="settings-card">
         <h2>已归档空间</h2>
