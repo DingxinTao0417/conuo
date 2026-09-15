@@ -2897,9 +2897,6 @@ export default function Workspace({
                   setSpaceId(id);
                   setSelected([]);
                 }}
-                onAutoChange={(enabled) =>
-                  update((workspace) => ({ ...workspace, autoOrganize: enabled }))
-                }
                 onGenerate={store.organize}
                 onStop={store.stopOrganization}
                 onRetry={store.retryOrganization}
@@ -3061,7 +3058,6 @@ export default function Workspace({
                 setToast={setToast}
                 setSpaceToDeleteId={setSpaceToDeleteId}
                 openExport={openExport}
-                openOrganization={openOrganization}
                 openSpaceCreation={openSpaceCreation}
                 chooseSpace={chooseSpace}
               />

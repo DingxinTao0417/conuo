@@ -30,7 +30,6 @@ export type SettingsSectionProps = {
   setToast: (message: string) => void;
   setSpaceToDeleteId: (spaceId: string) => void;
   openExport: () => void;
-  openOrganization: () => void;
   openSpaceCreation: () => void;
   chooseSpace: (spaceId: string) => void;
 };
@@ -56,7 +55,6 @@ export default function SettingsSection({
   setToast,
   setSpaceToDeleteId,
   openExport,
-  openOrganization,
   openSpaceCreation,
   chooseSpace,
 }: SettingsSectionProps) {
@@ -93,7 +91,6 @@ export default function SettingsSection({
           update={update}
           durableProcessorEnabled={durableProcessorEnabled}
           setToast={setToast}
-          openOrganization={openOrganization}
         />
       )}
       {settingsPane === "storage" && (

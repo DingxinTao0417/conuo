@@ -138,4 +138,20 @@ describe("Workspace settings sync status", () => {
 
     expect(window.location.hash).toBe("#tasks");
   });
+
+  it("keeps only the automatic-organization switch in the AI group", async () => {
+    await act(async () => {
+      window.history.replaceState(null, "", "#settings/ai");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+
+    expect(host.querySelector('[aria-label="自动整理资料"]')).toBeInstanceOf(HTMLInputElement);
+    // Reviewing organization work belongs to the task center and the knowledge
+    // tab's "从资料生成"; settings only decides whether it runs.
+    expect(
+      [...host.querySelectorAll<HTMLButtonElement>("button")].some(
+        (item) => item.textContent?.trim() === "查看整理任务与建议",
+      ),
+    ).toBe(false);
+  });
 });

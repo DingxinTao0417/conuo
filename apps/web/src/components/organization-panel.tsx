@@ -42,7 +42,6 @@ export interface OrganizationPanelProps {
   durableProcessorState?: OrganizationProcessorState;
   onRefreshStatus?: () => void;
   onSpaceChange: (id: string) => void;
-  onAutoChange: (enabled: boolean) => void;
   onGenerate: (input: {
     kind: "source" | "knowledge";
     spaceId: string;
@@ -460,7 +459,6 @@ export default function OrganizationPanel(props: OrganizationPanelProps) {
     status,
     durableProcessorState = "not-deployed",
     onSpaceChange,
-    onAutoChange,
     onGenerate,
     onStop,
     onRetry,
@@ -607,15 +605,6 @@ export default function OrganizationPanel(props: OrganizationPanelProps) {
     void run(() => onStop(jobId));
   }
 
-  function changeAutomatic(enabled: boolean) {
-    setError("");
-    try {
-      onAutoChange(enabled);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "自动分析设置未保存，请重试。");
-    }
-  }
-
   return (
     <section className="organization-panel" aria-labelledby="organization-title">
       <header className="organization-heading">
@@ -624,7 +613,7 @@ export default function OrganizationPanel(props: OrganizationPanelProps) {
             <Sparkles size={15} />
             AI 学习助手
           </div>
-          <h2 id="organization-title">资料整理</h2>
+          <h2 id="organization-title">从资料生成</h2>
           <p>从资料中提炼线索，由你决定哪些成为知识。</p>
         </div>
         <label className="organization-space-picker">
@@ -648,39 +637,19 @@ export default function OrganizationPanel(props: OrganizationPanelProps) {
           <ChevronDown size={13} />
         </label>
       </header>
-      <div
+      {/* Automatic organization is a workspace setting, not part of this flow;
+          it lives in 设置 · AI 与资料处理 so there is one place to turn it on. */}
+      <p
         className={`organization-auto-setting${
           durableProcessorEnabled ? "" : " organization-auto-setting--waiting"
         }`}
       >
-        <label>
-          <input
-            type="checkbox"
-            checked={Boolean(data.autoOrganize)}
-            disabled={
-              !data.autoOrganize && (!durableProcessorEnabled || !status.ready || !data.aiEnabled)
-            }
-            onChange={(event) => changeAutomatic(event.target.checked)}
-          />
-          <span>
-            <strong>自动分析资料</strong>
-            <span>
-              {durableProcessorEnabled
-                ? "开启后，整个工作区已有和新就绪的可用资料会提交到云端后台，依次生成摘要、标签与主题建议。"
-                : localDevelopmentRunnerEnabled
-                  ? "本地开发页面运行只支持手动点击；自动分析仍不会创建任务，避免一次开启发起多次模型请求。"
-                  : "后台处理器尚未在当前构建声明启用，自动分析不会创建新的资料分析或主题草稿任务。"}
-            </span>
-          </span>
-        </label>
-        <p className={durableProcessorEnabled ? "" : "organization-auto-setting-notice"}>
-          {durableProcessorEnabled
-            ? "与问答共用每日模型次数。任务是否在关闭页面后继续，取决于已部署的后台处理器；可刷新状态核对。"
-            : localDevelopmentRunnerEnabled
-              ? localDevelopmentOrganizationRunnerAvailabilityMessage()
-              : "已有任务记录仍可刷新、查看或停止；当前不能承诺 source／knowledge 任务在关闭页面后继续。"}
-        </p>
-      </div>
+        {durableProcessorEnabled
+          ? "与问答共用每日模型次数。任务是否在关闭页面后继续，取决于已部署的后台处理器；可刷新状态核对。"
+          : localDevelopmentRunnerEnabled
+            ? localDevelopmentOrganizationRunnerAvailabilityMessage()
+            : "已有任务记录仍可刷新、查看或停止；当前不能承诺 source／knowledge 任务在关闭页面后继续。"}
+      </p>
       {(disabledReason || displayedStatusMessage) && (
         <p
           className={`organization-status${disabledReason ? " organization-status-muted" : ""}`}

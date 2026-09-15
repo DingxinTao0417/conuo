@@ -14,7 +14,6 @@ export type AiPaneProps = {
   update: WorkspaceStore["update"];
   durableProcessorEnabled: boolean;
   setToast: (message: string) => void;
-  openOrganization: () => void;
 };
 
 export default function AiPane({
@@ -24,7 +23,6 @@ export default function AiPane({
   update,
   durableProcessorEnabled,
   setToast,
-  openOrganization,
 }: AiPaneProps) {
   return (
     <>
@@ -67,9 +65,6 @@ export default function AiPane({
                 ? "开启后，在页面打开期间分析整个工作区已有及新导入的可用资料，生成摘要、标签和主题建议。与问答共用模型次数；不会自动应用标签或改写知识页。"
                 : "后台自动整理等待部署。当前构建不会创建新任务；已有整理记录仍可刷新、查看或停止。"}
             </p>
-            <button className="text-button" onClick={() => openOrganization()}>
-              查看整理任务与建议
-            </button>
           </div>
           <input
             aria-label="自动整理资料"

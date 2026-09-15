@@ -17,7 +17,6 @@ function panelProps(
     spaceId: data.spaces[0]!.id,
     status: { ready: true, message: "", running: false },
     onSpaceChange: vi.fn(),
-    onAutoChange: vi.fn(),
     onGenerate: vi.fn(async () => {}),
     onStop: vi.fn(async () => {}),
     onRetry: vi.fn(async () => {}),
@@ -172,9 +171,11 @@ describe("OrganizationPanel source selection layout", () => {
     });
 
     expect(host.textContent).toContain("本地开发页面运行已启用");
-    expect(host.textContent).toContain("自动分析仍不会创建任务");
-    const automatic = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
-    expect(automatic.disabled).toBe(true);
+    // The same promise the removed in-panel toggle used to carry: this runner
+    // never queues automatic work. Turning automatic organization on or off is
+    // now only possible in 设置 · AI 与资料处理.
+    expect(host.textContent).toContain("不会创建后台任务或自动任务");
+    expect(host.textContent).not.toContain("自动分析资料");
     const analyze = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
       (button) => button.textContent?.replace(/\s+/g, "") === "分析这份资料",
     )!;
