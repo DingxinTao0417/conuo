@@ -43,6 +43,12 @@ export const answerPhases = {
  * visible, current scope rather than silently expanding the answer context.
  */
 export const FOLLOW_UP_PROMPTS = ["换个说法解释", "结合当前资料举个例子"] as const;
+/** Starter questions for an empty reader thread; they never widen the range. */
+export const READER_EMPTY_PROMPTS = [
+  "这份资料的核心观点是什么？",
+  "请解释其中最重要的概念",
+  "有哪些值得进一步思考的问题？",
+] as const;
 export const READING_ACTIVITY_THROTTLE_MS = 15_000;
 export const READING_OPEN_SETTLE_MS = 1_500;
 export const readingPositionOriginLabels: Record<ReadingPositionAlternative["origin"], string> = {

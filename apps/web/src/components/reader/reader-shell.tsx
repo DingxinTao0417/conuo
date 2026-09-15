@@ -16,7 +16,6 @@ import {
   ArrowLeft,
   ArrowUp,
   BookOpen,
-  Check,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -25,16 +24,13 @@ import {
   FolderOpen,
   Highlighter,
   History,
-  LoaderCircle,
   MessageSquare,
   Minus,
   MapPin,
-  PanelRightClose,
   Plus,
   Crop,
   Search,
   Sparkles,
-  Square,
   StickyNote,
   UserRound,
   X,
@@ -47,7 +43,6 @@ import type {
   Citation,
   Conversation,
   Message,
-  Scope,
   Source,
 } from "@/lib/types";
 import PdfReader from "../pdf-reader";
@@ -84,6 +79,8 @@ import {
   sourceParserCoverageNotice,
 } from "@/lib/source-coverage";
 import { selectReadingPositionAlternative } from "@/lib/reading-position-alternatives";
+import { documentAskScopeOf, readerAskScopes, type DocumentAskScope } from "@/lib/ask-scopes";
+import AskPanel from "../ai/ask-panel";
 import { useAskConversation } from "../ai/use-ask-conversation";
 import "../reader.css";
 import {
@@ -95,31 +92,14 @@ import {
   defaultAiPanelWidthForViewport,
   maxAiPanelWidthForWorkspace,
 } from "./ai-panel-width";
-import {
-  AnswerMarkdown,
-  CitationCard,
-  CitationChip,
-  Markdown,
-  NoteEvidenceCard,
-  NoteEvidenceChip,
-  noteEvidenceProblem,
-} from "./answer-markdown";
-import {
-  citationCardId,
-  citationKey,
-  citationMarkerIndexes,
-  noteEvidenceCardId,
-  noteEvidenceKey,
-} from "./citation-markdown";
+import { Markdown, noteEvidenceProblem } from "./answer-markdown";
 import {
   EMPTY_NOTES,
-  EMPTY_NOTE_EVIDENCE,
   FOLLOW_UP_PROMPTS,
+  READER_EMPTY_PROMPTS,
   READING_ACTIVITY_THROTTLE_MS,
   READING_OPEN_SETTLE_MS,
-  answerPhases,
   highlightStyles,
-  readerScopeOptions,
   readingPositionMetrics,
   readingPositionOriginLabels,
   readingPositionSummary,
@@ -227,40 +207,32 @@ export default function Reader(props: ReaderProps) {
   const selectionDisplay =
     currentSelectionPresentation?.visibleQuote ?? markdownQuoteText(source, selection);
   const [selectionToolbar, setSelectionToolbar] = useState<SelectionToolbarPosition | null>(null);
-  const [scope, setScope] = useState<Scope>("document-notes");
+  const [scope, setScope] = useState<DocumentAskScope>("document-notes");
   const [selectedIds, setSelectedIds] = useState<string[]>([source.id]);
+  const askConversation = useAskConversation();
   const {
     input,
     setInput,
     busy,
-    stopping: stoppingAnswer,
     answerDraft,
-    answerPhase,
-    error,
     setError,
-    historyOpen,
     setHistoryOpen,
     selectedConversationId: selectedConversation,
     setSelectedConversationId: setSelectedConversation,
     newConversation,
     setNewConversation,
-    expandedCitationKey,
-    toggleCitationKey,
-    saveTargetMessageId,
     setSaveTargetMessageId,
     knowledgePageTargetId,
     setKnowledgePageTargetId,
-    openKnowledgeSaveTarget,
     questionInput,
     chatEnd,
     focusInput: focusAiInput,
     beginNewConversation,
     running: askRunning,
     abort: abortAsk,
-    stop: stopAnswer,
     reset: resetAskConversation,
     run: runAsk,
-  } = useAskConversation();
+  } = askConversation;
   const [notice, setNotice] = useState("");
   const [webPanel, setWebPanel] = useState<"history" | "refresh" | "replace" | null>(null);
   const [sourceActionsOpen, setSourceActionsOpen] = useState(false);
@@ -634,7 +606,7 @@ export default function Reader(props: ReaderProps) {
     // A route must reopen the saved range, just like choosing the same item
     // from the visible history. In particular, never silently widen a saved
     // selection into the default document-and-notes range.
-    setScope(initialConversation.scope);
+    setScope(documentAskScopeOf(initialConversation.scope));
     setSelectedIds([...initialConversation.sourceIds]);
     setAiOpen(true);
     setMobileTab("ai");
@@ -2815,136 +2787,103 @@ export default function Reader(props: ReaderProps) {
               aria-label="关闭问答面板"
               onClick={closeAiPanel}
             />
-            <aside
-              id="reader-ai-panel"
-              className="reader-ai"
-              aria-label="资料问答"
-              aria-hidden={mobileTab === "citation" || undefined}
-            >
-              <div className="reader-ai-sheet-grab" aria-hidden="true" />
-              <header className="reader-ai-header">
-                <div className="reader-ai-heading">
-                  <div className="reader-ai-icon">
-                    <Sparkles size={17} />
-                  </div>
-                  <strong>{historical ? "已有问答" : "问 AI"}</strong>
-                  <div className="reader-tool-spacer" />
-                  <button
-                    className="icon-btn"
-                    aria-label="对话历史"
-                    aria-expanded={historyOpen}
-                    disabled={busy}
-                    onClick={() => setHistoryOpen(!historyOpen)}
-                  >
-                    <History size={16} />
-                  </button>
-                  <button
-                    className="icon-btn"
-                    aria-label="新建对话"
-                    disabled={busy || historical}
-                    onClick={() => {
-                      beginNewConversation();
-                      questionInput.current?.focus();
-                    }}
-                  >
-                    <Plus size={18} />
-                  </button>
-                  <button
-                    className="icon-btn reader-close-ai"
-                    aria-label="收起问答面板"
-                    onClick={closeAiPanel}
-                  >
-                    <PanelRightClose size={17} />
-                  </button>
-                </div>
-                <p>
-                  {historical
-                    ? "查看已有回答和确切版本的原文引用"
-                    : "基于你收藏的资料，陪你读懂每一段"}
-                </p>
-                {!historical && (
+            <AskPanel
+              ask={askConversation}
+              surface={{
+                id: "reader-ai-panel",
+                eligibilityId: "reader-ask-eligibility",
+                label: "资料问答",
+                title: historical ? "已有问答" : "问 AI",
+                description: historical
+                  ? "查看已有回答和确切版本的原文引用"
+                  : "基于你收藏的资料，陪你读懂每一段",
+                placeholder: "从你不理解的地方开始提问…",
+                footnote: "答案请结合原文判断 · Enter 发送，Shift + Enter 换行",
+                historyTitle: "此资料的对话",
+                historyEmpty: "发送第一个问题后，对话会保存在这里。",
+                empty: {
+                  title: historical ? "保留当时的阅读依据" : "一起把这一段读懂",
+                  text: historical
+                    ? "这里可查看已有问答与引用。新的问题请回到当前版本发起。"
+                    : "从不理解的地方开始提问。回答会显示依据，你可以随时回到原文核对。",
+                  prompts: READER_EMPTY_PROMPTS,
+                },
+                extra: !historical && (
                   <ModelStatus
                     key={props.cloudUserId || "local"}
                     userId={props.cloudUserId}
                     compact
                   />
-                )}
-                <label className="reader-scope">
-                  <span>提问范围</span>
-                  <select
-                    value={scope}
-                    disabled={busy || historical}
-                    onChange={(event) => setScope(event.target.value as Scope)}
-                  >
-                    {readerScopeOptions.map((key) => (
-                      <option value={key} key={key}>
-                        {scopeLabels[key]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {scope === "sources" && (
-                  <fieldset className="reader-source-picker">
-                    <legend>选择当前空间的资料</legend>
-                    {availableSources.map((item) => (
-                      <label key={item.id}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(item.id)}
-                          disabled={busy || historical || !item.aiAllowed}
-                          onChange={(event) =>
-                            setSelectedIds(
-                              event.target.checked
-                                ? [...selectedIds, item.id]
-                                : selectedIds.filter((id) => id !== item.id),
-                            )
-                          }
-                        />
-                        <span>
-                          {item.title}
-                          {!item.aiAllowed ? "（未允许 AI）" : ""}
-                        </span>
-                      </label>
-                    ))}
-                    {!availableSources.length && <p>当前空间没有可选资料。</p>}
-                  </fieldset>
-                )}
-                {scope === "selection" && (
-                  <div className="reader-selected-quote">
-                    {selection ? (
-                      <>
-                        <blockquote>{selectionDisplay}</blockquote>
-                        {selectionDisplay !== selection && (
-                          <details className="reader-selection-source-format">
-                            <summary>查看原文格式</summary>
-                            <blockquote>{selection}</blockquote>
-                          </details>
-                        )}
-                      </>
-                    ) : (
-                      <span>请在阅读区选择一段原文。</span>
+                ),
+                hidden: mobileTab === "citation",
+              }}
+              scope={{
+                active: scope,
+                options: readerAskScopes,
+                locked: busy || historical,
+                onChange: (next) => setScope(next as DocumentAskScope),
+                blockedMessage:
+                  !historical && askEligibilityMessage ? askEligibilityMessage : undefined,
+                notice: !!ineligibleCount && (
+                  <p className="reader-scope-warning" role="status">
+                    范围中有 {ineligibleCount} 份资料尚未就绪或未允许 AI，不会作为回答依据。
+                  </p>
+                ),
+                detail: (
+                  <>
+                    {scope === "sources" && (
+                      <fieldset className="reader-source-picker">
+                        <legend>选择当前空间的资料</legend>
+                        {availableSources.map((item) => (
+                          <label key={item.id}>
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(item.id)}
+                              disabled={busy || historical || !item.aiAllowed}
+                              onChange={(event) =>
+                                setSelectedIds(
+                                  event.target.checked
+                                    ? [...selectedIds, item.id]
+                                    : selectedIds.filter((id) => id !== item.id),
+                                )
+                              }
+                            />
+                            <span>
+                              {item.title}
+                              {!item.aiAllowed ? "（未允许 AI）" : ""}
+                            </span>
+                          </label>
+                        ))}
+                        {!availableSources.length && <p>当前空间没有可选资料。</p>}
+                      </fieldset>
                     )}
-                  </div>
-                )}
-                {scope === "document-notes" && (
-                  <p className="reader-note-scope" role="status">
-                    {documentNoteCount
-                      ? `会同时检索此资料，以及 ${documentNoteCount} 条已关联的人工笔记；回答会明确区分两类依据。`
-                      : "会检索此资料。暂时没有已关联到当前资料、可安全纳入的人工笔记。"}
-                  </p>
-                )}
-                {!historical && askEligibilityMessage ? (
-                  <p id="reader-ask-eligibility" className="reader-scope-warning" role="status">
-                    {askEligibilityMessage}
-                  </p>
-                ) : (
-                  !!ineligibleCount && (
-                    <p className="reader-scope-warning" role="status">
-                      范围中有 {ineligibleCount} 份资料尚未就绪或未允许 AI，不会作为回答依据。
-                    </p>
-                  )
-                )}
-                {!historical && !source.aiAllowed && (
+                    {scope === "selection" && (
+                      <div className="reader-selected-quote">
+                        {selection ? (
+                          <>
+                            <blockquote>{selectionDisplay}</blockquote>
+                            {selectionDisplay !== selection && (
+                              <details className="reader-selection-source-format">
+                                <summary>查看原文格式</summary>
+                                <blockquote>{selection}</blockquote>
+                              </details>
+                            )}
+                          </>
+                        ) : (
+                          <span>请在阅读区选择一段原文。</span>
+                        )}
+                      </div>
+                    )}
+                    {scope === "document-notes" && (
+                      <p className="reader-note-scope" role="status">
+                        {documentNoteCount
+                          ? `会同时检索此资料，以及 ${documentNoteCount} 条已关联的人工笔记；回答会明确区分两类依据。`
+                          : "会检索此资料。暂时没有已关联到当前资料、可安全纳入的人工笔记。"}
+                      </p>
+                    )}
+                  </>
+                ),
+                footer: !historical && !source.aiAllowed && (
                   <button
                     className="reader-enable"
                     disabled={busy}
@@ -2952,581 +2891,78 @@ export default function Reader(props: ReaderProps) {
                   >
                     允许此资料用于 AI
                   </button>
-                )}
-              </header>
-              {historyOpen && (
-                <div className="reader-history">
-                  <h3>此资料的对话</h3>
-                  {history.length ? (
-                    history.map((item) => (
-                      <button
-                        className={conversation?.id === item.id ? "reader-active" : ""}
-                        key={item.id}
-                        onClick={() => {
-                          setSelectedConversation(item.id);
-                          setNewConversation(false);
-                          setScope(item.scope);
-                          setSelectedIds(item.sourceIds);
-                          setHistoryOpen(false);
-                          setError("");
-                        }}
-                      >
-                        <MessageSquare size={15} />
-                        <span>{item.title}</span>
-                        {item.resolved && <Check size={14} />}
-                      </button>
-                    ))
-                  ) : (
-                    <p>发送第一个问题后，对话会保存在这里。</p>
-                  )}
-                </div>
-              )}
-              {conversation && (
-                <div className="reader-conversation-state">
-                  <span>{conversation.resolved ? "这个问题已解决" : "正在探索这个问题"}</span>
-                  <button
-                    disabled={busy || historical}
-                    onClick={() =>
-                      onConversationChange({
-                        ...conversation,
-                        resolved: !conversation.resolved,
-                        updatedAt: new Date().toISOString(),
-                      })
-                    }
-                  >
-                    {conversation.resolved ? "重新打开" : "标记已解决"}
-                  </button>
-                </div>
-              )}
-              <div className="reader-messages" aria-live="polite" aria-relevant="additions text">
-                {!messages.length && (
-                  <div className="reader-ai-empty">
-                    <div className="reader-ai-empty-icon">
-                      <Sparkles size={24} />
-                    </div>
-                    <h2>{historical ? "保留当时的阅读依据" : "一起把这一段读懂"}</h2>
-                    <p>
-                      {historical
-                        ? "这里可查看已有问答与引用。新的问题请回到当前版本发起。"
-                        : "从不理解的地方开始提问。回答会显示依据，你可以随时回到原文核对。"}
-                    </p>
-                    <div>
-                      {[
-                        "这份资料的核心观点是什么？",
-                        "请解释其中最重要的概念",
-                        "有哪些值得进一步思考的问题？",
-                      ].map((question) => (
-                        <button
-                          key={question}
-                          disabled={historical}
-                          onClick={() => {
-                            setInput(question);
-                            questionInput.current?.focus();
-                          }}
-                        >
-                          {question}
-                          <ArrowUp size={14} />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {messages.map((message, index) => {
-                  const messageNoteEvidence = message.noteEvidence ?? EMPTY_NOTE_EVIDENCE;
-                  const citationIssues = message.citations.map((citation) =>
-                    citationProblem(citation, sources),
-                  );
-                  const noteEvidenceIssues = messageNoteEvidence.map((evidence) =>
-                    noteEvidenceProblem(evidence, notes, sources),
-                  );
-                  const activeCitationIndex = message.citations.findIndex(
-                    (_, citationIndex) =>
-                      citationKey(message.id, citationIndex) === expandedCitationKey,
-                  );
-                  const expandedCitationIndex =
-                    activeCitationIndex === -1 ? null : activeCitationIndex;
-                  const activeNoteEvidenceIndex = messageNoteEvidence.findIndex(
-                    (_, noteIndex) =>
-                      noteEvidenceKey(message.id, noteIndex) === expandedCitationKey,
-                  );
-                  const expandedNoteEvidenceIndex =
-                    activeNoteEvidenceIndex === -1 ? null : activeNoteEvidenceIndex;
-                  const referencedEvidenceIndexes =
-                    message.role === "assistant"
-                      ? citationMarkerIndexes(
+                ),
+              }}
+              conversation={{
+                current: conversation,
+                history,
+                onNew: () => {
+                  beginNewConversation();
+                  questionInput.current?.focus();
+                },
+                onSelect: (item) => {
+                  setSelectedConversation(item.id);
+                  setNewConversation(false);
+                  setScope(documentAskScopeOf(item.scope));
+                  setSelectedIds(item.sourceIds);
+                  setHistoryOpen(false);
+                  setError("");
+                },
+                onToggleResolved: (item) =>
+                  onConversationChange({
+                    ...item,
+                    resolved: !item.resolved,
+                    updatedAt: new Date().toISOString(),
+                  }),
+              }}
+              messages={messages}
+              evidence={{
+                citationIssue: (citation) => citationProblem(citation, sources),
+                noteEvidenceIssue: (item) => noteEvidenceProblem(item, notes, sources),
+                onOpenCitation: openCitation,
+              }}
+              composer={{
+                readOnly: historical,
+                readOnlyMessage: "历史版本仅供阅读与摘录，请回到当前版本提问。",
+                disabledMessage: aiEnabled ? undefined : "资料问答已关闭，可在设置中开启。",
+                followUps: FOLLOW_UP_PROMPTS,
+                onFollowUp: prepareFollowUp,
+                onSubmit: () => void ask(),
+                onRetry: (message) => void ask({ retryAttempt: message.attempt }),
+                onEditQuestion: (content) => {
+                  setInput(content);
+                  questionInput.current?.focus();
+                },
+                scopeSummary: scopeLabels[scope],
+              }}
+              answerActions={{
+                knowledgePages,
+                blockedReason: (message) =>
+                  message.noteEvidence?.length
+                    ? "此回答引用了个人笔记；为避免丢失这类依据，暂不能直接保存。"
+                    : undefined,
+                onSaveNote: (message) => {
+                  onSaveNote(message.content, message.citations, "note", message.mode === "model");
+                  setNotice("回答已保存为笔记，来源引用一并保留。");
+                },
+                ...(onAppendToKnowledgePage
+                  ? {
+                      onAppendToKnowledgePage: appendAnswerToKnowledgePage,
+                      onCreateKnowledgeDraft: (message: Message) => {
+                        onSaveNote(
                           message.content,
                           message.citations,
-                          messageNoteEvidence,
-                          message.mode,
-                        )
-                      : { citations: new Set<number>(), notes: new Set<number>() };
-                  const fallbackCitationIndexes =
-                    message.role === "assistant"
-                      ? message.citations.flatMap((_, citationIndex) =>
-                          referencedEvidenceIndexes.citations.has(citationIndex)
-                            ? []
-                            : [citationIndex],
-                        )
-                      : [];
-                  const fallbackNoteEvidenceIndexes =
-                    message.role === "assistant"
-                      ? messageNoteEvidence.flatMap((_, noteIndex) =>
-                          referencedEvidenceIndexes.notes.has(noteIndex) ? [] : [noteIndex],
-                        )
-                      : [];
-                  const includesNoteEvidence = messageNoteEvidence.length > 0;
-                  const retryQuestion =
-                    message.role === "assistant" && message.error && message.attempt
-                      ? messages.find(
-                          (item) =>
-                            item.id === message.attempt?.questionMessageId && item.role === "user",
-                        )
-                      : undefined;
-                  const attemptNumber = message.attempt
-                    ? messages
-                        .slice(0, index + 1)
-                        .filter(
-                          (item) =>
-                            item.role === "assistant" &&
-                            item.attempt?.questionMessageId === message.attempt?.questionMessageId,
-                        ).length
-                    : 0;
-                  const showFollowUps =
-                    message.role === "assistant" &&
-                    !!message.content &&
-                    !message.error &&
-                    !message.attempt?.unavailableReason &&
-                    !historical &&
-                    !busy &&
-                    index === messages.length - 1;
-
-                  return (
-                    <div
-                      key={message.id}
-                      className={`reader-message reader-message-${message.role}`}
-                    >
-                      <div className="reader-message-label">
-                        {message.role === "user" ? (
-                          "你"
-                        ) : (
-                          <>
-                            <Sparkles size={14} />
-                            Conuo{" "}
-                            <span>
-                              {attemptNumber > 1 ? `第 ${attemptNumber} 次尝试 · ` : ""}
-                              {message.error
-                                ? message.content
-                                  ? "已停止 · 未完成、未核验"
-                                  : "本次未完成"
-                                : message.mode === "extractive"
-                                  ? "原文检索 · 未调用生成模型"
-                                  : message.mode === "model"
-                                    ? "AI 回答"
-                                    : ""}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                      {message.content && (
-                        <div className="reader-message-content">
-                          {message.role === "assistant" ? (
-                            <AnswerMarkdown
-                              content={message.content}
-                              citations={message.citations}
-                              noteEvidence={messageNoteEvidence}
-                              mode={message.mode}
-                              messageId={message.id}
-                              expandedCitationIndex={expandedCitationIndex}
-                              expandedNoteEvidenceIndex={expandedNoteEvidenceIndex}
-                              citationIssues={citationIssues}
-                              noteEvidenceIssues={noteEvidenceIssues}
-                              onCitationToggle={(citationIndex) =>
-                                toggleCitationKey(citationKey(message.id, citationIndex))
-                              }
-                              onNoteEvidenceToggle={(noteIndex) =>
-                                toggleCitationKey(noteEvidenceKey(message.id, noteIndex))
-                              }
-                            />
-                          ) : (
-                            <Markdown content={message.content} />
-                          )}
-                        </div>
-                      )}
-                      {message.error && (
-                        <div className="reader-message-error">
-                          <p>{message.error}</p>
-                          {message.content && (
-                            <small>
-                              这段内容保留供回顾和继续提问，不会作为已核验答案保存或另存。
-                            </small>
-                          )}
-                          {message.attempt?.unavailableReason && (
-                            <small>当时使用的资料已彻底删除，不能重试这次回答。</small>
-                          )}
-                          {retryQuestion &&
-                            message.attempt &&
-                            !message.attempt.unavailableReason && (
-                              <button
-                                className="btn"
-                                disabled={busy || historical || !aiEnabled}
-                                onClick={() => void ask({ retryAttempt: message.attempt })}
-                              >
-                                重试此回答
-                              </button>
-                            )}
-                          <button
-                            className="text-button"
-                            disabled={busy || historical || !aiEnabled}
-                            onClick={() => {
-                              const previous = messages
-                                .slice(0, index)
-                                .reverse()
-                                .find((item) => item.role === "user");
-                              if (previous) {
-                                setInput(previous.content);
-                                questionInput.current?.focus();
-                              }
-                            }}
-                          >
-                            重新编辑问题
-                          </button>
-                        </div>
-                      )}
-                      {message.role === "assistant" &&
-                        !message.error &&
-                        message.attempt?.unavailableReason && (
-                          <p className="reader-message-history-notice">
-                            当时使用的资料已彻底删除；此回答仅保留为历史记录。
-                          </p>
-                        )}
-                      {message.role === "assistant" &&
-                        (message.citations.length > 0 || messageNoteEvidence.length > 0) && (
-                          <div
-                            className="reader-citations"
-                            aria-label={messageNoteEvidence.length ? "回答依据" : "回答引用"}
-                          >
-                            {expandedCitationIndex !== null && (
-                              <CitationCard
-                                citation={message.citations[expandedCitationIndex]}
-                                index={expandedCitationIndex}
-                                id={citationCardId(message.id, expandedCitationIndex)}
-                                issue={citationIssues[expandedCitationIndex] || null}
-                                onOpen={() =>
-                                  openCitation(message.citations[expandedCitationIndex])
-                                }
-                              />
-                            )}
-                            {expandedNoteEvidenceIndex !== null && (
-                              <NoteEvidenceCard
-                                evidence={messageNoteEvidence[expandedNoteEvidenceIndex]}
-                                index={expandedNoteEvidenceIndex}
-                                id={noteEvidenceCardId(message.id, expandedNoteEvidenceIndex)}
-                                issue={noteEvidenceIssues[expandedNoteEvidenceIndex] || null}
-                              />
-                            )}
-                            {fallbackCitationIndexes.length > 0 && (
-                              <div className="reader-citation-fallback">
-                                <span>引用</span>
-                                {fallbackCitationIndexes.map((citationIndex) => {
-                                  const citation = message.citations[citationIndex];
-                                  return (
-                                    <CitationChip
-                                      key={`${citation.chunkId}-${citationIndex}`}
-                                      citation={citation}
-                                      index={citationIndex}
-                                      cardId={citationCardId(message.id, citationIndex)}
-                                      expanded={expandedCitationIndex === citationIndex}
-                                      issue={citationIssues[citationIndex] || null}
-                                      onToggle={() =>
-                                        toggleCitationKey(citationKey(message.id, citationIndex))
-                                      }
-                                    />
-                                  );
-                                })}
-                              </div>
-                            )}
-                            {fallbackNoteEvidenceIndexes.length > 0 && (
-                              <div className="reader-citation-fallback reader-note-evidence-fallback">
-                                <span>我的笔记</span>
-                                {fallbackNoteEvidenceIndexes.map((noteIndex) => {
-                                  const evidence = messageNoteEvidence[noteIndex];
-                                  return (
-                                    <NoteEvidenceChip
-                                      key={`${evidence.noteId}-${evidence.blockId}-${noteIndex}`}
-                                      evidence={evidence}
-                                      index={noteIndex}
-                                      cardId={noteEvidenceCardId(message.id, noteIndex)}
-                                      expanded={expandedNoteEvidenceIndex === noteIndex}
-                                      issue={noteEvidenceIssues[noteIndex] || null}
-                                      onToggle={() =>
-                                        toggleCitationKey(noteEvidenceKey(message.id, noteIndex))
-                                      }
-                                    />
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      {showFollowUps && (
-                        <div className="reader-followups" role="group" aria-label="继续追问建议">
-                          {FOLLOW_UP_PROMPTS.map((question) => (
-                            <button
-                              key={question}
-                              type="button"
-                              onClick={() => prepareFollowUp(question)}
-                            >
-                              {question}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {message.role === "assistant" && message.content && !message.error && (
-                        <div className="reader-message-actions">
-                          <button
-                            disabled={includesNoteEvidence}
-                            title={
-                              includesNoteEvidence
-                                ? "此回答引用了个人笔记；为避免丢失这类依据，暂不能直接保存。"
-                                : undefined
-                            }
-                            onClick={() => {
-                              onSaveNote(
-                                message.content,
-                                message.citations,
-                                "note",
-                                message.mode === "model",
-                              );
-                              setNotice("回答已保存为笔记，来源引用一并保留。");
-                            }}
-                          >
-                            <StickyNote size={13} />
-                            保存笔记
-                          </button>
-                          <button
-                            aria-expanded={saveTargetMessageId === message.id}
-                            disabled={includesNoteEvidence || !onAppendToKnowledgePage}
-                            title={
-                              includesNoteEvidence
-                                ? "此回答引用了个人笔记；为避免丢失这类依据，暂不能直接保存。"
-                                : !onAppendToKnowledgePage
-                                  ? "当前页面无法保存到既有知识页，请刷新后重试。"
-                                  : undefined
-                            }
-                            onClick={() => openKnowledgeSaveTarget(message.id)}
-                          >
-                            <BookOpen size={13} />
-                            保存到知识页
-                          </button>
-                        </div>
-                      )}
-                      {message.role === "assistant" &&
-                        message.content &&
-                        !message.error &&
-                        saveTargetMessageId === message.id &&
-                        !includesNoteEvidence && (
-                          <div
-                            className="reader-save-target"
-                            role="group"
-                            aria-label="保存回答到知识页"
-                          >
-                            <p>追加后会保留原文依据并新建一个历史版本，知识页将回到待审核状态。</p>
-                            {knowledgePages.length ? (
-                              <div className="reader-save-target-select">
-                                <select
-                                  aria-label="选择要追加的知识页"
-                                  value={knowledgePageTargetId}
-                                  onChange={(event) => setKnowledgePageTargetId(event.target.value)}
-                                >
-                                  <option value="">选择已有知识页</option>
-                                  {knowledgePages.map((page) => (
-                                    <option key={page.id} value={page.id}>
-                                      {page.title || "未命名知识页"}
-                                      {page.status === "draft" ? " · 待审核" : ""}
-                                    </option>
-                                  ))}
-                                </select>
-                                <button
-                                  className="btn btn-primary"
-                                  disabled={!knowledgePageTargetId}
-                                  onClick={() => appendAnswerToKnowledgePage(message)}
-                                >
-                                  追加到知识页
-                                </button>
-                              </div>
-                            ) : (
-                              <p className="reader-save-target-empty">
-                                当前知识库还没有可追加的知识页。
-                              </p>
-                            )}
-                            <div className="reader-save-target-actions">
-                              <button
-                                className="btn"
-                                onClick={() => {
-                                  onSaveNote(
-                                    message.content,
-                                    message.citations,
-                                    "knowledge",
-                                    message.mode === "model",
-                                  );
-                                  setSaveTargetMessageId(null);
-                                  setNotice("已新建知识页草稿，来源引用一并保留。");
-                                }}
-                              >
-                                <Plus size={13} />
-                                新建知识页草稿
-                              </button>
-                              <button
-                                className="btn"
-                                onClick={() => {
-                                  setSaveTargetMessageId(null);
-                                  setKnowledgePageTargetId("");
-                                }}
-                              >
-                                取消
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                    </div>
-                  );
-                })}
-                {busy && answerDraft && (
-                  <div
-                    className="reader-message reader-message-assistant reader-message-draft"
-                    role="group"
-                    aria-label="正在生成的回答"
-                    aria-busy="true"
-                  >
-                    <div className="reader-message-label">
-                      <Sparkles size={14} />
-                      Conuo{" "}
-                      <span>
-                        {stoppingAnswer ? "已停止 · 正在保留以上内容" : "生成中 · 尚未保存"}
-                      </span>
-                    </div>
-                    <div className="reader-message-content">
-                      <Markdown content={answerDraft.content} />
-                    </div>
-                    <details className="reader-draft-sources">
-                      <summary>
-                        本次段落依据 · {answerDraft.citations.length} 处原文
-                        {answerDraft.noteEvidence?.length
-                          ? ` + ${answerDraft.noteEvidence.length} 段我的笔记`
-                          : ""}
-                      </summary>
-                      <ol>
-                        {answerDraft.citations.map((citation, index) => (
-                          <li key={`${citation.chunkId}-${index}`}>
-                            <strong>
-                              {citation.title} ·{" "}
-                              {citation.page ? `第 ${citation.page} 页` : citation.section}
-                            </strong>
-                            <p>{citation.quote}</p>
-                          </li>
-                        ))}
-                      </ol>
-                      {!!answerDraft.noteEvidence?.length && (
-                        <ul className="reader-draft-note-evidence">
-                          {answerDraft.noteEvidence.map((evidence, index) => (
-                            <li key={`${evidence.noteId}-${evidence.blockId}-${index}`}>
-                              <strong>我的笔记 · {evidence.title}</strong>
-                              <p>{evidence.quote}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </details>
-                    <p className="reader-draft-notice">
-                      {answerDraft.noteEvidence?.length
-                        ? "回答尚未完成；若最终引用个人笔记，会保留其快照而暂不支持直接另存。"
-                        : "回答尚未完成，完成后可保存为笔记或知识页。"}
-                    </p>
-                  </div>
-                )}
-                {busy && (
-                  <div className="reader-answer-progress" role="status">
-                    <LoaderCircle size={17} className="reader-spin" />
-                    {answerPhases[answerPhase]}
-                  </div>
-                )}
-                <div ref={chatEnd} />
-              </div>
-              <form
-                className="reader-composer"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void ask();
-                }}
-              >
-                {historical && (
-                  <p className="reader-form-error">历史版本仅供阅读与摘录，请回到当前版本提问。</p>
-                )}
-                {!aiEnabled && (
-                  <p className="reader-form-error">资料问答已关闭，可在设置中开启。</p>
-                )}
-                {error && (
-                  <p className="reader-form-error" role="alert">
-                    {error}
-                  </p>
-                )}
-                <div className="reader-input-box">
-                  <textarea
-                    ref={questionInput}
-                    aria-label="向资料提问"
-                    aria-describedby={
-                      !historical && askEligibilityMessage ? "reader-ask-eligibility" : undefined
+                          "knowledge",
+                          message.mode === "model",
+                        );
+                        setSaveTargetMessageId(null);
+                        setNotice("已新建知识页草稿，来源引用一并保留。");
+                      },
                     }
-                    value={input}
-                    disabled={busy || historical || !aiEnabled}
-                    rows={3}
-                    maxLength={4000}
-                    placeholder="从你不理解的地方开始提问…"
-                    onChange={(event) => setInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (
-                        event.key === "Enter" &&
-                        !event.shiftKey &&
-                        !event.nativeEvent.isComposing
-                      ) {
-                        event.preventDefault();
-                        if (!askEligibilityMessage) void ask();
-                      }
-                    }}
-                  />
-                  <div className="reader-input-footer">
-                    <span>
-                      <FileText size={12} />
-                      {scopeLabels[scope]}
-                    </span>
-                    {busy ? (
-                      <button
-                        type="button"
-                        className="reader-send reader-stop"
-                        aria-label="停止回答"
-                        onClick={stopAnswer}
-                      >
-                        <Square size={14} fill="currentColor" />
-                      </button>
-                    ) : (
-                      <button
-                        type="submit"
-                        className="reader-send"
-                        aria-label="发送问题"
-                        disabled={
-                          historical || !input.trim() || !aiEnabled || !!askEligibilityMessage
-                        }
-                      >
-                        <ArrowUp size={17} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <p className="reader-ai-footnote">
-                  答案请结合原文判断 · Enter 发送，Shift + Enter 换行
-                </p>
-              </form>
-            </aside>
+                  : {}),
+              }}
+              onClose={closeAiPanel}
+            />
           </>
         )}
       </div>

@@ -40,14 +40,26 @@ export const askScopeLabels: Record<AskScope, string> = {
   "cross-library": "跨知识库固定资料",
 };
 
+/** Ranges a document surface offers; their option id equals their server scope. */
+export type DocumentAskScope = Extract<AskScope, Scope>;
+
 /** The reader and the comparison reader share one document-centred range list. */
-export const readerAskScopes: AskScope[] = [
+export const readerAskScopes: DocumentAskScope[] = [
   "selection",
   "document",
   "document-notes",
   "sources",
   "space",
 ];
+
+/**
+ * Narrows a saved thread's scope back to what a document surface can show. A
+ * cross-library thread never opens inside a reader, so this falls back to the
+ * document's own default rather than widening anything.
+ */
+export function documentAskScopeOf(scope: Scope): DocumentAskScope {
+  return scope === "cross-library-sources" ? "document-notes" : scope;
+}
 
 /** A knowledge page may only ask about the original sources it already cites. */
 export const noteAskScopes: AskScope[] = ["note-evidence"];
