@@ -193,6 +193,23 @@
   }
 }
 
+/* Below ~860px a third docked column would leave the source list under ~420px,
+   which the design guidance rules out for tablet widths. Float the panel over
+   the list instead: the list keeps its full width and stays clickable, so
+   reviewing several sources in a row still works. */
+@media (min-width: 621px) and (max-width: 859px) {
+  .source-detail-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    flex-basis: auto;
+    width: 340px;
+    max-width: 82vw;
+  }
+}
+
 /* The design's phone layout opens details as its own page rather than a
    cramped column; the list is restored when the page is dismissed. */
 @media (max-width: 620px) {
