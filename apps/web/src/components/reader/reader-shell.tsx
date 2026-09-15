@@ -127,6 +127,10 @@ import {
   scopeLabels,
   sourceStatusLabel,
 } from "./reader-constants";
+import AnnotationsPanel from "./panels/annotations-panel";
+import CitationPreviewPanel from "./panels/citation-preview-panel";
+import FindPanel from "./panels/find-panel";
+import OutlinePanel from "./panels/outline-panel";
 import ReaderTopbar from "./reader-topbar";
 import {
   clearReaderSearchHighlights,
@@ -2290,132 +2294,32 @@ export default function Reader(props: ReaderProps) {
             />
           )}
           {outlineOpen && outlineItems.length > 0 && (
-            <nav className="reader-outline" id="reader-outline-panel" aria-label="资料目录">
-              <header className="reader-outline-header">
-                <div>
-                  <strong>目录</strong>
-                  <span>{outlineItems.length} 个已解析章节</span>
-                </div>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  aria-label="关闭资料目录"
-                  onClick={closeOutline}
-                >
-                  <X size={15} />
-                </button>
-              </header>
-              <div className="reader-outline-list">
-                {outlineItems.map((item) => (
-                  <button
-                    type="button"
-                    className={`reader-outline-item reader-outline-level-${item.level}`}
-                    data-reader-outline-item={item.id}
-                    key={item.id}
-                    title={item.title}
-                    aria-label={`跳转到章节：${item.title}`}
-                    onClick={() => jumpToOutlineItem(item)}
-                  >
-                    {item.title}
-                  </button>
-                ))}
-              </div>
-            </nav>
+            <OutlinePanel
+              outlineItems={outlineItems}
+              closeOutline={closeOutline}
+              jumpToOutlineItem={jumpToOutlineItem}
+            />
           )}
           {searchOpen && (
-            <form
-              id="reader-find-panel"
-              className="reader-find"
-              onSubmit={(event) => {
-                event.preventDefault();
-                findInDocument();
-              }}
-            >
-              <Search size={15} />
-              <input
-                ref={searchInput}
-                aria-label="查找文字"
-                placeholder={
-                  source.kind === "pdf" && !showText ? "在当前 PDF 页查找" : "在原文中查找"
-                }
-                value={search}
-                onChange={(event) => {
-                  clearSearchResults();
-                  setSearch(event.target.value);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
-                  event.preventDefault();
-                  findInDocument(event.shiftKey ? -1 : 1);
-                }}
-              />
-              <span
-                className="reader-find-count"
-                role="status"
-                aria-live="polite"
-                data-reader-search-count
-              >
-                {searchResult?.query.toLowerCase() === search.trim().toLowerCase()
-                  ? `${searchResult.index + 1} / ${searchResult.count}`
-                  : search.trim()
-                    ? "按 Enter 查找"
-                    : "输入文字"}
-              </span>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="上一处匹配"
-                title="上一处匹配（Shift + Enter）"
-                disabled={!search.trim()}
-                onClick={() => findInDocument(-1)}
-              >
-                <ChevronLeft size={15} />
-              </button>
-              <button
-                className="icon-btn"
-                type="submit"
-                aria-label="下一处匹配"
-                title="下一处匹配（Enter）"
-                disabled={!search.trim()}
-              >
-                <ChevronRight size={15} />
-              </button>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="关闭查找"
-                onClick={closeDocumentSearch}
-              >
-                <X size={15} />
-              </button>
-            </form>
+            <FindPanel
+              search={search}
+              searchResult={searchResult}
+              searchInput={searchInput}
+              showText={showText}
+              source={source}
+              setSearch={setSearch}
+              clearSearchResults={clearSearchResults}
+              closeDocumentSearch={closeDocumentSearch}
+              findInDocument={findInDocument}
+            />
           )}
           {focusedCitation && (
-            <div
-              className={`reader-citation-target ${citationError ? "reader-citation-warning" : ""}`}
-              role="status"
-            >
-              <div>
-                <strong>
-                  引用原文 · {focusedCitation.title}
-                  {focusedCitation.page
-                    ? ` · 第 ${focusedCitation.page} 页`
-                    : ` · ${focusedCitation.section}`}
-                </strong>
-                <blockquote>{focusedCitation.quote}</blockquote>
-                {citationError && <p>{citationError}</p>}
-              </div>
-              <button
-                className="icon-btn"
-                aria-label="关闭引用定位"
-                onClick={() => {
-                  setFocusedCitation(null);
-                  setCitationError("");
-                }}
-              >
-                <X size={15} />
-              </button>
-            </div>
+            <CitationPreviewPanel
+              focusedCitation={focusedCitation}
+              citationError={citationError}
+              setFocusedCitation={setFocusedCitation}
+              setCitationError={setCitationError}
+            />
           )}
           {selection && selectionToolbar && (
             <div
@@ -2521,106 +2425,27 @@ export default function Reader(props: ReaderProps) {
             </form>
           )}
           {annotationOpen && (
-            <aside
-              id="reader-annotations-panel"
-              className="reader-annotations"
-              aria-label="我的标注"
-            >
-              <h3>
-                我的标注 <span>{sourceAnnotations.length}</span>
-              </h3>
-              {!sourceAnnotations.length && (
-                <p className="muted">
-                  {historical
-                    ? "这个历史版本没有已保存的标注；如需记录原文，可以保存独立笔记。"
-                    : "选择原文后点击“高亮”，标注会保存在这里。"}
-                </p>
-              )}
-              {sourceAnnotations.map((item) => {
-                const editing = editingAnnotationId === item.id;
-                return (
-                  <article className="reader-annotation-card" key={item.id}>
-                    <button
-                      type="button"
-                      className="reader-annotation-locate"
-                      aria-label={`定位批注：${markdownQuoteText(source, item.quote).slice(0, 32)}`}
-                      onClick={() => {
-                        if (item.page) changePage(item.page);
-                        setFocusedCitation(null);
-                        setFocusedAnnotationId(item.id);
-                        setAnnotationFocusEpoch((current) => current + 1);
-                        setMobileTab("reading");
-                        if (!isWideReaderLayout()) setAiOpen(false);
-                      }}
-                    >
-                      <blockquote>{markdownQuoteText(source, item.quote)}</blockquote>
-                      <span className="reader-annotation-meta">
-                        {item.page ? `第 ${item.page} 页 · ` : ""}
-                        {new Date(item.createdAt).toLocaleDateString("zh-CN")}
-                      </span>
-                    </button>
-                    {editing ? (
-                      <form
-                        className="reader-annotation-editor"
-                        aria-label="编辑批注"
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          saveAnnotationEdit(item);
-                        }}
-                      >
-                        <textarea
-                          aria-label="编辑批注内容"
-                          value={editingAnnotationNote}
-                          maxLength={4_000}
-                          placeholder="写下你的理解、疑问或下一步行动"
-                          onChange={(event) => setEditingAnnotationNote(event.target.value)}
-                        />
-                        <div className="reader-annotation-form-actions">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingAnnotationId(null);
-                              setEditingAnnotationNote("");
-                            }}
-                          >
-                            取消
-                          </button>
-                          <button type="submit" className="btn btn-primary">
-                            保存修改
-                          </button>
-                        </div>
-                      </form>
-                    ) : (
-                      <p
-                        className={
-                          item.note ? "reader-annotation-note" : "reader-annotation-note muted"
-                        }
-                      >
-                        {item.note || "未添加说明"}
-                      </p>
-                    )}
-                    <div className="reader-annotation-actions">
-                      <button
-                        type="button"
-                        aria-label="编辑批注"
-                        disabled={historical || !onAnnotationUpdate}
-                        onClick={() => beginAnnotationEdit(item)}
-                      >
-                        编辑
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="删除批注"
-                        disabled={historical || !onAnnotationDelete}
-                        onClick={() => deleteAnnotation(item)}
-                      >
-                        删除
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </aside>
+            <AnnotationsPanel
+              sourceAnnotations={sourceAnnotations}
+              source={source}
+              historical={historical}
+              editingAnnotationId={editingAnnotationId}
+              editingAnnotationNote={editingAnnotationNote}
+              onAnnotationUpdate={onAnnotationUpdate}
+              onAnnotationDelete={onAnnotationDelete}
+              isWideReaderLayout={isWideReaderLayout}
+              changePage={changePage}
+              beginAnnotationEdit={beginAnnotationEdit}
+              saveAnnotationEdit={saveAnnotationEdit}
+              deleteAnnotation={deleteAnnotation}
+              setEditingAnnotationId={setEditingAnnotationId}
+              setEditingAnnotationNote={setEditingAnnotationNote}
+              setFocusedAnnotationId={setFocusedAnnotationId}
+              setAnnotationFocusEpoch={setAnnotationFocusEpoch}
+              setFocusedCitation={setFocusedCitation}
+              setAiOpen={setAiOpen}
+              setMobileTab={setMobileTab}
+            />
           )}
           {source.originalMissing && (
             <div className="reader-warning" role="status">
