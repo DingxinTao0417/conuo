@@ -73,6 +73,39 @@
   }
 }
 
+/*
+ * The relations and knowledge-update surfaces were built as full-width pages.
+ * Their side-by-side comparisons only collapse to one column on a narrow
+ * viewport, but here the viewport stays wide while the column is ~520px, so
+ * each side would get about 240px — unreadable for prose. Collapse them for
+ * the panel itself instead, on top of the existing viewport rules.
+ */
+.note-side-panel .relations-sides,
+.note-side-panel .relations-editor-sides,
+.note-side-panel .knowledge-update-comparison,
+.note-side-panel .organization-source-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.note-side-panel .relations-side + .relations-side {
+  border-left: 0;
+  border-top: 1px solid #eae5ef;
+}
+
+.note-side-panel .relations-editor-sides > section + section {
+  padding-top: 14px;
+  border-top: 1px solid #e9e1f0;
+}
+
+.note-side-panel .knowledge-update-after {
+  border-left: 0;
+  border-top: 1px solid #e9e5ef;
+}
+
+.note-side-panel .knowledge-update-before {
+  max-height: 240px;
+}
+
 .note-evidence-source {
   display: flex;
   align-items: center;
