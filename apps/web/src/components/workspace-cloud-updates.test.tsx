@@ -126,7 +126,7 @@ describe("Workspace foreground cloud update integration", () => {
       stopOrganization: vi.fn(),
       useRemote: vi.fn(),
     };
-    window.history.replaceState(null, "", "#settings");
+    window.history.replaceState(null, "", "#settings/reading");
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);

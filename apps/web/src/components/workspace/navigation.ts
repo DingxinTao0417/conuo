@@ -37,6 +37,28 @@ export const sections = [
   ["knowledge", "知识页", BookOpen],
 ] as const;
 
+/**
+ * Settings groups, in display order, following the product requirement's
+ * settings outline (account and devices, AI and source processing, cloud data
+ * and storage, reading and sync). Each one is a `#settings/<pane>` route so a
+ * reload or a shared link reopens the same group.
+ *
+ * Learning-space management is still listed here; it moves to the space
+ * overview once that page exists.
+ */
+export const settingsPanes = [
+  ["account", "账号与设备"],
+  ["ai", "AI 与资料处理"],
+  ["storage", "云端资料与存储"],
+  ["reading", "阅读与同步"],
+  ["spaces", "学习空间"],
+] as const;
+export type SettingsPane = (typeof settingsPanes)[number][0];
+
+export function isSettingsPane(value: string | undefined): value is SettingsPane {
+  return settingsPanes.some(([pane]) => pane === value);
+}
+
 export const labels: Record<Section, string> = {
   home: "学习概览",
   library: "资料库",

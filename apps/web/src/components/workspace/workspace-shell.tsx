@@ -146,7 +146,7 @@ import KnowledgeSection from "./sections/knowledge-section";
 import LibrarySection from "./sections/library-section";
 import NotesSection from "./sections/notes-section";
 import QuestionsSection from "./sections/questions-section";
-import SettingsSection from "./sections/settings-section";
+import SettingsSection from "./sections/settings/settings-section";
 import TrashSection from "./sections/trash-section";
 import {
   AccountPanel,
@@ -164,7 +164,14 @@ import type { CrossLibrarySearchDraft, NoteSearchTarget, WorkspaceModal } from "
 import { useExportFlow } from "./hooks/use-export-flow";
 import { useLibraryRoute } from "./hooks/use-library-route";
 import NotePage from "./note-page/note-page";
-import { labels, spaceTabs, type Section, type SpaceTab } from "./navigation";
+import {
+  isSettingsPane,
+  labels,
+  spaceTabs,
+  type Section,
+  type SettingsPane,
+  type SpaceTab,
+} from "./navigation";
 import WorkspaceSidebar from "./sidebar";
 import WorkspaceTopbar from "./topbar";
 
@@ -271,6 +278,7 @@ export default function Workspace({
     applyRoute: applyLibraryRoute,
     replaceLibraryView,
   } = useLibraryRoute();
+  const [settingsPane, setSettingsPane] = useState<SettingsPane>("account");
   const [questionHistoryFilter, setQuestionHistoryFilter] = useState<QuestionHistoryFilter>("all");
   const [knowledgeFilter, setKnowledgeFilter] = useState<KnowledgeLibraryFilter>("all");
   const [crossLibrarySearchDraft, setCrossLibrarySearchDraft] =
@@ -1037,6 +1045,9 @@ export default function Workspace({
         setSection(type as Section);
         setSourceId(null);
         setNoteId(null);
+        // `#settings/<pane>` reopens one settings group; a bare or unknown
+        // pane falls back to the first group instead of an empty screen.
+        if (type === "settings") setSettingsPane(isSettingsPane(id) ? id : "account");
         if (type === "library" && libraryRoute) {
           const parsedTags = normalizeLibraryTags(libraryRoute.tags);
           // A direct library link is handled before the workspace finishes
@@ -1152,6 +1163,7 @@ export default function Workspace({
     setKnowledgeFilter("all");
     setCollectionSearch("");
     setSidebar(false);
+    if (next === "settings") setSettingsPane("account");
     if (next === "library") {
       const target = libraryTarget || {
         spaceId,
@@ -2011,6 +2023,10 @@ export default function Workspace({
       return;
     }
     navigate(tab, undefined, activeSpace.id);
+  }
+  function openSettingsPane(pane: SettingsPane) {
+    setSettingsPane(pane);
+    window.history.pushState(null, "", `#settings/${pane}`);
   }
   function openSpaceCreation(intent: "browse" | "import" = "browse") {
     setSpaceCreationIntent(intent);
@@ -3081,6 +3097,8 @@ export default function Workspace({
                 busy={busy}
                 exporting={exporting}
                 exportProgress={exportProgress}
+                settingsPane={settingsPane}
+                openSettingsPane={openSettingsPane}
                 navigate={navigate}
                 setModal={setModal}
                 setToast={setToast}

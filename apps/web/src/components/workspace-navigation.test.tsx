@@ -172,6 +172,43 @@ describe("Workspace primary navigation", () => {
     expect(tasks!.querySelector(".topbar-task-count")).toBeNull();
   });
 
+  it("opens settings as grouped panes and keeps the group in the URL", async () => {
+    await openHash("#settings");
+
+    const panes = host.querySelector<HTMLElement>('[aria-label="设置分组"]');
+    expect(panes).toBeInstanceOf(HTMLElement);
+    expect([...panes!.querySelectorAll("button")].map((button) => button.textContent)).toEqual([
+      "账号与设备",
+      "AI 与资料处理",
+      "云端资料与存储",
+      "阅读与同步",
+      "学习空间",
+    ]);
+    // A bare #settings opens the first group; AI and storage controls are not
+    // stacked onto the same screen any more.
+    expect(host.textContent).toContain("安装与设备");
+    expect(host.textContent).not.toContain("允许 AI 使用我的资料");
+    expect(host.textContent).not.toContain("导出学习资料");
+
+    const ai = [...panes!.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === "AI 与资料处理",
+    );
+    await act(async () => ai!.click());
+    expect(window.location.hash).toBe("#settings/ai");
+    expect(host.textContent).toContain("允许 AI 使用我的资料");
+    expect(host.textContent).not.toContain("安装与设备");
+  });
+
+  it("restores a settings group from its own link and falls back for an unknown group", async () => {
+    await openHash("#settings/storage");
+    expect(host.textContent).toContain("导出学习资料");
+    expect(host.querySelector<HTMLElement>('[aria-label="设置分组"]')).toBeInstanceOf(HTMLElement);
+
+    await openHash("#settings/not-a-group");
+    expect(host.textContent).toContain("安装与设备");
+    expect(host.textContent).not.toContain("导出学习资料");
+  });
+
   it("still resolves the task center and AI organization deep links", async () => {
     await openHash("#tasks");
     expect(window.location.hash).toBe("#tasks");

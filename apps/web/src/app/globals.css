@@ -1720,6 +1720,51 @@ h1 {
   font-size: 12px;
   font-weight: 500;
 }
+.settings-panes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 820px;
+  margin: 0 0 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-panes button {
+  padding: 6px 11px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.settings-panes button:hover {
+  background: var(--bg-base-tertiary);
+  color: var(--text-default);
+}
+.settings-panes button.active {
+  background: var(--bg-base-tertiary);
+  border-color: var(--border);
+  color: var(--text-default);
+  font-weight: 500;
+}
+.settings-panes button:focus-visible {
+  outline: 2px solid var(--border-brand);
+  outline-offset: 2px;
+}
+.settings-advanced {
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.settings-advanced > summary {
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.settings-advanced > summary:focus-visible {
+  outline: 2px solid var(--border-brand);
+  outline-offset: 2px;
+}
 .settings-card {
   max-width: 820px;
   padding: 24px;

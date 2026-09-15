@@ -274,7 +274,7 @@ describe("Workspace account deletion access barrier", () => {
   });
 
   it("closes an ongoing backup review when account access stops and does not revive it afterward", async () => {
-    window.history.replaceState(null, "", "#settings");
+    window.history.replaceState(null, "", "#settings/storage");
     await render();
     await act(async () => button("恢复备份").click());
     expect(host.querySelector("[data-testid='backup-review']")).not.toBeNull();

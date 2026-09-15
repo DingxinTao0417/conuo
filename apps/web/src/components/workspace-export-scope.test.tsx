@@ -125,7 +125,7 @@ describe("Workspace reviewed knowledge-base backup exports", () => {
     };
     exportIO.exportWorkspace.mockReset().mockResolvedValue(result);
     exportIO.download.mockReset();
-    window.history.replaceState(null, "", "#settings");
+    window.history.replaceState(null, "", "#settings/storage");
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);

@@ -87,7 +87,7 @@ describe("Workspace settings sync status", () => {
       stopOrganization: vi.fn(),
       useRemote: vi.fn(),
     };
-    window.history.replaceState(null, "", "#settings");
+    window.history.replaceState(null, "", "#settings/reading");
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -104,16 +104,28 @@ describe("Workspace settings sync status", () => {
   it("shows the confirmed workspace state instead of inferring it from the connected account", async () => {
     const currentStatus = () =>
       host.querySelector<HTMLElement>('[aria-label="当前工作区保存状态"]');
-    expect(host.textContent).toContain("已连接账号");
     expect(currentStatus()?.textContent).toContain("当前工作区保存状态：保存需要处理");
     expect(currentStatus()?.textContent).toContain("网络中断，云端保存尚未确认。");
-    expect(host.textContent).not.toContain("资料保存到你的私有云端空间");
 
     workspaceStore = { ...workspaceStore, status: "cloud", error: "" };
     await act(async () => root.render(createElement(Workspace)));
 
     expect(currentStatus()?.textContent).toContain("当前工作区保存状态：工作区已保存到云端");
     expect(currentStatus()?.textContent).toContain("当前任务记录与资料库状态已确认保存。");
+  });
+
+  it("describes the connected account without implying a confirmed save", async () => {
+    await act(async () => {
+      window.history.replaceState(null, "", "#settings/account");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+
+    expect(host.textContent).toContain("已连接账号");
+    expect(host.textContent).toContain("以服务确认状态为准");
+    expect(host.textContent).not.toContain("资料保存到你的私有云端空间");
+    // The save state stays in its own settings group, so the account group
+    // cannot be mistaken for a save confirmation.
+    expect(host.querySelector('[aria-label="当前工作区保存状态"]')).toBeNull();
   });
 
   it("opens the global task center from the settings status", async () => {
