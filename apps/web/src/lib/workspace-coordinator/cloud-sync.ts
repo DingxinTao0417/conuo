@@ -104,7 +104,7 @@ export class CloudSyncController {
       session.checking ||
       session.purging ||
       this.core.isCloudReadOnly(session) ||
-      this.core.migrationChoiceBlocksWrites(session) ||
+      this.core.migration.migrationChoiceBlocksWrites(session) ||
       this.core.hasNewerLocalUpdate(session) ||
       session.loadingLocalUpdate ||
       (!committing &&

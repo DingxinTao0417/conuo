@@ -25,14 +25,8 @@ import { BackupRestoreController } from "./backup-restore";
 import { CloudSyncController } from "./cloud-sync";
 import { ImportsController } from "./imports";
 import { accountKey, defaultImportPipeline, defaultIO, unpack } from "./io";
-import {
-  anonymousMigrationSummary,
-  hasMeaningfulWorkspaceContent,
-  mergeConcurrentWorkspace,
-  noAnonymousWorkspaceMigration,
-  sameData,
-  withoutAnonymousCloudPaths,
-} from "./merge";
+import { MigrationController } from "./migration";
+import { mergeConcurrentWorkspace, noAnonymousWorkspaceMigration, sameData } from "./merge";
 import {
   keepsRunningAfterBrowserExit,
   OrganizationController,
@@ -109,6 +103,8 @@ export class WorkspaceCoordinator {
   readonly backupRestore = new BackupRestoreController(this);
   /** Cloud revision checks, fenced adoption, remote recovery and conflict plans. */
   readonly cloudSync = new CloudSyncController(this);
+  /** The one explicit anonymous-library decision a signed-in account must make. */
+  readonly migration = new MigrationController(this);
   // Recovery snapshots are intentionally independent from ordinary workspace
   // persistence, but account deletion still has to await them before clearing
   // IndexedDB. Keep only live writes for the owning session.
@@ -877,81 +873,10 @@ export class WorkspaceCoordinator {
     await this.discardAccount(target.accountId);
   }
 
-  /**
-   * Looks for a meaningful anonymous library only after this account's local
-   * and cloud copies have both been reconciled. A read failure is deliberately
-   * non-destructive: the account keeps its own normal load path and no
-   * anonymous data is inferred from a failed IndexedDB read.
-   */
-  private async discoverAnonymousWorkspaceMigration(session: Session): Promise<void> {
-    if (this.cloudOnly) return;
-    if (!session.user || !this.isActive(session)) return;
-    try {
-      const anonymous = unpack(await this.io.loadLocal("local")).data;
-      if (!this.isActive(session)) return;
-      if (!anonymous || !hasMeaningfulWorkspaceContent(anonymous)) return;
-
-      if (!session.knownRevision || session.blocked) {
-        session.anonymousMigration = anonymousMigrationSummary(
-          "unavailable",
-          anonymous,
-          "当前账号的云端状态尚未确认，未迁移此浏览器中的匿名资料。请先重新连接，或导出后再恢复。",
-        );
-        return;
-      }
-      if (hasMeaningfulWorkspaceContent(session.data)) {
-        // A successful migration deliberately leaves the anonymous local copy
-        // intact. On a later reload, recognize only an exact normalized match
-        // (cloud object paths excluded) as that same copied library. Any edit
-        // on either side falls through to the conservative export/recovery
-        // state instead of making a new overwrite decision automatically.
-        if (
-          sameData(withoutAnonymousCloudPaths(session.data), withoutAnonymousCloudPaths(anonymous))
-        ) {
-          session.anonymousMigration = anonymousMigrationSummary(
-            "migrated",
-            anonymous,
-            "当前账号已包含与此浏览器匿名副本一致的资料；匿名副本仍保留在本机。",
-          );
-          return;
-        }
-        session.anonymousMigration = anonymousMigrationSummary(
-          "requires-export",
-          anonymous,
-          "当前账号已有资料，匿名资料不会自动覆盖。请先导出匿名副本，或恢复到空账号后再迁移。",
-        );
-        return;
-      }
-
-      session.anonymousWorkspace = structuredClone(anonymous);
-      session.anonymousMigration = anonymousMigrationSummary(
-        "pending",
-        anonymous,
-        "发现此浏览器中的匿名资料。迁移会复制到当前账号，匿名副本仍会保留在本机。",
-        true,
-      );
-    } catch (cause) {
-      if (!this.isActive(session)) return;
-      session.anonymousWorkspace = null;
-      session.anonymousMigration = {
-        kind: "unavailable",
-        canMigrate: false,
-        message: "无法读取此浏览器中的匿名资料，未进行迁移：" + errorText(cause),
-      };
-    }
-  }
-
-  migrationChoiceBlocksWrites(session: Session): boolean {
-    return (
-      session.anonymousMigration.kind === "pending" ||
-      session.anonymousMigration.kind === "migrating"
-    );
-  }
-
   writesBlocked(session: Session): boolean {
     return (
       this.isCloudReadOnly(session) ||
-      this.migrationChoiceBlocksWrites(session) ||
+      this.migration.migrationChoiceBlocksWrites(session) ||
       this.hasNewerLocalUpdate(session) ||
       session.loadingLocalUpdate ||
       session.loadingCloudUpdate
@@ -962,7 +887,7 @@ export class WorkspaceCoordinator {
     this.assertWritable(session);
     if (session.loadingCloudUpdate)
       throw new Error("正在保存云端更新，请稍后再操作；当前编辑仍会保留。");
-    if (this.migrationChoiceBlocksWrites(session))
+    if (this.migration.migrationChoiceBlocksWrites(session))
       throw new Error("请先迁移或暂不迁移此浏览器中的匿名资料。");
     if (this.hasNewerLocalUpdate(session) || session.loadingLocalUpdate)
       throw new Error("另一个标签页已保存更新。请先载入最新数据，再继续编辑。");
@@ -979,7 +904,7 @@ export class WorkspaceCoordinator {
     if (
       previous?.localDirty &&
       this.memory.get(accountKey(previous.user)) === previous &&
-      !this.migrationChoiceBlocksWrites(previous)
+      !this.migration.migrationChoiceBlocksWrites(previous)
     ) {
       // Capture the outgoing account and its latest edit before changing identity.
       // This is a local-only flush; never upload using the next account's session.
@@ -1169,9 +1094,9 @@ export class WorkspaceCoordinator {
     }
     if (!this.isActive(session)) return;
     session.ready = true;
-    await this.discoverAnonymousWorkspaceMigration(session);
+    await this.migration.discoverAnonymousWorkspaceMigration(session);
     if (!this.isActive(session)) return;
-    if (!this.migrationChoiceBlocksWrites(session)) {
+    if (!this.migration.migrationChoiceBlocksWrites(session)) {
       this.organization.recoverOrganizationJobs(session);
       this.imports.recoverImportJobs(session);
     }
@@ -1184,7 +1109,7 @@ export class WorkspaceCoordinator {
     // A pending choice is intentionally a save barrier. Without it, the fresh
     // account's generated default workspace could be uploaded before the user
     // has decided what to do with the anonymous library.
-    if (this.migrationChoiceBlocksWrites(session)) return;
+    if (this.migration.migrationChoiceBlocksWrites(session)) return;
     await this.pump(session);
   }
 
@@ -1299,200 +1224,6 @@ export class WorkspaceCoordinator {
     );
   }
 
-  /**
-   * Explicitly copies the anonymous browser workspace into an otherwise empty
-   * signed-in account. This never deletes or rewrites the `local` workspace.
-   */
-  async migrateAnonymousWorkspace(token: number): Promise<void> {
-    const session = this.active;
-    if (
-      !session?.user ||
-      !session.ready ||
-      session.token !== token ||
-      session.anonymousMigration.kind !== "pending"
-    )
-      throw new Error("当前账号或匿名资料已改变，请重新检查迁移提示。");
-    this.assertWritable(session);
-    const userId = session.user.id;
-    const initial = {
-      data: session.data,
-      revision: session.revision,
-      knownRevision: session.knownRevision,
-      localDirty: session.localDirty,
-      cloudDirty: session.cloudDirty,
-      blocked: session.blocked,
-      recovery: session.recovery,
-      recoveryRevision: session.recoveryRevision,
-      confirmedCloud: session.confirmedCloud,
-      status: session.status,
-      error: session.error,
-    };
-    const pending = session.anonymousMigration;
-    const restorePending = (message: string) => {
-      if (!this.isActive(session) || session.user?.id !== userId || session.token !== token) return;
-      session.data = initial.data;
-      session.revision = initial.revision;
-      session.knownRevision = initial.knownRevision;
-      session.localDirty = initial.localDirty;
-      session.cloudDirty = initial.cloudDirty;
-      session.blocked = initial.blocked;
-      session.recovery = initial.recovery;
-      session.recoveryRevision = initial.recoveryRevision;
-      session.confirmedCloud = initial.confirmedCloud;
-      session.ready = true;
-      session.status = "error";
-      session.error = message;
-      session.anonymousMigration = {
-        ...pending,
-        kind: "pending",
-        canMigrate: true,
-        message: "匿名资料仍保留在本机；迁移前检查未完成，可在问题解决后重新尝试。",
-      };
-      this.remember(session);
-      this.publish(session);
-    };
-
-    // Freeze ordinary writes before reading the current account again. The
-    // rechecks below are intentionally fresh: the discovery result alone is
-    // never permission to overwrite a library changed in another tab/device.
-    session.ready = false;
-    session.status = "saving";
-    session.error = "";
-    session.anonymousMigration = { ...pending, kind: "migrating", canMigrate: false };
-    this.publish(session);
-
-    let targetLocal: WorkspaceData | null;
-    let remote: RemoteWorkspace;
-    let anonymous: WorkspaceData | null;
-    try {
-      const [localStored, loadedRemote, anonymousStored] = await Promise.all([
-        this.io.loadLocal(userId),
-        this.io.loadCloud(userId),
-        this.io.loadLocal("local"),
-      ]);
-      targetLocal = unpack(localStored).data;
-      remote = loadedRemote;
-      anonymous = unpack(anonymousStored).data;
-    } catch (cause) {
-      if (!this.isActive(session) || session.user?.id !== userId || session.token !== token) return;
-      const message = "迁移前无法确认本机或云端副本：" + errorText(cause) + "。未迁移任何资料。";
-      restorePending(message);
-      throw new Error(message);
-    }
-    if (!this.isActive(session) || session.user?.id !== userId || session.token !== token) return;
-
-    if (!anonymous || !hasMeaningfulWorkspaceContent(anonymous)) {
-      session.ready = true;
-      session.anonymousWorkspace = null;
-      session.anonymousMigration = noAnonymousWorkspaceMigration();
-      session.status = initial.status;
-      session.error = "";
-      this.remember(session);
-      this.publish(session);
-      await this.pump(session);
-      throw new Error("此浏览器中的匿名资料已不可用，未迁移任何资料。");
-    }
-
-    if (
-      hasMeaningfulWorkspaceContent(session.data) ||
-      (!!targetLocal && hasMeaningfulWorkspaceContent(targetLocal)) ||
-      (!!remote.data && hasMeaningfulWorkspaceContent(remote.data))
-    ) {
-      session.ready = true;
-      session.anonymousWorkspace = structuredClone(anonymous);
-      session.anonymousMigration = anonymousMigrationSummary(
-        "requires-export",
-        anonymous,
-        "当前账号已有资料，匿名资料不会自动覆盖。请先导出匿名副本，或恢复到空账号后再迁移。",
-      );
-      session.status = "error";
-      session.error = "当前账号已有资料，未迁移匿名副本。";
-      this.remember(session);
-      this.publish(session);
-      throw new Error(session.error);
-    }
-
-    // Only this explicit local-library action can share local-owner originals.
-    // Cloud references and ordinary account snapshots cannot grant this access.
-    if (this.io.shareAnonymousOriginals) {
-      try {
-        await this.io.shareAnonymousOriginals(
-          userId,
-          anonymous.sources.flatMap((source) =>
-            [source, ...(source.versions ?? [])].flatMap((version) =>
-              version.blobKey ? [version.blobKey] : [],
-            ),
-          ),
-        );
-      } catch (cause) {
-        if (!this.isActive(session) || session.user?.id !== userId || session.token !== token)
-          return;
-        const message =
-          "匿名原件迁移未得到本机确认：" + errorText(cause) + "。匿名副本仍保留，可重试。";
-        restorePending(message);
-        throw new Error(message);
-      }
-      if (!this.isActive(session) || session.user?.id !== userId || session.token !== token) return;
-    }
-    const migrated = withoutAnonymousCloudPaths(anonymous);
-    session.data = migrated;
-    session.revision = remote.revision;
-    session.knownRevision = true;
-    session.localDirty = true;
-    session.cloudDirty = true;
-    session.blocked = null;
-    session.recovery = null;
-    session.recoveryRevision = null;
-    session.confirmedCloud = remote.data ? structuredClone(remote.data) : null;
-    try {
-      await this.persist(session);
-    } catch (cause) {
-      if (!this.isActive(session) || session.user?.id !== userId || session.token !== token) return;
-      const message =
-        "匿名资料副本尚未确认保存在当前账号：" + errorText(cause) + "。未开始云端同步。";
-      restorePending(message);
-      throw new Error(message);
-    }
-    if (!this.isActive(session) || session.user?.id !== userId || session.token !== token) return;
-
-    session.ready = true;
-    session.status = "saving";
-    session.error = "";
-    session.anonymousWorkspace = null;
-    session.anonymousMigration = {
-      ...anonymousMigrationSummary(
-        "migrated",
-        migrated,
-        "匿名资料已复制到当前账号的本机副本，正在等待云端确认。匿名副本仍保留在此浏览器。",
-      ),
-      pendingCloudConfirmation: true,
-    };
-    this.organization.recoverOrganizationJobs(session);
-    this.imports.recoverImportJobs(session);
-    this.remember(session);
-    this.publish(session);
-    await this.pump(session);
-  }
-
-  /** Keeps the anonymous copy untouched and resumes normal empty-account setup. */
-  async skipAnonymousWorkspaceMigration(token: number): Promise<void> {
-    const session = this.active;
-    if (!session?.user || !session.ready || session.token !== token)
-      throw new Error("当前账号已改变，请重新检查匿名资料迁移提示。");
-    this.assertWritable(session);
-    if (session.anonymousMigration.kind !== "pending") return;
-    session.anonymousWorkspace = null;
-    session.anonymousMigration = {
-      ...session.anonymousMigration,
-      kind: "dismissed",
-      canMigrate: false,
-      message: "已暂不迁移。匿名资料仍保留在此浏览器，之后重新登录时可再次处理。",
-    };
-    this.remember(session);
-    this.publish(session);
-    await this.pump(session);
-  }
-
   applyUpdate(
     updater: (data: WorkspaceData) => WorkspaceData,
     token: number,
@@ -1504,7 +1235,7 @@ export class WorkspaceCoordinator {
       session.token !== token ||
       this.cloudSync.isResolvingReadingConflicts(session) ||
       this.isCloudReadOnly(session) ||
-      this.migrationChoiceBlocksWrites(session)
+      this.migration.migrationChoiceBlocksWrites(session)
     )
       return null;
     const next = updater(session.data);
@@ -2213,7 +1944,7 @@ export class WorkspaceCoordinator {
       await this.activate(session.user);
       return;
     }
-    if (this.migrationChoiceBlocksWrites(session))
+    if (this.migration.migrationChoiceBlocksWrites(session))
       throw new Error("请先迁移或暂不迁移此浏览器中的匿名资料。");
     if (!session.ready) {
       await this.activate(session.user);
@@ -2253,6 +1984,14 @@ export class WorkspaceCoordinator {
       // A failed reconnect must not block local persistence of edits.
       if (session.localDirty) await this.pump(session);
     }
+  }
+
+  migrateAnonymousWorkspace(token: number): Promise<void> {
+    return this.migration.migrateAnonymousWorkspace(token);
+  }
+
+  skipAnonymousWorkspaceMigration(token: number): Promise<void> {
+    return this.migration.skipAnonymousWorkspaceMigration(token);
   }
 
   checkCloudUpdates(token: number, signal?: AbortSignal): Promise<void> {
