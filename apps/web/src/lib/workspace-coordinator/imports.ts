@@ -1237,7 +1237,7 @@ export class ImportsController {
       // Do not download the cloud original until this browser owns the server
       // lease. That is the actual duplicate-work fence, not merely the final
       // revision CAS.
-      const blob = source ? await this.core.sourceBlob(source, session.token) : undefined;
+      const blob = source ? await this.core.originals.sourceBlob(source, session.token) : undefined;
       const afterRead = this.importError(pending);
       if (afterRead) throw afterRead;
       if (!source?.blobKey || !blob)
@@ -1315,7 +1315,7 @@ export class ImportsController {
       // A resumed account can have a durable Storage original before this
       // browser has cached it. `sourceBlob` first checks IndexedDB, then only
       // downloads the exact current account/version path after revalidating it.
-      const blob = source ? await this.core.sourceBlob(source, session.token) : undefined;
+      const blob = source ? await this.core.originals.sourceBlob(source, session.token) : undefined;
       const afterRead = this.importError(pending);
       if (afterRead) throw afterRead;
       if (!source?.blobKey || !blob)
@@ -1770,9 +1770,9 @@ export class ImportsController {
     let published = false;
     try {
       await verifyOriginal(prepared, file);
-      created = await this.core.putLocalOriginal(session, blobKey, file);
+      created = await this.core.originals.putLocalOriginal(session, blobKey, file);
       if (!created) throw new Error("原文件标识已存在，请重新选择文件后重试。已有原件未被覆盖。");
-      const stored = await this.core.readLocalOriginal(session, blobKey);
+      const stored = await this.core.originals.readLocalOriginal(session, blobKey);
       if (!stored) throw new Error("原文件尚未确认保存在此浏览器，资料未导入。");
       await verifyOriginal(prepared, stored);
       if (!this.core.isActive(session) || !session.ready)
@@ -1802,7 +1802,7 @@ export class ImportsController {
     } catch (cause) {
       if (!published && created && this.core.io.deleteUnreferencedBlob) {
         try {
-          await this.core.deleteLocalOriginal(session, blobKey);
+          await this.core.originals.deleteLocalOriginal(session, blobKey);
         } catch {
           // An unverified cleanup must never hide the original save failure.
         }

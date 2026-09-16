@@ -16,7 +16,7 @@ import {
 } from "../permanent-deletion";
 import { createEmptyWorkspace } from "../seed";
 import { sameSourcePurgeSelection, sourcePurgeSelectionSchema } from "../source-purge-contract";
-import { getSourceVersion, replaceFileSource } from "../source-versions";
+import { getSourceVersion } from "../source-versions";
 import { assertWorkspaceOwner, workspaceSchema } from "../supabase/validation";
 import {
   applyNoteSyncResolution,
@@ -61,6 +61,7 @@ import {
   mergeOriginalPath,
   originalIdentity,
   originalKeys,
+  OriginalsController,
   pendingFileKeys,
   verifyOriginal,
 } from "./originals";
@@ -122,6 +123,8 @@ export class WorkspaceCoordinator {
   readonly organization = new OrganizationController(this);
   /** Import queue, parse leases, transition fences and cancellations. */
   readonly imports = new ImportsController(this);
+  /** Original bytes: local reads/writes, cloud download and reference checks. */
+  readonly originals = new OriginalsController(this);
   // Recovery snapshots are intentionally independent from ordinary workspace
   // persistence, but account deletion still has to await them before clearing
   // IndexedDB. Keep only live writes for the owning session.
@@ -1836,9 +1839,9 @@ export class WorkspaceCoordinator {
       this.remember(session);
       this.publish(session);
       for (const key of localKeys) {
-        if (this.referencesBlob(key) || !this.io.deleteUnreferencedBlob) continue;
+        if (this.originals.referencesBlob(key) || !this.io.deleteUnreferencedBlob) continue;
         try {
-          await this.deleteLocalOriginal(session, key);
+          await this.originals.deleteLocalOriginal(session, key);
         } catch {
           // The deletion is already durable. A future reference-safe cleanup
           // may retry; never report a physical local cleanup we cannot prove.
@@ -1984,9 +1987,9 @@ export class WorkspaceCoordinator {
       this.remember(session);
       this.publish(session);
       for (const key of localKeys) {
-        if (this.referencesBlob(key) || !this.io.deleteUnreferencedBlob) continue;
+        if (this.originals.referencesBlob(key) || !this.io.deleteUnreferencedBlob) continue;
         try {
-          await this.deleteLocalOriginal(session, key);
+          await this.originals.deleteLocalOriginal(session, key);
         } catch {
           // The cloud metadata is durable. A later reference-safe cleanup may retry.
         }
@@ -2005,102 +2008,6 @@ export class WorkspaceCoordinator {
       this.remember(session);
       this.publish(session);
       throw cause;
-    }
-  }
-
-  referencesBlob(key: string): boolean {
-    const sessions = new Set([...this.memory.values(), ...(this.active ? [this.active] : [])]);
-    return [...sessions].some((session) =>
-      [session.data, session.confirmedCloud, session.recovery].some((data) =>
-        data?.sources.some(
-          (source) =>
-            source.blobKey === key || source.versions?.some((version) => version.blobKey === key),
-        ),
-      ),
-    );
-  }
-
-  async replaceFile(
-    sourceId: string,
-    expectedVersionId: string,
-    candidate: Source,
-    blob: Blob,
-    token: number,
-  ): Promise<void> {
-    const session = this.active;
-    if (!session?.ready || session.token !== token)
-      throw new Error("当前账号已改变，请重新打开文件替换面板。");
-    this.assertWorkspaceWritable(session);
-    const prepared = structuredClone(candidate);
-    const validate = () => {
-      if (!this.isActive(session) || !session.ready)
-        throw new Error("当前账号已改变，请重新打开文件替换面板。");
-      return replaceFileSource(session.data, sourceId, expectedVersionId, prepared);
-    };
-    validate();
-    const key = prepared.blobKey!;
-    if (!this.io.putBlobIfAbsent || !this.io.deleteUnreferencedBlob)
-      throw new Error("当前环境无法安全保存替换原件，请重新载入后重试。原资料未修改。");
-    if (pendingFileKeys.has(key)) throw new Error("这个文件正在保存，请等待完成，勿重复提交。");
-    if (this.referencesBlob(key))
-      throw new Error("新文件原件标识已被使用，请重新选择文件，避免覆盖已有原件。");
-    pendingFileKeys.add(key);
-    let created = false;
-    let applied = false;
-    let attemptedWrite = false;
-    try {
-      await verifyOriginal(prepared, blob);
-      validate();
-      attemptedWrite = true;
-      created = await this.putLocalOriginal(session, key, blob);
-      if (!created) {
-        const existing = await this.readLocalOriginal(session, key);
-        if (existing) await verifyOriginal(prepared, existing);
-        throw new Error("这个原件标识已经存在，请重新选择文件生成新预览。已有原件未被覆盖。");
-      }
-      // Read back the immutable reservation before publishing a workspace that
-      // depends on it. A failed write must never create a dangling current page.
-      const persisted = await this.readLocalOriginal(session, key);
-      if (!persisted) throw new Error("替换原件尚未确认保存在此浏览器，原资料未修改。");
-      await verifyOriginal(prepared, persisted);
-      validate();
-      // Saving and reading back the immutable original can take long enough for
-      // another tab to commit a newer workspace. Recheck that boundary before
-      // publishing replacement metadata from this page's now-stale snapshot.
-      this.assertWorkspaceWritable(session);
-      const durableWrite = this.updateDurably(
-        (data) => replaceFileSource(data, sourceId, expectedVersionId, prepared),
-        token,
-      );
-      // updateDurably applies synchronously before awaiting IndexedDB. Read the
-      // live references now so a later local-write failure keeps an original
-      // already adopted by the in-memory recovery snapshot.
-      applied = this.referencesBlob(key);
-      if (!(await durableWrite))
-        throw new Error(session.error || "当前资料正在解析或账号已改变，原资料未修改。");
-      // A successful replacement promise now means its metadata is durable in
-      // IndexedDB. Cloud upload still follows the ordinary background status.
-    } catch (cause) {
-      let cleanup = "";
-      if (!applied && created) {
-        try {
-          const stored = await this.readLocalOriginal(session, key);
-          if (stored) await verifyOriginal(prepared, stored);
-          if (this.referencesBlob(key) || !(await this.deleteLocalOriginal(session, key)))
-            cleanup = " 暂存原件可能仍被引用，已保留，未清理。";
-        } catch {
-          cleanup = " 无法确认暂存原件可安全删除，已保留，未清理。";
-        }
-      } else if (!applied && attemptedWrite && !created) {
-        cleanup = " 未确认由本次操作创建的原件均未清理。";
-      }
-      const message =
-        !this.isActive(session) || !session.ready
-          ? "当前账号已改变，未将此次文件替换写入新账号。"
-          : errorText(cause);
-      throw new Error(message + cleanup);
-    } finally {
-      pendingFileKeys.delete(key);
     }
   }
 
@@ -2196,7 +2103,11 @@ export class WorkspaceCoordinator {
     }
     if (entries.length && (!this.io.putBlobIfAbsent || !this.io.deleteUnreferencedBlob))
       throw new Error("当前环境无法安全保存备份原件，请重新载入后重试。现有资料未修改。");
-    if (entries.some((entry) => pendingFileKeys.has(entry.key) || this.referencesBlob(entry.key)))
+    if (
+      entries.some(
+        (entry) => pendingFileKeys.has(entry.key) || this.originals.referencesBlob(entry.key),
+      )
+    )
       throw new Error("恢复原件标识正在使用，请重新生成恢复预览。已有原件未被覆盖。");
     const created = new Set<string>();
     const attempted = new Set<string>();
@@ -2210,11 +2121,11 @@ export class WorkspaceCoordinator {
       }
       for (const entry of entries) {
         attempted.add(entry.key);
-        const added = await this.putLocalOriginal(session, entry.key, entry.blob);
+        const added = await this.originals.putLocalOriginal(session, entry.key, entry.blob);
         if (!added) throw new Error("恢复原件标识已经存在，请重新生成恢复预览。已有原件未被覆盖。");
         created.add(entry.key);
         validate();
-        const stored = await this.readLocalOriginal(session, entry.key);
+        const stored = await this.originals.readLocalOriginal(session, entry.key);
         if (!stored) throw new Error("备份原件尚未确认保存在此浏览器，现有资料未修改。");
         await verifyOriginal(entry.version, stored);
         validate();
@@ -2234,11 +2145,11 @@ export class WorkspaceCoordinator {
         for (const entry of entries) {
           if (!created.has(entry.key)) continue;
           try {
-            const stored = await this.readLocalOriginal(session, entry.key);
+            const stored = await this.originals.readLocalOriginal(session, entry.key);
             if (stored) await verifyOriginal(entry.version, stored);
             if (
-              this.referencesBlob(entry.key) ||
-              !(await this.deleteLocalOriginal(session, entry.key))
+              this.originals.referencesBlob(entry.key) ||
+              !(await this.originals.deleteLocalOriginal(session, entry.key))
             )
               cleanup = " 无法确认可安全清理的暂存原件已保留。";
           } catch {
@@ -2457,7 +2368,7 @@ export class WorkspaceCoordinator {
                 const source = getSourceVersion(live, version.versionId);
                 if (!source)
                   throw new OriginalSyncError("资料历史版本身份无效，尚未上传，请检查版本记录。");
-                const blob = await this.readLocalOriginal(session, source.blobKey!);
+                const blob = await this.originals.readLocalOriginal(session, source.blobKey!);
                 if (!this.isActive(session)) return;
                 if (!blob)
                   throw new OriginalSyncError(
@@ -3542,74 +3453,22 @@ export class WorkspaceCoordinator {
     await this.pump(session);
   }
 
-  readLocalOriginal(session: Session, key: string): Promise<Blob | undefined> {
-    return this.io.getAccountBlob
-      ? this.io.getAccountBlob(key, accountKey(session.user))
-      : this.io.getBlob(key);
-  }
-
-  deleteLocalOriginal(session: Session, key: string): Promise<boolean> {
-    return this.io.deleteAccountUnreferencedBlob
-      ? this.io.deleteAccountUnreferencedBlob(key, accountKey(session.user))
-      : this.io.deleteUnreferencedBlob!(key);
-  }
-
-  putLocalOriginal(session: Session, key: string, blob: Blob): Promise<boolean> {
-    return this.io.putAccountBlobIfAbsent
-      ? this.io.putAccountBlobIfAbsent(key, blob, accountKey(session.user))
-      : this.io.putBlobIfAbsent!(key, blob);
-  }
-
-  async sourceBlob(
+  sourceBlob(
     source: Source,
     token: number,
     options: SourceBlobReadOptions = {},
   ): Promise<Blob | undefined> {
-    const session = this.active;
-    if (!session?.ready || session.token !== token) {
-      throw new Error("当前账号或资料版本已改变，请重新打开资料。");
-    }
-    // Only immutable identity comes from the caller. Originals, including a
-    // retained version's handles, must come from this account's live record.
-    const sourceId = source.id;
-    const versionId = source.versionId;
-    const ownedVersion = () => {
-      if (!this.isActive(session) || !session.ready)
-        throw new Error("当前账号已改变，请重新打开资料。");
-      const live = session.data.sources.find((item) => item.id === sourceId);
-      const version = live && getSourceVersion(live, versionId);
-      if (!version) throw new Error("当前账号或资料版本已改变，请重新打开资料。");
-      // Deleted records remain readable here for the user's recoverable backup.
-      return version;
-    };
-    const canonical = { ...ownedVersion() };
-    const originalKey = (item: Source) =>
-      JSON.stringify([item.kind, item.blobKey, item.storagePath, item.hash, item.size]);
-    const expectedKey = originalKey(canonical);
-    const assertUnchanged = () => {
-      if (originalKey(ownedVersion()) !== expectedKey)
-        throw new Error("资料原件记录已变化，请重新打开对应版本后重试。");
-    };
-    try {
-      if (!options.preferCloud) {
-        const local = canonical.blobKey
-          ? await this.readLocalOriginal(session, canonical.blobKey)
-          : undefined;
-        assertUnchanged();
-        if (local) return local;
-      }
-      if (session.user && canonical.storagePath) {
-        const blob = await this.io.downloadBlob(canonical, session.user.id);
-        assertUnchanged();
-        return blob;
-      }
-      return undefined;
-    } catch (cause) {
-      // A late failure can contain the old account's object details. Validate
-      // the active session before allowing either bytes or that error to escape.
-      assertUnchanged();
-      throw cause;
-    }
+    return this.originals.sourceBlob(source, token, options);
+  }
+
+  replaceFile(
+    sourceId: string,
+    expectedVersionId: string,
+    candidate: Source,
+    blob: Blob,
+    token: number,
+  ): Promise<void> {
+    return this.originals.replaceFile(sourceId, expectedVersionId, candidate, blob, token);
   }
 
   importFile(
