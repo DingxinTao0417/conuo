@@ -212,6 +212,15 @@ describe("reader panel slot", () => {
       "框选区域交给 AI",
       "我的标注（0）",
     ]);
+    // The single-page/continuous switch belongs to the strip at every width,
+    // including the phone row behind 工具; it no longer keeps a second bar of
+    // its own above the document.
+    expect(host.querySelectorAll('[aria-label="PDF 阅读模式"]')).toHaveLength(1);
+    expect(
+      toolstrip()
+        .querySelector("[data-reader-toolstrip-tools]")
+        ?.querySelector('[aria-label="PDF 阅读模式"]'),
+    ).toBeTruthy();
 
     // Text formats have neither pages nor a physical page to frame, so the
     // strip must not leave their slots behind as empty controls.

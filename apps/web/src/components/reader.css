@@ -1835,9 +1835,6 @@
   border-radius: 8px;
   background: #f5f5f7;
 }
-.reader-mobile-pdf-mode {
-  display: none;
-}
 .reader-pdf-mode button {
   min-height: 30px;
   border: 0;
@@ -1863,23 +1860,6 @@
   }
 }
 @media (max-width: 620px) {
-  .reader-toolstrip-tools > .reader-pdf-mode {
-    display: none;
-  }
-  .reader-mobile-pdf-mode {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex: 0 0 auto;
-    gap: 12px;
-    padding: 5px 12px;
-    border-bottom: 1px solid #e5e5e5;
-    background: #fff;
-  }
-  .reader-mobile-pdf-mode > span {
-    color: #89849b;
-    font-size: 11px;
-  }
   .reader-pdf-mode button {
     min-height: 44px;
     padding: 4px 14px;

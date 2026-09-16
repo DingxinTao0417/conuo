@@ -2360,12 +2360,6 @@ export default function Reader(props: ReaderProps) {
               恢复备份时缺少此版本的原件。已有文字和引用记录仍保留；可切换到文字阅读，或重新选择文件保存为新版本。
             </div>
           )}
-          {source.kind === "pdf" && !showText && (
-            <div className="reader-mobile-pdf-mode">
-              <span>阅读方式</span>
-              {pdfReadingModeControls()}
-            </div>
-          )}
           <div
             className="reader-document-scroll"
             ref={textContainer}
