@@ -12,29 +12,17 @@ import type { OrganizationRequest } from "../organization-types";
 import type { PermanentSourceDeletionSelection } from "../permanent-deletion";
 import { createEmptyWorkspace } from "../seed";
 import { getSourceVersion } from "../source-versions";
-import { assertWorkspaceOwner, workspaceSchema } from "../supabase/validation";
-import {
-  applyNoteSyncResolution,
-  applyReadingProgressSyncResolution,
-  applySafeNoteSyncChanges,
-  mergeReadingProgressConflict,
-  planNoteSyncConflicts,
-  planReadingProgressSyncConflicts,
-  rebaseIndependentWorkspaceChanges,
-  resolveNoteSyncConflict,
-  type NoteSyncPlan,
-  type ReadingProgressSyncPlan,
-} from "../sync-conflicts";
+import { mergeReadingProgressConflict, rebaseIndependentWorkspaceChanges } from "../sync-conflicts";
 import type { AnswerRequest, Source, SourceBlobReadOptions, WorkspaceData } from "../types";
 import {
   conflictError,
-  conflictRecordId,
   errorText,
   exceedsCloudWorkspaceCapacity,
   OriginalSyncError,
   workspaceSaveNeedsReadBack,
 } from "./errors";
 import { BackupRestoreController } from "./backup-restore";
+import { CloudSyncController } from "./cloud-sync";
 import { ImportsController } from "./imports";
 import { accountKey, defaultImportPipeline, defaultIO, unpack } from "./io";
 import {
@@ -43,7 +31,6 @@ import {
   mergeConcurrentWorkspace,
   noAnonymousWorkspaceMigration,
   sameData,
-  sameDataOutsideNotes,
   withoutAnonymousCloudPaths,
 } from "./merge";
 import {
@@ -55,7 +42,6 @@ import {
   mergeOriginalPath,
   originalIdentity,
   OriginalsController,
-  pendingFileKeys,
   verifyOriginal,
 } from "./originals";
 import { PurgeController } from "./purge";
@@ -109,8 +95,6 @@ export class WorkspaceCoordinator {
   private accountDeletionUnsubscribe: (() => void) | null = null;
   private confirmedAccountDeletionUnsubscribe: (() => void) | null = null;
   private deletionMarkerChecks = new WeakMap<Session, Promise<void>>();
-  /** Ordinary editor callbacks cannot mutate a snapshot while a reviewed reading choice is saved. */
-  readingConflictResolutions = new WeakSet<Session>();
   /** Question requests and their evidence-boundary fences. */
   readonly questions = new QuestionsController(this);
   /** Page-run and durable organization tasks. */
@@ -123,17 +107,14 @@ export class WorkspaceCoordinator {
   readonly purge = new PurgeController(this);
   /** Adds a backup copy into the current workspace, never replacing it. */
   readonly backupRestore = new BackupRestoreController(this);
+  /** Cloud revision checks, fenced adoption, remote recovery and conflict plans. */
+  readonly cloudSync = new CloudSyncController(this);
   // Recovery snapshots are intentionally independent from ordinary workspace
   // persistence, but account deletion still has to await them before clearing
   // IndexedDB. Keep only live writes for the owning session.
-  private pendingRecoveryWrites = new Map<Session, Set<Promise<void>>>();
+  pendingRecoveryWrites = new Map<Session, Set<Promise<void>>>();
   private localCommitUnsubscribe: (() => void) | null = null;
   private localReloadTasks = new WeakMap<Session, Promise<boolean>>();
-  private cloudUpdateTasks = new WeakMap<
-    Session,
-    { controller: AbortController; promise: Promise<void> }
-  >();
-  private pendingReadingPositions = new WeakMap<Session, Set<string>>();
   private view: View = {
     data: createEmptyWorkspace(),
     user: null,
@@ -284,7 +265,7 @@ export class WorkspaceCoordinator {
       // A broken optional notification channel cannot affect persistence.
     }
   }
-  private markNewerLocalUpdate(
+  markNewerLocalUpdate(
     session: Session,
     accountId: string,
     event: LocalWorkspaceCommitEvent,
@@ -322,7 +303,7 @@ export class WorkspaceCoordinator {
     } catch {
       /* Disposal never authorizes old writes. */
     }
-    if (this.active) this.cloudUpdateTasks.get(this.active)?.controller.abort();
+    if (this.active) this.cloudSync.abortCloudUpdate(this.active);
     if (this.cloudOnly) {
       this.active = null;
       this.memory.clear();
@@ -339,47 +320,6 @@ export class WorkspaceCoordinator {
   }
   isCurrent(session: Session): boolean {
     return this.active === session && !this.discardedAccounts.has(accountKey(session.user));
-  }
-  private noteSyncPlan(session: Session): NoteSyncPlan | null {
-    if (
-      session.blocked !== "conflict" ||
-      !session.recovery ||
-      !sameDataOutsideNotes(session.data, session.recovery)
-    )
-      return null;
-    try {
-      const plan = planNoteSyncConflicts(session.data, session.recovery, session.confirmedCloud);
-      // Tombstone and missing-record conflicts require a durable conflict
-      // snapshot collection. Until that exists, keep the conservative whole
-      // workspace recovery path instead of implying that either side vanished.
-      if (plan.conflicts.some((conflict) => conflict.kind !== "both-edited")) return null;
-      return plan.conflicts.length || plan.safe.some((change) => change.side === "local")
-        ? plan
-        : null;
-    } catch {
-      // Invalid or duplicate legacy note records remain recoverable through
-      // export/remote recovery, but must not be rewritten by a best effort merge.
-      return null;
-    }
-  }
-  private readingProgressSyncPlan(session: Session): ReadingProgressSyncPlan | null {
-    if (
-      session.blocked !== "conflict" ||
-      !session.recovery ||
-      session.recoveryRevision === null ||
-      !session.confirmedCloud
-    )
-      return null;
-    try {
-      const plan = planReadingProgressSyncConflicts(
-        session.data,
-        session.recovery,
-        session.confirmedCloud,
-      );
-      return plan?.conflicts.length ? plan : null;
-    } catch {
-      return null;
-    }
   }
   private signOutState(session: Session): WorkspaceSignOutState {
     if (!session.user) return { kind: "ready", canSync: false, canKeepLocalDraft: false };
@@ -487,8 +427,10 @@ export class WorkspaceCoordinator {
       ready: !verificationFailed && session.ready,
       recovery: verificationFailed ? null : session.recovery,
       recoveryRevision: verificationFailed ? null : session.recoveryRevision,
-      noteSyncPlan: verificationFailed ? null : this.noteSyncPlan(session),
-      readingProgressSyncPlan: verificationFailed ? null : this.readingProgressSyncPlan(session),
+      noteSyncPlan: verificationFailed ? null : this.cloudSync.noteSyncPlan(session),
+      readingProgressSyncPlan: verificationFailed
+        ? null
+        : this.cloudSync.readingProgressSyncPlan(session),
       token: session.token,
       organizationStatus: verificationFailed
         ? { ready: false, running: false, message: "账号状态尚未核验，资料访问已暂停。" }
@@ -757,7 +699,7 @@ export class WorkspaceCoordinator {
           if (session.ready) this.remember(session);
           session.accountAccessVerificationFailed = true;
           session.ready = false;
-          this.cloudUpdateTasks.get(session)?.controller.abort();
+          this.cloudSync.abortCloudUpdate(session);
           session.status = "error";
           session.error = "无法核验本机账号注销状态，已暂停访问：" + errorText(cause);
           this.publish(session);
@@ -800,7 +742,7 @@ export class WorkspaceCoordinator {
       this.discardedSessions.add(session);
       this.pendingLocalPersists.delete(session);
       this.backupRestore.redactSession(session);
-      this.cloudUpdateTasks.get(session)?.controller.abort();
+      this.cloudSync.abortCloudUpdate(session);
       session.data = { ...createEmptyWorkspace(), spaces: [] };
       session.recovery = null;
       session.recoveryRevision = null;
@@ -1033,7 +975,7 @@ export class WorkspaceCoordinator {
       );
     }
     const previous = this.active;
-    if (previous) this.cloudUpdateTasks.get(previous)?.controller.abort();
+    if (previous) this.cloudSync.abortCloudUpdate(previous);
     if (
       previous?.localDirty &&
       this.memory.get(accountKey(previous.user)) === previous &&
@@ -1560,7 +1502,7 @@ export class WorkspaceCoordinator {
       !session?.ready ||
       session.exiting ||
       session.token !== token ||
-      this.readingConflictResolutions.has(session) ||
+      this.cloudSync.isResolvingReadingConflicts(session) ||
       this.isCloudReadOnly(session) ||
       this.migrationChoiceBlocksWrites(session)
     )
@@ -2190,7 +2132,7 @@ export class WorkspaceCoordinator {
     // durability check. `isActive()` becomes false, so existing question,
     // organization, import and pump continuations stop at their next guard.
     session.exiting = true;
-    this.cloudUpdateTasks.get(session)?.controller.abort();
+    this.cloudSync.abortCloudUpdate(session);
     session.status = "saving";
     session.error = "";
     this.publish(session);
@@ -2313,587 +2255,37 @@ export class WorkspaceCoordinator {
     }
   }
 
-  private cloudUpdateBusy(session: Session, explicit: boolean, committing = false): boolean {
-    return (
-      !this.isActive(session) ||
-      !session.ready ||
-      !session.user ||
-      !session.knownRevision ||
-      !session.confirmedCloud ||
-      session.exiting ||
-      session.pumping ||
-      session.checking ||
-      session.purging ||
-      this.isCloudReadOnly(session) ||
-      this.migrationChoiceBlocksWrites(session) ||
-      this.hasNewerLocalUpdate(session) ||
-      session.loadingLocalUpdate ||
-      (!committing &&
-        (session.loadingCloudUpdate || !!this.atomicLocalWriteBarriers.get(session))) ||
-      !!this.pendingLocalPersists.get(session)?.length ||
-      !!this.pumpTasks.get(session) ||
-      this.readingConflictResolutions.has(session) ||
-      this.imports.hasFencedImportTransition(session) ||
-      !!this.pendingRecoveryWrites.get(session)?.size ||
-      this.backupRestore.hasSession(session) ||
-      this.aiBusy(session.token) ||
-      this.organization.hasPendingCloudOperations(session) ||
-      pendingFileKeys.size > 0 ||
-      this.imports.hasLeaseRetries(session) ||
-      !!this.pendingReadingPositions.get(session)?.size ||
-      this.questions.hasSession(session) ||
-      this.organization.hasSession(session) ||
-      this.imports.hasSession(session) ||
-      this.imports.hasCancellations(session) ||
-      (!explicit &&
-        (session.localDirty ||
-          session.cloudDirty ||
-          !!session.blocked ||
-          !sameData(session.data, session.confirmedCloud)))
-    );
-  }
-
   checkCloudUpdates(token: number, signal?: AbortSignal): Promise<void> {
-    return this.startCloudUpdateCheck(token, false, signal);
-  }
-
-  /** Reader-local staging fence; this never changes workspace data or starts a save. */
-  setPendingReadingPosition(token: number, readerKey: string, pending: boolean): void {
-    const session = this.active;
-    if (!session || session.token !== token || !this.isActive(session) || !readerKey) return;
-    const keys = this.pendingReadingPositions.get(session) ?? new Set<string>();
-    if (pending) keys.add(readerKey);
-    else keys.delete(readerKey);
-    if (keys.size) this.pendingReadingPositions.set(session, keys);
-    else this.pendingReadingPositions.delete(session);
+    return this.cloudSync.checkCloudUpdates(token, signal);
   }
 
   loadCloudUpdate(token: number, signal?: AbortSignal): Promise<void> {
-    return this.startCloudUpdateCheck(token, true, signal);
+    return this.cloudSync.loadCloudUpdate(token, signal);
   }
 
-  private startCloudUpdateCheck(
-    token: number,
-    explicit: boolean,
-    signal?: AbortSignal,
-  ): Promise<void> {
-    const session = this.active;
-    if (
-      !session?.user ||
-      !session.ready ||
-      session.token !== token ||
-      session.exiting ||
-      !this.io.loadCloudRevision ||
-      signal?.aborted
-    )
-      return Promise.resolve();
-    const existing = this.cloudUpdateTasks.get(session);
-    if (existing) return existing.promise;
-    const controller = new AbortController();
-    let timedOut = false;
-    const cancel = () => controller.abort();
-    signal?.addEventListener("abort", cancel, { once: true });
-    const timer = setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, 12_000);
-    session.checkingCloudUpdate = true;
-    session.cloudUpdateError = "";
-    const task = Promise.resolve()
-      .then(() => this.runCloudUpdateCheck(session, explicit, controller.signal))
-      .catch((cause: unknown) => {
-        if (!this.isActive(session)) return;
-        if (!controller.signal.aborted || timedOut)
-          session.cloudUpdateError = timedOut ? "云端版本检查超时，请稍后重试。" : errorText(cause);
-      })
-      .finally(() => {
-        clearTimeout(timer);
-        signal?.removeEventListener("abort", cancel);
-        if (this.cloudUpdateTasks.get(session)?.controller === controller)
-          this.cloudUpdateTasks.delete(session);
-        session.checkingCloudUpdate = false;
-        session.loadingCloudUpdate = false;
-        if (this.isActive(session)) this.publish(session);
-      });
-    this.cloudUpdateTasks.set(session, { controller, promise: task });
-    this.publish(session);
-    return task;
+  setPendingReadingPosition(token: number, readerKey: string, pending: boolean): void {
+    this.cloudSync.setPendingReadingPosition(token, readerKey, pending);
   }
 
-  private async runCloudUpdateCheck(
-    session: Session,
-    explicit: boolean,
-    signal: AbortSignal,
-  ): Promise<void> {
-    signal.throwIfAborted();
-    const userId = session.user!.id;
-    const read = async <T>(operation: Promise<T>): Promise<T> => {
-      signal.throwIfAborted();
-      let cancel!: () => void;
-      const aborted = new Promise<never>((_, reject) => {
-        cancel = () => reject(new DOMException("云端检查已取消。", "AbortError"));
-        signal.addEventListener("abort", cancel, { once: true });
-      });
-      try {
-        return await Promise.race([operation, aborted]);
-      } finally {
-        signal.removeEventListener("abort", cancel);
-      }
-    };
-    const discovered = await read(this.io.loadCloudRevision!(userId, signal));
-    if (!this.isActive(session) || signal.aborted) return;
-    if (!Number.isSafeInteger(discovered.revision) || discovered.revision < 0)
-      throw new Error("云端版本检查返回了无效数据，请稍后重试。");
-    if (discovered.revision > session.revision)
-      session.cloudUpdateRevision = Math.max(session.cloudUpdateRevision ?? 0, discovered.revision);
-    if (session.cloudUpdateRevision !== null && session.cloudUpdateRevision <= session.revision)
-      session.cloudUpdateRevision = null;
-    this.publish(session);
-    if (session.cloudUpdateRevision === null) return;
-    if (this.cloudUpdateBusy(session, explicit)) {
-      if (explicit)
-        session.cloudUpdateError = "当前编辑或任务仍在保存，请等待操作完成后再载入云端更新。";
-      return;
-    }
-    const boundary = {
-      data: session.data,
-      revision: session.revision,
-      localRevision: session.localRevision,
-      localDirty: session.localDirty,
-      cloudDirty: session.cloudDirty,
-      confirmedCloud: session.confirmedCloud,
-      queue: this.queues.get(userId),
-    };
-    const unchanged = () =>
-      session.data === boundary.data &&
-      session.revision === boundary.revision &&
-      session.localDirty === boundary.localDirty &&
-      session.cloudDirty === boundary.cloudDirty &&
-      session.confirmedCloud === boundary.confirmedCloud;
-    const remote = await read(this.io.loadCloud(userId, signal));
-    if (
-      !this.isActive(session) ||
-      signal.aborted ||
-      !unchanged() ||
-      session.localRevision !== boundary.localRevision ||
-      this.queues.get(userId) !== boundary.queue ||
-      this.cloudUpdateBusy(session, explicit)
-    )
-      return;
-    if (
-      !Number.isSafeInteger(remote.revision) ||
-      remote.revision < 1 ||
-      !remote.data ||
-      remote.revision <= session.revision ||
-      remote.revision < session.cloudUpdateRevision
-    )
-      throw new Error("尚未读到已发现的云端新版本，请稍后重试；当前内容仍然保留。");
-    const parsed = workspaceSchema.safeParse(remote.data);
-    if (!parsed.success) throw new Error("云端工作区格式不兼容，请保留本机资料。");
-    assertWorkspaceOwner(parsed.data, userId);
-    const candidate: Session = { ...session };
-    this.reconcile(candidate, { data: parsed.data, revision: remote.revision }, true);
-    if (candidate.blocked) {
-      if (candidate.blocked === "conflict") {
-        session.blocked = "conflict";
-        session.status = "conflict";
-        session.recovery = candidate.recovery;
-        session.recoveryRevision = candidate.recoveryRevision;
-        session.error = candidate.error;
-        this.remember(session);
-      } else session.cloudUpdateError = candidate.error;
-      return;
-    }
-    let release!: () => void;
-    const barrier = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    this.atomicLocalWriteBarriers.set(session, barrier);
-    session.loadingCloudUpdate = true;
-    const previous = this.queues.get(userId) ?? Promise.resolve();
-    const write = previous.then(async () => {
-      if (
-        this.discardedSessions.has(session) ||
-        signal.aborted ||
-        !this.isActive(session) ||
-        !unchanged() ||
-        session.localRevision !== boundary.localRevision ||
-        this.cloudUpdateBusy(session, explicit, true)
-      )
-        return;
-      const savedRevision = await this.io.saveLocal(
-        structuredClone(this.stored(candidate)),
-        userId,
-        session.localRevision,
-      );
-      if (typeof savedRevision === "number") this.setLocalRevision(session, savedRevision);
-      if (this.discardedSessions.has(session)) return;
-      if (
-        this.isActive(session) &&
-        !signal.aborted &&
-        unchanged() &&
-        !this.cloudUpdateBusy(session, explicit, true)
-      ) {
-        session.data = candidate.data;
-        session.revision = candidate.revision;
-        session.knownRevision = true;
-        session.confirmedCloud = candidate.confirmedCloud;
-        session.cloudDirty = candidate.cloudDirty;
-        session.localDirty = false;
-        session.blocked = null;
-        session.recovery = null;
-        session.recoveryRevision = null;
-        session.error = "";
-        session.status = candidate.cloudDirty ? "saving" : "cloud";
-        session.cloudAdoptionSequence += 1;
-        if ((session.cloudUpdateRevision ?? 0) <= remote.revision)
-          session.cloudUpdateRevision = null;
-        this.remember(session);
-        return;
-      }
-      // Ordinary editor input stays live during CAS. Deferred local persists
-      // wait on our barrier, so repairs cannot be followed by an older queued
-      // editor snapshot. Never give an edit from the old cloud base a new base.
-      if (session.localDirty || this.isActive(session)) {
-        session.localDirty = true;
-        for (;;) {
-          if (this.discardedSessions.has(session)) return;
-          const data = session.data;
-          const revision = session.revision;
-          const dirty = session.cloudDirty;
-          const base = session.confirmedCloud;
-          const localRevision = await this.io.saveLocal(
-            structuredClone(this.stored(session)),
-            userId,
-            session.localRevision,
-          );
-          if (typeof localRevision === "number") this.setLocalRevision(session, localRevision);
-          if (
-            data === session.data &&
-            revision === session.revision &&
-            dirty === session.cloudDirty &&
-            base === session.confirmedCloud
-          ) {
-            session.localDirty = false;
-            this.remember(session);
-            break;
-          }
-        }
-      }
-    });
-    this.queues.set(
-      userId,
-      write.catch(() => {}),
-    );
-    this.publish(session);
-    try {
-      await write;
-    } catch (cause) {
-      if (
-        !this.discardedSessions.has(session) &&
-        cause instanceof Error &&
-        "code" in cause &&
-        cause.code === "LOCAL_WORKSPACE_CONFLICT"
-      ) {
-        try {
-          const latest = unpack(await this.io.loadLocal(userId));
-          this.markNewerLocalUpdate(session, userId, {
-            accountId: userId,
-            localRevision: latest.localRevision,
-            writerId: "cloud-update-conflict-readback",
-          });
-        } catch {
-          /* Preserve the original local CAS failure. */
-        }
-      }
-      if (!this.discardedSessions.has(session) && !unchanged()) {
-        session.localDirty = true;
-        session.status = "error";
-        session.error =
-          "当前编辑尚未保存到此浏览器：" + errorText(cause) + "。请重试或导出后再离开。";
-      }
-      throw cause;
-    } finally {
-      if (this.atomicLocalWriteBarriers.get(session) === barrier)
-        this.atomicLocalWriteBarriers.delete(session);
-      session.loadingCloudUpdate = false;
-      release();
-    }
-    if (this.isActive(session) && session.cloudDirty && !session.localDirty)
-      void this.pump(session);
-  }
-
-  async useRemote(
+  useRemote(
     token: number,
     preserveCurrent?: (snapshot: WorkspaceData) => Promise<boolean>,
   ): Promise<void> {
-    const session = this.active;
-    if (!session?.user || !session.ready || session.token !== token || !session.recovery) return;
-    this.assertWorkspaceWritable(session);
-    if (this.cloudOnly) {
-      const boundary = session.data;
-      const recovery = session.recovery;
-      if (!preserveCurrent || !(await preserveCurrent(structuredClone(boundary))))
-        throw new Error("当前页面的修改尚未完整导出，未载入云端副本。");
-      if (
-        !this.isActive(session) ||
-        session.token !== token ||
-        session.data !== boundary ||
-        session.recovery !== recovery
-      )
-        throw new Error("导出期间账号或内容发生变化，请重新核对当前副本。");
-    }
-    session.ready = false;
-    session.status = "loading";
-    this.publish(session);
-    try {
-      const backupId = "recovery:" + session.user.id + ":" + Date.now() + ":" + session.token;
-      const backup = structuredClone(this.stored(session));
-      // Do not serialize recovery creation behind ordinary saving: useRemote
-      // must be able to preserve its own conflict snapshot while an earlier
-      // local confirmation is still in flight. The write is tracked separately
-      // so discardAccount can still wait before clearing its recovery record.
-      const write = this.discardedSessions.has(session)
-        ? Promise.resolve()
-        : this.io.saveLocal(backup, backupId, 0).then(() => {});
-      this.trackRecoveryWrite(session, write);
-      await write;
-      if (!this.isActive(session)) return;
-      const remote = await this.io.loadCloud(session.user.id);
-      if (!this.isActive(session)) return;
-      session.data = remote.data || createEmptyWorkspace();
-      session.confirmedCloud = remote.data ? structuredClone(remote.data) : null;
-      session.revision = remote.revision;
-      session.knownRevision = true;
-      session.cloudDirty = !remote.data;
-      session.localDirty = true;
-      session.blocked = null;
-      session.recovery = null;
-      session.recoveryRevision = null;
-      session.error = "";
-      session.ready = true;
-      this.organization.recoverOrganizationJobs(session);
-      this.imports.recoverImportJobs(session);
-      this.remember(session);
-      this.publish(session);
-      await this.pump(session);
-    } catch (cause) {
-      if (!this.isActive(session)) return;
-      session.ready = true;
-      session.status = "error";
-      session.error = "没有覆盖当前副本：" + errorText(cause);
-      this.publish(session);
-    }
+    return this.cloudSync.useRemote(token, preserveCurrent);
   }
 
-  /**
-   * Resolve a reading-only race against the exact cloud snapshot shown in the
-   * chooser. Reading timestamps remain display metadata; the user's explicit
-   * per-source choice is the only authority when both browsers moved.
-   */
-  async resolveReadingProgressConflicts(
+  resolveReadingProgressConflicts(
     selections: readonly ReadingProgressSyncSelection[],
     token: number,
   ): Promise<void> {
-    const session = this.active;
-    if (!session?.user || !session.ready || session.token !== token)
-      throw new Error("当前账号已改变，请重新检查阅读位置冲突。 ");
-    this.assertWorkspaceWritable(session);
-    if (session.blocked !== "conflict" || !session.recovery || session.recoveryRevision === null)
-      throw new Error("当前没有可处理的阅读位置冲突。 ");
-    if (this.readingConflictResolutions.has(session))
-      throw new Error("正在保存所选阅读位置，请等待当前操作完成。 ");
-
-    this.readingConflictResolutions.add(session);
-    try {
-      const reviewedLocal = session.data;
-      const reviewedRecovery = session.recovery;
-      const reviewedRevision = session.recoveryRevision;
-      let remote: RemoteWorkspace;
-      try {
-        remote = await this.io.loadCloud(session.user.id);
-      } catch (cause) {
-        if (!this.isActive(session)) throw new Error("当前账号已改变，阅读位置尚未保存。 ");
-        throw new Error("无法读取最新云端副本：" + errorText(cause));
-      }
-      if (!this.isActive(session)) throw new Error("当前账号已改变，阅读位置尚未保存。 ");
-      if (session.data !== reviewedLocal)
-        throw new Error("本机阅读位置已变化，请重新检查后再选择。 ");
-      const candidate = remote.data || createEmptyWorkspace();
-      if (remote.revision !== reviewedRevision || !sameData(candidate, reviewedRecovery)) {
-        session.recovery = candidate;
-        session.recoveryRevision = remote.revision;
-        session.error = "云端版本已再次变化，已刷新待处理的阅读位置。";
-        session.status = "conflict";
-        this.remember(session);
-        this.publish(session);
-        throw new Error("云端版本已再次变化，请检查刷新后的阅读位置。 ");
-      }
-
-      const plan = planReadingProgressSyncConflicts(
-        session.data,
-        candidate,
-        session.confirmedCloud,
-      );
-      if (!plan?.conflicts.length)
-        throw new Error(
-          "此冲突还包含资料内容、版本或其他工作区修改，不能只选择阅读位置。请先导出当前副本，再选择云端恢复。",
-        );
-      const next = applyReadingProgressSyncResolution(candidate, plan, selections);
-
-      const previous = {
-        data: session.data,
-        confirmedCloud: session.confirmedCloud,
-        revision: session.revision,
-        knownRevision: session.knownRevision,
-        localDirty: session.localDirty,
-        cloudDirty: session.cloudDirty,
-      };
-      session.data = next;
-      session.confirmedCloud = remote.data ? structuredClone(remote.data) : null;
-      session.revision = remote.revision;
-      session.knownRevision = true;
-      session.localDirty = true;
-      session.cloudDirty = !sameData(next, candidate);
-      // Keep the reviewed recovery attached until the chosen positions are
-      // durable in IndexedDB. If that write fails, restore both visible sides.
-      try {
-        await this.persist(session);
-      } catch (cause) {
-        if (!this.isActive(session)) throw new Error("当前账号已改变，阅读位置尚未保存。 ");
-        Object.assign(session, previous);
-        session.blocked = "conflict";
-        session.status = "conflict";
-        session.error = "所选阅读位置尚未保存在此浏览器：" + errorText(cause);
-        this.remember(session);
-        this.publish(session);
-        throw new Error(session.error);
-      }
-      if (!this.isActive(session)) throw new Error("当前账号已改变，阅读位置尚未保存。 ");
-      session.blocked = null;
-      session.recovery = null;
-      session.recoveryRevision = null;
-      session.error = "";
-      session.status = session.cloudDirty ? "saving" : "cloud";
-      this.remember(session);
-      this.publish(session);
-      await this.pump(session);
-      if (!this.isActive(session)) throw new Error("当前账号已改变，阅读位置保存结果未知。 ");
-      if (session.blocked === "conflict")
-        throw new Error("保存期间云端版本再次变化，请检查新的阅读位置冲突。 ");
-      if (session.blocked === "error" || session.cloudDirty)
-        throw new Error(session.error || "阅读位置尚未确认保存到云端，请重试。 ");
-    } finally {
-      this.readingConflictResolutions.delete(session);
-    }
+    return this.cloudSync.resolveReadingProgressConflicts(selections, token);
   }
 
-  /**
-   * Rebase disclosed note-only changes on the exact cloud revision the user
-   * reviewed. Other workspace objects deliberately stay on the explicit
-   * export/remote-recovery path; guessing across files, sources, or tasks
-   * could make source evidence disappear without a review surface.
-   */
-  async resolveNoteConflicts(
+  resolveNoteConflicts(
     selections: readonly NoteSyncConflictSelection[],
     token: number,
   ): Promise<void> {
-    const session = this.active;
-    if (!session?.user || !session.ready || session.token !== token)
-      throw new Error("当前账号已改变，请重新检查同步冲突。 ");
-    this.assertWorkspaceWritable(session);
-    if (session.blocked !== "conflict" || !session.recovery || session.recoveryRevision === null)
-      throw new Error("当前没有可处理的笔记同步冲突。 ");
-
-    const reviewedRecovery = session.recovery;
-    const reviewedRevision = session.recoveryRevision;
-    let remote: RemoteWorkspace;
-    try {
-      remote = await this.io.loadCloud(session.user.id);
-    } catch (cause) {
-      throw new Error("无法读取最新云端副本：" + errorText(cause));
-    }
-    if (!this.isActive(session)) return;
-    const candidate = remote.data || createEmptyWorkspace();
-    if (remote.revision !== reviewedRevision || !sameData(candidate, reviewedRecovery)) {
-      session.recovery = candidate;
-      session.recoveryRevision = remote.revision;
-      session.error = "云端版本已再次变化，已刷新待处理的冲突内容。";
-      session.status = "conflict";
-      this.remember(session);
-      this.publish(session);
-      throw new Error("云端版本已再次变化，请检查刷新后的冲突内容。 ");
-    }
-
-    const plan = this.noteSyncPlan(session);
-    if (!plan)
-      throw new Error(
-        "此冲突包含资料、空间或删除记录，暂不能安全自动合并。请先导出当前副本，再选择云端恢复。",
-      );
-    const choices = new Map<string, NoteSyncConflictSelection>();
-    for (const selection of selections) {
-      if (choices.has(selection.conflictId)) throw new Error("同一笔记的冲突只能选择一次。 ");
-      choices.set(selection.conflictId, selection);
-    }
-    const known = new Set(plan.conflicts.map((conflict) => conflict.id));
-    for (const id of choices.keys()) {
-      if (!known.has(id)) throw new Error("冲突列表已改变，请重新检查后再提交。 ");
-    }
-    const unresolved = plan.conflicts.find((conflict) => !choices.has(conflict.id));
-    if (unresolved) throw new Error(`请先处理笔记「${unresolved.noteId}」的两个版本。`);
-
-    const at = new Date().toISOString();
-    let next = applySafeNoteSyncChanges(
-      candidate,
-      plan.safe.filter((change) => change.side === "local"),
-    );
-    for (const conflict of plan.conflicts) {
-      const selection = choices.get(conflict.id)!;
-      const resolution = resolveNoteSyncConflict(conflict, {
-        choice: selection.choice,
-        content: selection.content,
-        at,
-        preservedVersionIds: {
-          local: conflictRecordId("local-conflict-version"),
-          remote: conflictRecordId("remote-conflict-version"),
-        },
-      });
-      // The plan only exposes live-vs-live conflicts. Keep this guard so a
-      // stale or malformed input can never discard an undisclosed tombstone.
-      if (resolution.preservedSnapshots.length)
-        throw new Error("这项选择包含未保存的删除快照，不能自动覆盖。请导出后使用云端恢复。 ");
-      next = applyNoteSyncResolution(next, resolution);
-    }
-
-    session.data = next;
-    session.confirmedCloud = remote.data ? structuredClone(remote.data) : null;
-    session.revision = remote.revision;
-    session.knownRevision = true;
-    session.localDirty = true;
-    session.cloudDirty = true;
-    // Leave the reviewed remote snapshot attached until the merged data is
-    // durably written to IndexedDB. A close or failed write therefore cannot
-    // turn a recoverable conflict into an untracked in-memory edit.
-    try {
-      await this.persist(session);
-    } catch (cause) {
-      if (!this.isActive(session)) return;
-      session.blocked = "conflict";
-      session.status = "conflict";
-      session.error = "合并结果尚未保存在此浏览器：" + errorText(cause);
-      this.remember(session);
-      this.publish(session);
-      throw new Error(session.error);
-    }
-    if (!this.isActive(session)) return;
-    session.blocked = null;
-    session.recovery = null;
-    session.recoveryRevision = null;
-    session.error = "";
-    session.status = "saving";
-    this.remember(session);
-    this.publish(session);
-    await this.pump(session);
+    return this.cloudSync.resolveNoteConflicts(selections, token);
   }
 
   restoreBackup(plan: RestorePlan, token: number): Promise<void> {
