@@ -7,6 +7,7 @@ import {
   sourcePresentationStatus,
 } from "@/lib/source-coverage";
 import { sourceStatusLabel } from "../shared";
+import "./recognized-content-panel.css";
 
 type RecognizedContentState = {
   tone: "ready" | "partial" | "pending" | "unavailable";
