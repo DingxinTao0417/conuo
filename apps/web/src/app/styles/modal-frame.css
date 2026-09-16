@@ -1,0 +1,96 @@
+.modal {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  border: 1px solid #dedede;
+  border-radius: 13px;
+  padding: 0;
+  box-shadow: 0 24px 90px #0002;
+  background: #fff;
+  color: #171717;
+  overflow-y: auto;
+}
+.modal::backdrop {
+  background: #17171740;
+  backdrop-filter: blur(2px);
+}
+.modal-wide {
+  width: min(620px, calc(100vw - 32px));
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 17px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-header h2 {
+  font-size: 15px;
+  font-weight: 550;
+}
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 19px;
+  padding: 22px;
+}
+.modal-body label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.modal-body label small {
+  font-size: 10px;
+  font-weight: 400;
+  color: #999;
+}
+.modal-body .checkbox-row {
+  flex-direction: row;
+  align-items: center;
+}
+.export-progress {
+  margin: 7px 0 0;
+  color: #625c6d;
+  font-size: 11px;
+}
+.export-result-modal {
+  gap: 14px;
+}
+.export-result-intro {
+  margin: 0;
+  color: #514a5d;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.export-issue-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(280px, 36dvh);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.export-issue-list li {
+  display: grid;
+  gap: 3px;
+  padding: 10px 11px;
+  border: 1px solid #efd6cb;
+  border-radius: 8px;
+  background: #fffaf8;
+}
+.export-issue-list strong {
+  color: #5d3329;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.export-issue-list span {
+  color: #7b615a;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}

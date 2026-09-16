@@ -1,0 +1,219 @@
+.comparison-source-picker {
+  gap: 14px;
+}
+.comparison-source-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.comparison-source-fieldset legend {
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 550;
+}
+.comparison-source-list {
+  display: grid;
+  gap: 5px;
+  max-height: min(300px, 38dvh);
+  margin-top: 8px;
+  overflow-y: auto;
+}
+.comparison-source-option {
+  display: grid !important;
+  grid-template-columns: auto 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px !important;
+  min-height: 52px;
+  margin: 0;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+.comparison-source-option:hover,
+.comparison-source-option.selected {
+  border-color: #cfc9f5;
+  background: #faf9ff;
+}
+.comparison-source-option > input {
+  margin: 0;
+}
+.comparison-source-option .file-icon {
+  width: 32px;
+  height: 32px;
+  margin: 0;
+}
+.comparison-source-option > span:last-child {
+  min-width: 0;
+}
+.comparison-source-option b,
+.comparison-source-option small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comparison-source-option b {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 550;
+}
+.comparison-source-option small {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.modal-body textarea {
+  resize: vertical;
+  min-height: 75px;
+}
+.space-delete-modal {
+  gap: 15px;
+}
+.space-delete-intro,
+.space-delete-note {
+  color: #666;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.space-delete-impact {
+  border: 1px solid #ece9f4;
+  border-radius: 8px;
+  background: #fbfaff;
+  padding: 13px 14px;
+  color: #5f5877;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.space-delete-impact > p {
+  margin: 0;
+}
+.space-delete-impact > p:first-child {
+  color: #342d4a;
+  font-weight: 550;
+}
+.space-delete-impact ul {
+  margin: 7px 0;
+  padding-left: 19px;
+}
+.space-delete-derived {
+  color: #8c554f;
+}
+.space-delete-recycle-info {
+  color: #786f85;
+}
+.space-delete-option {
+  color: #6a3d39;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.space-delete-note {
+  margin: -3px 0 0;
+}
+.source-purge-modal {
+  gap: 15px;
+}
+.source-purge-intro,
+.source-purge-cleanup {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.source-purge-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  padding: 13px 0;
+}
+.source-purge-error {
+  align-items: center;
+}
+.source-purge-impact {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #f0d9d5;
+  border-radius: var(--radius-8);
+  background: #fffafa;
+  padding: 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.source-purge-impact h3 {
+  color: #7c3b36;
+  font-size: 12px;
+  font-weight: 600;
+}
+.source-purge-impact h3:nth-of-type(2) {
+  margin-top: 5px;
+  color: var(--text-secondary);
+}
+.source-purge-impact ul {
+  margin: 0;
+  padding-left: 19px;
+}
+.source-purge-blockers {
+  border-color: #efd29e;
+}
+.source-purge-confirmation {
+  color: #613633;
+}
+.source-purge-confirmation b {
+  color: var(--text-default);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.conversation-history-modal {
+  gap: 14px;
+}
+.conversation-transcript {
+  display: grid;
+  gap: 10px;
+  max-height: min(54vh, 540px);
+  overflow: auto;
+  padding-right: 3px;
+}
+.conversation-transcript-message {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 12px;
+  color: #413c4e;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.conversation-transcript-message.user {
+  border-color: #ddd9ec;
+  background: #fbfaff;
+}
+.conversation-transcript-message b {
+  display: block;
+  margin-bottom: 5px;
+  color: #6b647c;
+  font-size: 11px;
+}
+.conversation-transcript-message p {
+  white-space: pre-wrap;
+}
+.conversation-transcript-message small {
+  display: block;
+  margin-top: 7px;
+  color: #a35f54;
+}
+.conversation-transcript-message details {
+  margin-top: 9px;
+  color: #6b647c;
+  font-size: 11px;
+}
+.conversation-transcript-message summary {
+  cursor: pointer;
+}
+.conversation-transcript-message ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}

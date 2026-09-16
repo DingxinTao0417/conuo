@@ -1,0 +1,126 @@
+.anonymous-workspace-migration {
+  align-items: flex-start;
+  gap: 10px;
+}
+.anonymous-workspace-migration.is-collapsed {
+  align-items: center;
+  min-height: 44px;
+  padding-block: 8px;
+}
+.anonymous-workspace-migration > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--brand);
+}
+.anonymous-workspace-migration.is-collapsed > svg {
+  margin-top: 0;
+}
+.anonymous-workspace-copy {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+.anonymous-workspace-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.anonymous-workspace-migration strong {
+  display: block;
+  color: #3e347b;
+  font-size: 12px;
+  font-weight: 600;
+}
+.anonymous-workspace-heading small {
+  color: inherit;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.anonymous-workspace-migration p {
+  margin: 4px 0 0;
+  line-height: 1.6;
+}
+.anonymous-workspace-migration-migrated {
+  color: #397553;
+  background: #f4fbf7;
+  border-color: #d7eadd;
+}
+.anonymous-workspace-migration-migrated > svg,
+.anonymous-workspace-migration-migrated strong {
+  color: #287047;
+}
+.anonymous-workspace-migration-requires-export,
+.anonymous-workspace-migration-unavailable {
+  color: #8b6426;
+  background: #fffbef;
+  border-color: #f1e3c7;
+}
+.anonymous-workspace-migration-requires-export > svg,
+.anonymous-workspace-migration-requires-export strong,
+.anonymous-workspace-migration-unavailable > svg,
+.anonymous-workspace-migration-unavailable strong {
+  color: #976919;
+}
+.anonymous-workspace-confirmation {
+  color: #397553;
+}
+.anonymous-workspace-followup {
+  color: #8b6426;
+}
+.anonymous-workspace-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 32px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.anonymous-workspace-toggle:hover {
+  background: rgb(91 74 192 / 7%);
+}
+.anonymous-workspace-toggle:focus-visible {
+  outline: 2px solid rgb(75 63 227 / 35%);
+  outline-offset: 2px;
+}
+.anonymous-workspace-toggle svg {
+  transition: transform 160ms ease;
+}
+.anonymous-workspace-toggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+.reader-shell .anonymous-workspace-migration.is-compact {
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 16px;
+}
+.reader-shell .anonymous-workspace-migration.is-compact .anonymous-workspace-copy {
+  flex: 1 1 auto;
+}
+.reader-shell .anonymous-workspace-migration.is-compact .anonymous-workspace-heading {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.reader-shell .anonymous-workspace-migration.is-compact .anonymous-workspace-heading strong,
+.reader-shell .anonymous-workspace-migration.is-compact .anonymous-workspace-heading small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reader-shell .anonymous-workspace-migration.is-compact .anonymous-workspace-toggle {
+  flex: 0 0 auto;
+}
+.anonymous-workspace-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}

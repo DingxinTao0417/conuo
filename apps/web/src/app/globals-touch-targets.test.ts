@@ -2,7 +2,14 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const css = readFileSync(fileURLToPath(new URL("./globals.css", import.meta.url)), "utf8");
+// globals.css is an ordered list of imports; assert against the sheet it composes.
+const css = readFileSync(fileURLToPath(new URL("./globals.css", import.meta.url)), "utf8")
+  .split("\n")
+  .flatMap((line) => {
+    const local = /^@import "(\.\/[^"]+)";$/.exec(line.trim());
+    return local ? [readFileSync(fileURLToPath(new URL(local[1], import.meta.url)), "utf8")] : [];
+  })
+  .join("\n");
 
 function mediaBlock(query: string, selector: string) {
   let start = css.indexOf(query);

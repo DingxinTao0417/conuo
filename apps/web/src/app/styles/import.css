@@ -1,0 +1,138 @@
+.import-ai-consent input {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  accent-color: var(--brand);
+}
+.import-ai-consent span {
+  display: grid;
+  gap: 3px;
+}
+.import-ai-consent strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+.import-ai-consent small {
+  color: #81798d;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px dashed #d9d4eb;
+  background: #fdfcff;
+  padding: 35px 20px;
+  border-radius: 10px;
+  gap: 10px;
+  color: #9a92bd;
+}
+.dropzone b {
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  margin-top: 6px;
+}
+.dropzone span {
+  font-size: 11px;
+  color: #999;
+}
+.dropzone small {
+  font-size: 10px;
+  color: #aaa;
+}
+.dropzone.dragging {
+  background: #f1edff;
+  border-color: var(--brand);
+}
+.import-results {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 240px;
+  overflow: auto;
+}
+.import-results > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.import-results > div:last-child {
+  border: 0;
+}
+.import-results > .import-cloud-confirmation {
+  align-items: flex-start;
+  background: #f6f5ff;
+  color: #6654b8;
+}
+.import-results > .import-cloud-confirmation.confirmed {
+  background: #effaf4;
+  color: #21865f;
+}
+.import-results > .import-cloud-confirmation.blocked {
+  background: #fff6f5;
+  color: #b9574d;
+}
+.import-cloud-confirmation p {
+  color: inherit;
+  line-height: 1.5;
+}
+.import-results b {
+  font-size: 11px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.import-results p {
+  font-size: 10px;
+  color: #999;
+  margin-top: 3px;
+}
+.web-import {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.web-import > .btn {
+  align-self: flex-start;
+}
+.space-checkboxes {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.space-checkboxes legend {
+  color: #888;
+  font-size: 11px;
+  padding: 0 6px;
+}
+.space-checkboxes label {
+  flex-direction: row;
+  align-items: center;
+  font-weight: 400;
+}
+.source-meta-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.source-meta-list > div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.source-meta-list dt {
+  color: #8a8494;
+}
+.source-meta-list dd {
+  min-width: 0;
+  margin: 0;
+  color: #403b48;
+}
+.source-meta-list .text-button {
+  display: inline-flex;
+}

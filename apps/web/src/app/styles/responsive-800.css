@@ -1,0 +1,107 @@
+@media (max-width: 800px) {
+  .sidebar {
+    width: 190px;
+    flex-basis: 190px;
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+  .brand {
+    padding-left: 6px;
+  }
+  .brand > span {
+    font-size: 17px;
+  }
+  .brand small {
+    display: none;
+  }
+  .continue-grid {
+    grid-template-columns: 1fr;
+  }
+  .pending-question-list {
+    grid-template-columns: 1fr;
+  }
+  .continue-empty {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .continue-card {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    column-gap: 14px;
+  }
+  .continue-card .file-icon {
+    grid-row: 1 / 4;
+  }
+  .continue-card h3 {
+    margin: 0 0 5px;
+  }
+  .continue-card > p {
+    -webkit-line-clamp: 1;
+  }
+  .continue-card > div {
+    padding-top: 10px;
+    grid-column: 2;
+  }
+  .recent-note-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .topbar {
+    padding: 0 16px;
+  }
+  .space-context-bar {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+  .page-heading {
+    align-items: flex-start;
+    gap: 16px;
+  }
+  h1 {
+    font-size: 22px;
+  }
+  .page-heading > .btn {
+    font-size: 11px;
+    padding: 6px 10px;
+    margin-top: 22px;
+  }
+  .source-date {
+    display: none;
+  }
+  .source-list-heading {
+    grid-template-columns: 1fr 100px 64px;
+  }
+  .source-list-heading > span:nth-child(3) {
+    display: none;
+  }
+  .source-open p {
+    gap: 4px;
+  }
+  .source-row {
+    gap: 9px;
+  }
+  .source-open {
+    gap: 9px;
+  }
+  .source-row > .badge {
+    min-width: 0;
+  }
+  .source-grid .source-date {
+    display: block;
+  }
+  .content-toolbar {
+    padding: 10px 16px;
+  }
+  .content-toolbar .btn {
+    font-size: 10px;
+  }
+  .note-paper {
+    padding: 25px;
+  }
+  .note-title {
+    font-size: 24px;
+  }
+}
+/* Keep row-level collection actions usable on touch-first tablet layouts
+   without changing the denser desktop control size. */

@@ -1,0 +1,36 @@
+@media (min-width: 1600px) {
+  .content-scroll {
+    padding-top: 45px;
+  }
+}
+@media (max-width: 1100px) {
+  .content-scroll {
+    padding: 28px 24px 50px;
+  }
+  .sidebar {
+    width: 200px;
+    flex-basis: 200px;
+  }
+  .continue-grid {
+    gap: 10px;
+  }
+  .pending-question-list {
+    gap: 8px;
+  }
+  .continue-card {
+    padding: 16px;
+  }
+  .recent-note-grid {
+    gap: 8px;
+  }
+  .note-paper {
+    margin: 20px;
+    padding: 30px;
+  }
+  .source-date {
+    width: 60px;
+  }
+  .source-list-heading {
+    grid-template-columns: 1fr 95px 75px 66px;
+  }
+}

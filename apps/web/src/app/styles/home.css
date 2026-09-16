@@ -1,0 +1,238 @@
+.continue-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 34px;
+}
+.continue-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 34px;
+}
+.continue-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 22px;
+  background: white;
+  min-height: 224px;
+}
+.continue-card:hover {
+  border-color: #bab3ee;
+  background: #fdfdff;
+}
+.continue-card h3 {
+  font-size: 14px;
+  font-weight: 550;
+  margin: 15px 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.continue-card > p {
+  color: #999;
+  font-size: 11px;
+  line-height: 1.8;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.continue-card > div {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  color: #999;
+  font-size: 10px;
+  margin-top: auto;
+  padding-top: 18px;
+}
+.file-icon {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 44px;
+  border: 1px solid #dedce9;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: #f7f6fb;
+  color: #8075ba;
+  position: relative;
+}
+.file-icon small {
+  font-size: 6px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  margin-top: 1px;
+}
+.file-pdf {
+  color: #c56864;
+  background: #fff8f7;
+  border-color: #f0dedd;
+}
+.file-docx {
+  color: #6385b9;
+  background: #f7faff;
+  border-color: #dce5f1;
+}
+.file-web {
+  color: #589a8b;
+  background: #f6fbf9;
+  border-color: #d9e9e3;
+}
+.welcome-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border: 1px dashed #d8d6e4;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fdfdff, #fff);
+  padding: 41px 20px 31px;
+  margin-bottom: 35px;
+}
+.welcome-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid #e7e3fb;
+  background: #f5f3ff;
+  color: #7366c6;
+  border-radius: 16px;
+  margin-bottom: 18px;
+}
+.welcome-card h2 {
+  font-size: 17px;
+  font-weight: 550;
+}
+.welcome-card p {
+  font-size: 12px;
+  color: #888;
+  line-height: 1.9;
+  margin: 10px 0 22px;
+}
+.welcome-card small {
+  font-size: 10px;
+  color: #aaa;
+  margin-top: 19px;
+}
+.button-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.recent-note-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.pending-question-heading {
+  margin-top: 4px;
+}
+.pending-question-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 34px;
+}
+.pending-question-card {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e8e5f2;
+  border-radius: 8px;
+  padding: 13px;
+  background: #fff;
+  color: #7366c6;
+  text-align: left;
+}
+.pending-question-card:hover {
+  border-color: #cfc7ed;
+  background: #fdfcff;
+}
+.pending-question-card > div {
+  min-width: 0;
+  flex: 1;
+}
+.pending-question-card b {
+  display: block;
+  overflow: hidden;
+  color: #39354a;
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pending-question-card p {
+  margin-top: 4px;
+  overflow: hidden;
+  color: #999;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pending-question-card > svg:last-child {
+  color: #aaa;
+}
+.space-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  text-align: left;
+}
+.space-card:hover {
+  background: #fafafa;
+}
+.space-card > div {
+  flex: 1;
+  min-width: 0;
+}
+.space-card b {
+  font-size: 12px;
+  font-weight: 500;
+}
+.space-card p {
+  margin-top: 3px;
+  color: #999;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.space-card > svg {
+  color: #999;
+}
+.empty-small {
+  color: #999;
+  font-size: 11px;
+  padding: 25px 14px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+.count-badge {
+  vertical-align: middle;
+  margin-left: 11px;
+  padding: 2px 7px;
+  background: #f3f3f3;
+  color: #999;
+  font-size: 12px;
+  font-weight: 400;
+  border-radius: 5px;
+  letter-spacing: 0;
+}

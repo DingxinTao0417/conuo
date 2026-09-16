@@ -1,0 +1,82 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: #fff;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+  color: inherit;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+button {
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid #4b3fe325;
+  outline-offset: 1px;
+  border-color: var(--brand);
+}
+input[type="checkbox"] {
+  accent-color: var(--brand);
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+a {
+  color: var(--brand);
+  text-decoration: none;
+}
+svg {
+  flex-shrink: 0;
+  stroke-width: 1.7;
+}
+::selection {
+  background: #ddd8ff;
+}
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: #d0d0d0;
+  background-clip: padding-box;
+}

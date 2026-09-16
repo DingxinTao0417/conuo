@@ -1,0 +1,56 @@
+.conversation-list,
+.trash-list {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.conversation-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.conversation-row:last-child {
+  border-bottom: 0;
+}
+.conversation-row > button:first-child {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex: 1;
+  text-align: left;
+  border: 0;
+  background: none;
+  min-width: 0;
+}
+.conversation-row svg {
+  color: #999;
+}
+.conversation-row h3 {
+  font-size: 13px;
+  font-weight: 500;
+}
+.conversation-row p,
+.trash-row p {
+  font-size: 10px;
+  color: #999;
+  margin-top: 5px;
+}
+.resolved {
+  color: #59916a;
+}
+.trash-row {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  padding: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.trash-row:last-child {
+  border: 0;
+}
+.trash-row b {
+  font-size: 12px;
+  font-weight: 500;
+}

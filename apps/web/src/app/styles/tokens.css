@@ -1,0 +1,64 @@
+.knowledge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+@theme inline {
+  --color-brand: #4b3fe3;
+  --font-sans:
+    "SF Pro Text", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+}
+:root {
+  /* TraeWork-compatible aliases used by the product surface. Keeping these
+     names in the app lets production code follow the supplied design tokens
+     without importing the ignored local design-artifact directory at runtime. */
+  --bg-base-default: #fff;
+  --bg-base-secondary: #f5f5f5;
+  --bg-base-tertiary: #e5e5e5;
+  --bg-overlay-l1: color-mix(in srgb, #171717 8%, transparent);
+  --bg-brand: #4b3fe3;
+  --bg-brand-hover: #6a6fff;
+  --bg-brand-active: #3f31c6;
+  --bg-brand-popup: #f0eeff;
+  --text-default: #171717;
+  --text-secondary: #404040;
+  --text-tertiary: #737373;
+  --text-disabled: #a1a1a1;
+  --text-brand: #4b3fe3;
+  --border-neutral-l1: #e8e8e8;
+  --border-neutral-l2: #d1d1d1;
+  --border-brand: #4b3fe3;
+  --status-primary: #2f74ff;
+  --status-success: #15a877;
+  --status-warning: #e27900;
+  --radius-4: 4px;
+  --radius-6: 6px;
+  --radius-8: 8px;
+  --radius-12: 12px;
+  --spacer-4: 4px;
+  --spacer-8: 8px;
+  --spacer-12: 12px;
+  --spacer-16: 16px;
+  --spacer-20: 20px;
+  --spacer-24: 24px;
+  --heading-sm: 16px;
+  --heading-md: 20px;
+  --body-sm: 12px;
+  --body-base: 14px;
+  --brand: #4b3fe3;
+  --brand-soft: #f0eeff;
+  --bg: #fff;
+  --bg-secondary: #f5f5f5;
+  --text: #171717;
+  --muted: #737373;
+  --border: #e8e8e8;
+  --success: #15a877;
+  --danger: #e8463a;
+  --radius: 8px;
+  color-scheme: light;
+}
+* {
+  box-sizing: border-box;
+}

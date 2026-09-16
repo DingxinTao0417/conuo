@@ -1,0 +1,58 @@
+.inline-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 16px;
+  color: #737373;
+  background: #fafafa;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 11px;
+  margin-bottom: 20px;
+}
+.app-main > .notice {
+  margin: 0;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  flex-shrink: 0;
+}
+.notice-warning {
+  background: #fffbef;
+  color: #a07a30;
+  border-color: #f1e3c7;
+}
+.notice > span {
+  flex: 1;
+}
+.cloud-readonly-notice {
+  align-items: flex-start;
+  gap: 10px;
+}
+.cloud-readonly-notice > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.cloud-readonly-notice > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.cloud-readonly-notice strong {
+  color: #8d6116;
+  font-size: 12px;
+  font-weight: 600;
+}
+.cloud-readonly-notice small {
+  color: inherit;
+  line-height: 1.55;
+}
+.save-readonly {
+  color: #a06c1d;
+}
