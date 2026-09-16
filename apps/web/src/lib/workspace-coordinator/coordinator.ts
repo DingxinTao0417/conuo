@@ -1,6 +1,5 @@
 import { isAccountDeletionPendingError } from "../account-deletion";
 import type { OnAnswerProgress } from "../answer-stream-types";
-import { mergeBackupRestore } from "../backup-restore";
 import type { RestorePlan } from "../backup-types";
 import type { SourcePurgePreview, SourceVersionPurgePreview } from "../cloud";
 import {
@@ -28,7 +27,6 @@ import {
 } from "../sync-conflicts";
 import type { AnswerRequest, Source, SourceBlobReadOptions, WorkspaceData } from "../types";
 import {
-  BackupRestoreContextError,
   conflictError,
   conflictRecordId,
   errorText,
@@ -36,6 +34,7 @@ import {
   OriginalSyncError,
   workspaceSaveNeedsReadBack,
 } from "./errors";
+import { BackupRestoreController } from "./backup-restore";
 import { ImportsController } from "./imports";
 import { accountKey, defaultImportPipeline, defaultIO, unpack } from "./io";
 import {
@@ -122,14 +121,12 @@ export class WorkspaceCoordinator {
   readonly originals = new OriginalsController(this);
   /** Permanent deletion of a source or one of its historical versions. */
   readonly purge = new PurgeController(this);
+  /** Adds a backup copy into the current workspace, never replacing it. */
+  readonly backupRestore = new BackupRestoreController(this);
   // Recovery snapshots are intentionally independent from ordinary workspace
   // persistence, but account deletion still has to await them before clearing
   // IndexedDB. Keep only live writes for the owning session.
   private pendingRecoveryWrites = new Map<Session, Set<Promise<void>>>();
-  private pendingBackupRestores = new Map<
-    string,
-    { fingerprint: string; promise: Promise<void> }
-  >();
   private localCommitUnsubscribe: (() => void) | null = null;
   private localReloadTasks = new WeakMap<Session, Promise<boolean>>();
   private cloudUpdateTasks = new WeakMap<
@@ -802,9 +799,7 @@ export class WorkspaceCoordinator {
     for (const session of sessions) {
       this.discardedSessions.add(session);
       this.pendingLocalPersists.delete(session);
-      for (const key of this.pendingBackupRestores.keys()) {
-        if (key.startsWith(`[${session.token},`)) this.pendingBackupRestores.delete(key);
-      }
+      this.backupRestore.redactSession(session);
       this.cloudUpdateTasks.get(session)?.controller.abort();
       session.data = { ...createEmptyWorkspace(), spaces: [] };
       session.recovery = null;
@@ -1634,181 +1629,6 @@ export class WorkspaceCoordinator {
     return true;
   }
 
-  /** Resolves after the added copy is persisted locally; cloud sync keeps its usual status. */
-  async restoreBackup(plan: RestorePlan, token: number): Promise<void> {
-    const session = this.active;
-    if (!session?.ready || session.token !== token)
-      throw new Error("当前账号已改变，请重新打开备份恢复面板。");
-    this.assertWorkspaceWritable(session);
-    const key = JSON.stringify([session.token, plan.id]);
-    const pending = this.pendingBackupRestores.get(key);
-    if (pending) {
-      if (pending.fingerprint !== plan.fingerprint)
-        throw new Error("备份确认内容已改变，请重新选择备份文件。");
-      return pending.promise;
-    }
-    const prepared = structuredClone(plan);
-    const promise = (async () => {
-      await this.commitBackupRestore(prepared, session);
-      if (this.cloudOnly) {
-        await this.confirmWebCloudSave(session);
-        if (
-          !session.confirmedCloud ||
-          mergeBackupRestore(session.confirmedCloud, prepared) !== session.confirmedCloud
-        )
-          throw new Error("恢复副本尚未得到云端确认，请保留旧版备份并重试当前恢复计划。");
-      }
-    })();
-    this.pendingBackupRestores.set(key, { fingerprint: prepared.fingerprint, promise });
-    try {
-      await promise;
-    } finally {
-      if (this.pendingBackupRestores.get(key)?.promise === promise)
-        this.pendingBackupRestores.delete(key);
-    }
-  }
-
-  private async commitBackupRestore(plan: RestorePlan, session: Session): Promise<void> {
-    const validate = () => {
-      if (!this.isActive(session) || !session.ready)
-        throw new Error("当前账号已改变，未将备份副本写入新账号。");
-      this.assertWorkspaceWritable(session);
-      return mergeBackupRestore(session.data, plan);
-    };
-    const confirmPresent = () => {
-      if (validate() !== session.data)
-        throw new BackupRestoreContextError(
-          "恢复副本已从当前工作区移出，无法确认本次恢复完成；请检查当前副本或重新恢复。已保存原件不会被清理。",
-        );
-    };
-    if (
-      plan.data.sources.some((source) => source.aiAllowed) ||
-      plan.data.organizationJobs?.some((job) => ["queued", "running"].includes(job.status))
-    )
-      throw new Error("备份副本不能继承 AI 授权或正在执行的任务，请重新生成恢复预览。");
-    const versions = plan.data.sources.flatMap((source) =>
-      [source, ...(source.versions ?? [])].map((version) => ({ source, version })),
-    );
-    const entries = plan.blobs.map((entry) => {
-      const source = plan.data.sources.find((item) => item.id === entry.sourceId);
-      const version = source && getSourceVersion(source, entry.versionId);
-      if (
-        !version ||
-        entry.key !== version.blobKey ||
-        entry.key !== `original:${entry.sourceId}:${entry.versionId}`
-      )
-        throw new Error("备份原件与恢复版本不一致，请重新选择备份文件。");
-      return { ...entry, version };
-    });
-    if (
-      new Set(entries.map((entry) => entry.key)).size !== entries.length ||
-      versions.some(
-        ({ source, version }) =>
-          version.storagePath !== undefined ||
-          (version.blobKey &&
-            !entries.some(
-              (entry) =>
-                entry.sourceId === source.id &&
-                entry.versionId === version.versionId &&
-                entry.key === version.blobKey,
-            )),
-      )
-    )
-      throw new Error("备份包含未重映射的云路径或缺失的原件，请重新生成恢复预览。");
-    const initial = validate();
-    if (initial === session.data) {
-      // A previous attempt may have published the copy but failed its local write.
-      // The pure merge preserves subsequent edits and detects partial ID collisions.
-      await this.confirmBackupLocal(session);
-      confirmPresent();
-      void this.pump(session);
-      return;
-    }
-    if (entries.length && (!this.io.putBlobIfAbsent || !this.io.deleteUnreferencedBlob))
-      throw new Error("当前环境无法安全保存备份原件，请重新载入后重试。现有资料未修改。");
-    if (
-      entries.some(
-        (entry) => pendingFileKeys.has(entry.key) || this.originals.referencesBlob(entry.key),
-      )
-    )
-      throw new Error("恢复原件标识正在使用，请重新生成恢复预览。已有原件未被覆盖。");
-    const created = new Set<string>();
-    const attempted = new Set<string>();
-    let applied = false;
-    entries.forEach((entry) => pendingFileKeys.add(entry.key));
-    try {
-      // Verify all bytes before the first write; ZIP parsing itself never persists files.
-      for (const entry of entries) {
-        await verifyOriginal(entry.version, entry.blob);
-        validate();
-      }
-      for (const entry of entries) {
-        attempted.add(entry.key);
-        const added = await this.originals.putLocalOriginal(session, entry.key, entry.blob);
-        if (!added) throw new Error("恢复原件标识已经存在，请重新生成恢复预览。已有原件未被覆盖。");
-        created.add(entry.key);
-        validate();
-        const stored = await this.originals.readLocalOriginal(session, entry.key);
-        if (!stored) throw new Error("备份原件尚未确认保存在此浏览器，现有资料未修改。");
-        await verifyOriginal(entry.version, stored);
-        validate();
-      }
-      // Hashing and IndexedDB may have yielded to an editor or another import.
-      // Recheck capacity and append to the latest data, never the preview snapshot.
-      applied = this.update((current) => mergeBackupRestore(current, plan), session.token);
-      if (!applied) throw new Error("当前账号已改变，未将备份副本写入新账号。");
-      await this.confirmBackupLocal(session);
-      confirmPresent();
-      void this.pump(session);
-    } catch (cause) {
-      let cleanup = "";
-      if (!applied) {
-        if (attempted.size > created.size)
-          cleanup = " 未确认由本次操作创建的原件均已保留，未清理。";
-        for (const entry of entries) {
-          if (!created.has(entry.key)) continue;
-          try {
-            const stored = await this.originals.readLocalOriginal(session, entry.key);
-            if (stored) await verifyOriginal(entry.version, stored);
-            if (
-              this.originals.referencesBlob(entry.key) ||
-              !(await this.originals.deleteLocalOriginal(session, entry.key))
-            )
-              cleanup = " 无法确认可安全清理的暂存原件已保留。";
-          } catch {
-            cleanup = " 无法确认可安全清理的暂存原件已保留。";
-          }
-        }
-      }
-      const message =
-        cause instanceof BackupRestoreContextError
-          ? cause.message
-          : !this.isActive(session) || !session.ready
-            ? "当前账号已改变，未将备份副本写入新账号；已加入原账号的副本仍按原保存队列保留。"
-            : applied
-              ? "备份副本已加入，但本机保存尚未确认，请重试。原件和当前修改仍然保留。 " +
-                errorText(cause)
-              : errorText(cause);
-      throw new Error(message + cleanup);
-    } finally {
-      entries.forEach((entry) => pendingFileKeys.delete(entry.key));
-    }
-  }
-
-  private async confirmBackupLocal(session: Session): Promise<void> {
-    try {
-      await this.persist(session);
-    } catch (cause) {
-      if (this.isActive(session)) {
-        session.status = session.blocked || "error";
-        session.error =
-          "备份副本尚未确认保存在此浏览器，请重试；原件和当前修改仍然保留。 " + errorText(cause);
-        this.publish(session);
-      }
-      throw cause;
-    }
-  }
-
   /**
    * A failed HTTP exchange is not proof that the database rejected the write.
    * Read the authoritative snapshot once before asking the user to retry. This
@@ -2515,7 +2335,7 @@ export class WorkspaceCoordinator {
       this.readingConflictResolutions.has(session) ||
       this.imports.hasFencedImportTransition(session) ||
       !!this.pendingRecoveryWrites.get(session)?.size ||
-      [...this.pendingBackupRestores.keys()].some((key) => key.startsWith(`[${session.token},`)) ||
+      this.backupRestore.hasSession(session) ||
       this.aiBusy(session.token) ||
       this.organization.hasPendingCloudOperations(session) ||
       pendingFileKeys.size > 0 ||
@@ -3074,6 +2894,10 @@ export class WorkspaceCoordinator {
     this.remember(session);
     this.publish(session);
     await this.pump(session);
+  }
+
+  restoreBackup(plan: RestorePlan, token: number): Promise<void> {
+    return this.backupRestore.restoreBackup(plan, token);
   }
 
   previewSourcePurge(
