@@ -1,5 +1,4 @@
 import { isAccountDeletionPendingError } from "../account-deletion";
-import { answerStreamEventSchema, streamedAnswerSchema } from "../answer-stream";
 import type { OnAnswerProgress } from "../answer-stream-types";
 import { mergeBackupRestore } from "../backup-restore";
 import type { RestorePlan } from "../backup-types";
@@ -10,10 +9,6 @@ import type {
   SourceVersionPurgePreview,
 } from "../cloud";
 import { validateRelationProposals } from "../concept-relations";
-import {
-  isCrossLibraryAnswerRequest,
-  validateCrossLibraryAnswerRequest,
-} from "../cross-library-ask";
 import { assessImportQuota } from "../import-quota";
 import {
   advanceImportJob,
@@ -51,14 +46,7 @@ import {
   previewPermanentSourceDeletionContent,
   type PermanentSourceDeletionSelection,
 } from "../permanent-deletion";
-import { questionContextKey } from "../question-context";
-import {
-  resolveAnswerNoteEvidence,
-  resolveCitation,
-  retrieveEvidence,
-  selectedDocumentNoteEvidence,
-  selectedSources,
-} from "../retrieval";
+import { resolveCitation } from "../retrieval";
 import { createEmptyWorkspace } from "../seed";
 import { sameSourcePurgeSelection, sourcePurgeSelectionSchema } from "../source-purge-contract";
 import { getSourceVersion, replaceFileSource } from "../source-versions";
@@ -75,13 +63,7 @@ import {
   type NoteSyncPlan,
   type ReadingProgressSyncPlan,
 } from "../sync-conflicts";
-import type {
-  AnswerNoteEvidence,
-  AnswerRequest,
-  Source,
-  SourceBlobReadOptions,
-  WorkspaceData,
-} from "../types";
+import type { AnswerRequest, Source, SourceBlobReadOptions, WorkspaceData } from "../types";
 import {
   BackupRestoreContextError,
   conflictError,
@@ -116,6 +98,7 @@ import {
   pendingFileKeys,
   verifyOriginal,
 } from "./originals";
+import { QuestionsController } from "./questions";
 import type {
   AtomicPreparedImportResult,
   ImportPipeline,
@@ -125,7 +108,6 @@ import type {
   PendingImport,
   PendingLocalPersist,
   PendingOrganization,
-  PendingQuestion,
   QueuedImport,
   ReadingProgressSyncSelection,
   RecoverableImportTransition,
@@ -146,7 +128,8 @@ import type {
  * separate localStorage transaction.
  */
 export class WorkspaceCoordinator {
-  private active: Session | null = null;
+  /** Internal to this directory: sub-controllers read the live session here. */
+  active: Session | null = null;
   private token = 0;
   private listeners = new Set<() => void>();
   private queues = new Map<string, Promise<void>>();
@@ -172,7 +155,8 @@ export class WorkspaceCoordinator {
   private deletionMarkerChecks = new WeakMap<Session, Promise<void>>();
   /** Ordinary editor callbacks cannot mutate a snapshot while a reviewed reading choice is saved. */
   private readingConflictResolutions = new WeakSet<Session>();
-  private pendingQuestions = new Set<PendingQuestion>();
+  /** Question requests and their evidence-boundary fences. */
+  readonly questions = new QuestionsController(this);
   private pendingOrganizations = new Set<PendingOrganization>();
   private pendingImports = new Map<string, PendingImport>();
   private queuedImports: QueuedImport[] = [];
@@ -224,7 +208,7 @@ export class WorkspaceCoordinator {
     anonymousMigration: noAnonymousWorkspaceMigration(),
   };
   constructor(
-    private io: WorkspaceIO = defaultIO,
+    public io: WorkspaceIO = defaultIO,
     private imports: ImportPipeline = defaultImportPipeline,
     private capabilities: {
       storageMode?: "hybrid" | "cloud";
@@ -236,7 +220,7 @@ export class WorkspaceCoordinator {
     this.io = this.accountAwareIO(io);
   }
 
-  private get cloudOnly(): boolean {
+  get cloudOnly(): boolean {
     return this.capabilities.storageMode === "cloud";
   }
 
@@ -330,7 +314,7 @@ export class WorkspaceCoordinator {
       this.listeners.delete(listener);
     };
   };
-  private hasNewerLocalUpdate(session: Session): boolean {
+  hasNewerLocalUpdate(session: Session): boolean {
     return (
       session.localUpdateRevision !== null && session.localUpdateRevision > session.localRevision
     );
@@ -394,7 +378,7 @@ export class WorkspaceCoordinator {
       this.io.clearSession?.();
     }
   }
-  private isActive(session: Session): boolean {
+  isActive(session: Session): boolean {
     return (
       this.active === session &&
       !session.exiting &&
@@ -522,17 +506,14 @@ export class WorkspaceCoordinator {
       return { kind: "unsynced", canSync: true, canKeepLocalDraft: true };
     return { kind: "ready", canSync: false, canKeepLocalDraft: false };
   }
-  private publish(session: Session) {
+  publish(session: Session) {
     // A signing-out session deliberately rejects writes but still needs to
     // publish its frozen status while the Auth event replaces it.
     if (!this.isCurrent(session)) return;
     this.accountDeletionView = null;
     // Updates, cloud reconciliation, recovery and account changes all publish
     // through here. Stop old evidence requests as soon as their boundary changes.
-    for (const pending of this.pendingQuestions) {
-      const error = this.questionError(pending);
-      if (error) pending.controller.abort(error);
-    }
+    this.questions.abortInvalidated();
     for (const pending of this.pendingOrganizations) {
       const error = this.organizationError(pending);
       if (error) pending.controller.abort(error);
@@ -644,10 +625,10 @@ export class WorkspaceCoordinator {
   ): WorkspaceData | null {
     return mergeConcurrentWorkspace(current, committed, boundary);
   }
-  private isCloudReadOnly(session: Session): boolean {
+  isCloudReadOnly(session: Session): boolean {
     return session.localCacheMode === "cloud-readonly";
   }
-  private readOnlyMessage(): string {
+  readOnlyMessage(): string {
     return "此浏览器的本机副本暂时无法读取，当前仅可查看已确认的云端资料。请重新连接后再编辑、导入或整理。";
   }
   private assertWritable(session: Session): void {
@@ -860,7 +841,7 @@ export class WorkspaceCoordinator {
     for (const session of this.pendingLocalPersists.keys()) collect(session);
     for (const session of this.pendingRecoveryWrites.keys()) collect(session);
     for (const session of this.pumpTasks.keys()) collect(session);
-    for (const pending of this.pendingQuestions) collect(pending.session);
+    this.questions.collectSessions(collect);
     for (const pending of this.pendingOrganizations) collect(pending.session);
     for (const pending of this.pendingImports.values()) collect(pending.session);
     for (const pending of this.queuedImports) collect(pending.session);
@@ -897,12 +878,7 @@ export class WorkspaceCoordinator {
       }
     }
     const stopped = new DOMException("账号注销请求已提交，本次操作已停止。", "AbortError");
-    for (const pending of this.pendingQuestions) {
-      if (pending.session.user?.id === accountId) {
-        pending.controller.abort(stopped);
-        this.pendingQuestions.delete(pending);
-      }
-    }
+    this.questions.redactAccount(accountId, stopped);
     for (const pending of this.pendingOrganizations) {
       if (pending.session.user?.id === accountId) {
         pending.controller.abort(stopped);
@@ -3128,7 +3104,7 @@ export class WorkspaceCoordinator {
       pendingFileKeys.size > 0 ||
       [...this.importLeaseRetries.keys()].some((key) => key.startsWith(`${session.token}:`)) ||
       !!this.pendingReadingPositions.get(session)?.size ||
-      [...this.pendingQuestions].some((item) => item.session === session) ||
+      this.questions.hasSession(session) ||
       [...this.pendingOrganizations].some((item) => item.session === session) ||
       [...this.pendingImports.values()].some((item) => item.session === session) ||
       this.queuedImports.some((item) => item.session === session) ||
@@ -5481,174 +5457,8 @@ export class WorkspaceCoordinator {
     this.pendingImports.get(key)?.controller.abort(new DOMException("导入已取消。", "AbortError"));
   }
 
-  async ask(
-    request: AnswerRequest,
-    signal: AbortSignal,
-    token: number,
-    onProgress?: OnAnswerProgress,
-  ) {
-    const session = this.active;
-    if (!session?.ready || session.token !== token)
-      throw new Error("当前账号已改变，请重新打开问答。");
-    if (this.isCloudReadOnly(session)) throw new Error(this.readOnlyMessage());
-    if (signal.aborted) throw new DOMException("已停止", "AbortError");
-    if (this.organizationBusy(token))
-      throw new Error("资料整理正在进行，请等待完成或先停止整理，再发起问答。");
-    // The all-library panel validates before it creates a conversation, but a
-    // current local snapshot can change before this adapter runs. Recheck the
-    // exact cross-library range here for both local and cloud paths; never
-    // send a stale range and let it silently narrow downstream.
-    if (isCrossLibraryAnswerRequest(request)) {
-      const checked = validateCrossLibraryAnswerRequest(session.data, request);
-      if (!checked.ok) throw checked.error;
-    }
-    if (session.user) {
-      const contextKey = questionContextKey(session.data, request);
-      // Reader saves the question before calling ask(). That conversation write
-      // may still be pending; only unsynced evidence must block disclosure.
-      if (
-        session.blocked ||
-        !session.knownRevision ||
-        !session.confirmedCloud ||
-        questionContextKey(session.confirmedCloud, request) !== contextKey
-      )
-        throw new Error("资料尚未同步，请保存成功后再检索云端资料。");
-      const userId = session.user.id;
-      const pending: PendingQuestion = {
-        session,
-        request: structuredClone(request),
-        contextKey,
-        controller: new AbortController(),
-      };
-      const stop = () => pending.controller.abort(new DOMException("已停止", "AbortError"));
-      signal.addEventListener("abort", stop, { once: true });
-      let rejectAbort!: (reason: unknown) => void;
-      const aborted = new Promise<never>((_resolve, reject) => {
-        rejectAbort = reject;
-      });
-      const rejectStopped = () => rejectAbort(pending.controller.signal.reason);
-      pending.controller.signal.addEventListener("abort", rejectStopped, { once: true });
-      this.pendingQuestions.add(pending);
-      this.publish(session);
-      let settled = false;
-      const report: OnAnswerProgress = (value) => {
-        if (settled) return;
-        try {
-          const error = this.questionError(pending);
-          if (error) throw error;
-          const event = answerStreamEventSchema.safeParse(value);
-          if (!event.success || (event.data.type !== "progress" && event.data.type !== "draft"))
-            throw new Error("问答进度格式无效，本次回答已停止。");
-          if (event.data.type === "draft") this.validateQuestionAnswer(pending, event.data.answer);
-          // Progress is temporary UI state, never a workspace write. Extractive
-          // responses and disabled AI do not imitate model generation.
-          if (
-            session.data.aiEnabled &&
-            (event.data.type !== "draft" || event.data.answer.mode === "model")
-          )
-            onProgress?.(structuredClone(event.data));
-          const changed = this.questionError(pending);
-          if (changed) throw changed;
-        } catch (cause) {
-          // A late asynchronous adapter callback must not throw outside ask().
-          // Aborting also settles the request when an adapter ignores its signal.
-          pending.controller.abort(
-            cause instanceof Error ? cause : new Error("问答进度处理失败。"),
-          );
-        }
-      };
-      try {
-        const result = await Promise.race([
-          Promise.resolve().then(() => {
-            const error = this.questionError(pending);
-            if (error) throw error;
-            return this.io.askCloud(pending.request, pending.controller.signal, userId, report);
-          }),
-          aborted,
-        ]);
-        const error = this.questionError(pending);
-        if (error) throw error;
-        return this.validateQuestionAnswer(pending, result);
-      } catch (cause) {
-        // A fetch rejection must not hide the more useful account/permission
-        // change reason. An adapter ignoring abort must never publish late output.
-        throw this.questionError(pending) ?? cause;
-      } finally {
-        settled = true;
-        signal.removeEventListener("abort", stop);
-        pending.controller.signal.removeEventListener("abort", rejectStopped);
-        this.pendingQuestions.delete(pending);
-        this.publish(session);
-      }
-    }
-    const result = retrieveEvidence(session.data, request);
-    if (signal.aborted) throw new DOMException("已停止", "AbortError");
-    return result;
-  }
-
-  private validateQuestionAnswer(pending: PendingQuestion, value: unknown) {
-    const answer = streamedAnswerSchema.safeParse(value);
-    const data = pending.session.data;
-    const normalize = (text: string) => text.replace(/\s+/g, " ").trim();
-    const available = new Map(
-      selectedSources(data, pending.request).map((source) => [source.id, source]),
-    );
-    const noteKey = (item: AnswerNoteEvidence) =>
-      JSON.stringify([
-        item.noteId,
-        item.spaceId,
-        item.sourceId,
-        item.sourceVersionId,
-        item.revision,
-        item.updatedAt,
-        item.blockId,
-        item.title,
-        item.quote,
-      ]);
-    const availableNotes = new Set(
-      selectedDocumentNoteEvidence(data, pending.request).map(noteKey),
-    );
-    if (
-      !answer.success ||
-      answer.data.citations.some((citation) => {
-        const source = available.get(citation.sourceId);
-        const resolved = resolveCitation(data, citation);
-        return (
-          !data.aiEnabled ||
-          !source ||
-          (source.status !== "ready" && source.status !== "partial") ||
-          !resolved ||
-          resolved.source !== source ||
-          !normalize(source.text).includes(normalize(resolved.chunk.text)) ||
-          citation.title !== source.title ||
-          citation.page !== resolved.chunk.page ||
-          citation.section !== resolved.chunk.section
-        );
-      }) ||
-      answer.data.noteEvidence?.some(
-        (evidence) =>
-          !data.aiEnabled ||
-          evidence.sourceId !== pending.request.sourceId ||
-          !availableNotes.has(noteKey(evidence)) ||
-          !resolveAnswerNoteEvidence(data, evidence),
-      )
-    )
-      throw new Error("回答依据不属于当前范围的确切资料或笔记版本，本次回答已停止。");
-    return answer.data;
-  }
-
-  private questionError(pending: PendingQuestion): Error | null {
-    if (pending.controller.signal.aborted) return pending.controller.signal.reason as Error;
-    if (!this.isActive(pending.session))
-      return new Error("当前账号已改变，本次回答已停止。请在当前账号重新提问。");
-    if (!pending.session.ready)
-      return new Error("资料正在更新，本次回答已停止。请在更新完成后重新提问。");
-    if (this.isCloudReadOnly(pending.session)) return new Error(this.readOnlyMessage());
-    if (this.hasNewerLocalUpdate(pending.session) || pending.session.loadingLocalUpdate)
-      return new Error("另一个标签页已保存更新，本次回答已停止。请载入最新数据后重新提问。");
-    if (questionContextKey(pending.session.data, pending.request) !== pending.contextKey)
-      return new Error("本次问答的资料、版本或 AI 权限已改变，回答已停止。请确认当前范围后重试。");
-    return null;
+  ask(request: AnswerRequest, signal: AbortSignal, token: number, onProgress?: OnAnswerProgress) {
+    return this.questions.ask(request, signal, token, onProgress);
   }
 
   setOrganizationStatus(status: OrganizationStatus, token: number) {
@@ -5678,10 +5488,7 @@ export class WorkspaceCoordinator {
     return [...this.pendingOrganizations].some((pending) => pending.session.token === token);
   }
   aiBusy(token: number) {
-    return (
-      this.organizationBusy(token) ||
-      [...this.pendingQuestions].some((pending) => pending.session.token === token)
-    );
+    return this.organizationBusy(token) || this.questions.busy(token);
   }
   canOrganize(request: OrganizationRequest, token: number) {
     const session = this.active;
