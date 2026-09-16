@@ -1,17 +1,13 @@
 "use client";
-import type { ReactNode, RefObject } from "react";
+import type { RefObject } from "react";
 import {
   ArrowLeft,
-  BookOpen,
   Check,
   ChevronRight,
   Cloud,
   Columns2,
-  Crop,
   Download,
-  FileText,
   FileUp,
-  Highlighter,
   History,
   LoaderCircle,
   MapPin,
@@ -20,8 +16,7 @@ import {
   Search,
   Sparkles,
 } from "lucide-react";
-import type { Annotation, SaveState, Source, Space } from "@/lib/types";
-import type { ReaderOutlineItem } from "../reader-outline";
+import type { SaveState, Source, Space } from "@/lib/types";
 import { sourcePresentationStatus } from "@/lib/source-coverage";
 import { sourceStatusLabel } from "./reader-constants";
 import type { ReaderPanels } from "./hooks/use-reader-panels";
@@ -38,17 +33,10 @@ export type ReaderTopbarProps = {
   mobileReadingStatus: string;
   mobileTab: "reading" | "ai" | "citation";
   aiOpen: boolean;
-  showText: boolean;
-  outlineOpen: boolean;
-  outlineItems: ReaderOutlineItem[];
   searchOpen: boolean;
-  annotationOpen: boolean;
-  sourceAnnotations: Annotation[];
   sourceActionsOpen: boolean;
   sourceActions: RefObject<HTMLDivElement | null>;
   sourceActionsToggle: RefObject<HTMLButtonElement | null>;
-  regionCaptureActive: boolean;
-  regionStudyBlockedMessage: string;
   onBack: () => void;
   onStartComparison: ReaderProps["onStartComparison"];
   onRefreshWeb: ReaderProps["onRefreshWeb"];
@@ -57,19 +45,22 @@ export type ReaderTopbarProps = {
   openAiPanel: () => void;
   closeAiPanel: () => void;
   isCompactReaderLayout: () => boolean;
-  pdfReadingModeControls: () => ReactNode;
-  toggleOutline: (trigger: HTMLButtonElement) => void;
-  togglePdfText: () => void;
   toggleDocumentSearch: (trigger: HTMLButtonElement) => void;
-  toggleRegionCapture: () => void;
-  setNotice: (notice: string) => void;
   panels: ReaderPanels;
 };
 
+/**
+ * The reader's global bar: where the learner came from, what they are reading,
+ * whether it is saved, and four controls — back, find, Ask AI and more.
+ *
+ * Reading tools deliberately live in the tool strip inside the document
+ * instead, because half of them only apply to one format. Keeping them here
+ * meant every non-PDF source showed the same bar with holes in it, and the
+ * control count changed with the file type.
+ */
 export default function ReaderTopbar(props: ReaderTopbarProps) {
   const {
     aiOpen,
-    annotationOpen,
     backLabel,
     closeAiPanel,
     contextualBackLabel,
@@ -80,24 +71,14 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
     mobileTab,
     onBack,
     openAiPanel,
-    outlineItems,
-    outlineOpen,
     panels,
-    pdfReadingModeControls,
-    regionCaptureActive,
-    regionStudyBlockedMessage,
     searchOpen,
-    showText,
     source,
     sourceActions,
     sourceActionsOpen,
     sourceActionsToggle,
-    sourceAnnotations,
     space,
     toggleDocumentSearch,
-    toggleOutline,
-    togglePdfText,
-    toggleRegionCapture,
   } = props;
   return (
     <header className="reader-topbar">
@@ -142,73 +123,18 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
           <span>{props.saveLabel}</span>
         </span>
       )}
-      <div className="reader-desktop-topbar-tools" role="group" aria-label="阅读工具">
-        {source.kind === "pdf" && !showText && pdfReadingModeControls()}
-        {outlineItems.length > 0 && (
-          <button
-            type="button"
-            className="icon-btn"
-            data-reader-outline-trigger
-            aria-label={`打开资料目录（${outlineItems.length} 项）`}
-            aria-controls="reader-outline-panel"
-            aria-expanded={outlineOpen}
-            title="资料目录"
-            onClick={(event) => toggleOutline(event.currentTarget)}
-          >
-            <BookOpen size={16} />
-          </button>
-        )}
-        {source.kind === "pdf" && (
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label={showText ? "查看原始 PDF" : "查看解析文本"}
-            aria-pressed={showText}
-            title={showText ? "查看原始 PDF" : "查看解析文本"}
-            onClick={togglePdfText}
-          >
-            <FileText size={16} />
-          </button>
-        )}
-        {source.kind === "pdf" && !showText && (
-          <button
-            type="button"
-            className="icon-btn"
-            data-reader-region-trigger
-            aria-label={regionCaptureActive ? "取消区域框选" : "框选区域交给 AI"}
-            aria-pressed={regionCaptureActive}
-            title={regionStudyBlockedMessage || "区域视觉学习"}
-            disabled={Boolean(regionStudyBlockedMessage)}
-            onClick={toggleRegionCapture}
-          >
-            <Crop size={16} />
-          </button>
-        )}
-        <button
-          type="button"
-          className="icon-btn"
-          data-reader-search-trigger
-          aria-label="查找原文"
-          aria-controls="reader-find-panel"
-          aria-expanded={searchOpen}
-          title="页内搜索"
-          onClick={(event) => toggleDocumentSearch(event.currentTarget)}
-        >
-          <Search size={16} />
-        </button>
-        <button
-          type="button"
-          className="icon-btn"
-          data-reader-annotation-trigger
-          aria-label={`我的标注（${sourceAnnotations.length}）`}
-          aria-controls="reader-annotations-panel"
-          aria-expanded={annotationOpen}
-          title="我的标注"
-          onClick={() => panels.toggle("annotations")}
-        >
-          <Highlighter size={16} />
-        </button>
-      </div>
+      <button
+        type="button"
+        className="icon-btn reader-find-action"
+        data-reader-search-trigger
+        aria-label="查找原文"
+        aria-controls="reader-find-panel"
+        aria-expanded={searchOpen}
+        title="搜索文内"
+        onClick={(event) => toggleDocumentSearch(event.currentTarget)}
+      >
+        <Search size={16} />
+      </button>
       <div className="reader-source-actions" ref={sourceActions}>
         <button
           ref={sourceActionsToggle}
@@ -240,6 +166,21 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
               sourceActionsToggle.current?.focus();
             }}
           >
+            {props.onStartComparison && (
+              <button
+                type="button"
+                className="reader-source-action-item"
+                aria-label="选择资料进行对照阅读"
+                title="选择同一知识库中的另一份资料并排阅读"
+                onClick={() => {
+                  panels.close();
+                  props.onStartComparison?.();
+                }}
+              >
+                <Columns2 size={16} aria-hidden="true" />
+                对照阅读
+              </button>
+            )}
             <button
               type="button"
               className="reader-source-action-item"
@@ -293,18 +234,6 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
           </div>
         )}
       </div>
-      {props.onStartComparison && (
-        <button
-          type="button"
-          className="btn reader-compare-action"
-          aria-label="选择资料进行对照阅读"
-          title="选择同一知识库中的另一份资料并排阅读"
-          onClick={props.onStartComparison}
-        >
-          <Columns2 size={15} />
-          对照阅读
-        </button>
-      )}
       <button
         className="btn reader-ai-toggle"
         onClick={() => {

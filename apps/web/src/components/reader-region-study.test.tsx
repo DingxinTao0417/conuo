@@ -135,7 +135,9 @@ describe("Reader region study integration", () => {
   }
 
   it("turns an exact PDF capture into the visual study review panel", async () => {
-    expect(regionTriggers()).toHaveLength(2);
+    // Framing is a PDF tool, so it has exactly one trigger: the strip inside
+    // the document. It used to be duplicated in the global top bar.
+    expect(regionTriggers()).toHaveLength(1);
     expect(regionTriggers().every((button) => !button.disabled)).toBe(true);
 
     await click(regionTriggers()[0]!);
@@ -274,7 +276,11 @@ describe("Reader region study integration", () => {
   });
 
   it("removes the image-region action in parsed-text mode", async () => {
-    const toggle = host.querySelector<HTMLButtonElement>('[aria-label="查看解析文本"]');
+    // The parsed-text switch is a pressed-state control in the tool strip now,
+    // so it is addressed by the label the reader actually sees.
+    const toggle = [
+      ...host.querySelectorAll<HTMLButtonElement>("[data-reader-document-tools] button"),
+    ].find((button) => button.textContent?.trim() === "解析文本");
     expect(toggle).toBeTruthy();
     await click(toggle!);
     expect(regionTriggers()).toHaveLength(0);

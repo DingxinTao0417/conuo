@@ -125,8 +125,9 @@ describe("reader document controls and source actions", () => {
     expect([...scroll!.children].indexOf(toolbar!)).toBeLessThan(
       [...scroll!.children].indexOf(paper!),
     );
-    expect(toolbar?.querySelector('[aria-label="查找原文"]')).toBeTruthy();
     expect(toolbar?.querySelector('[aria-label^="我的标注"]')).toBeTruthy();
+    // Find is one of the four top bar controls, so the strip does not repeat it.
+    expect(toolbar?.querySelector('[aria-label="查找原文"]')).toBeNull();
   });
 
   it("keeps the top bar and AI panel in separate desktop layout regions", async () => {
@@ -147,10 +148,13 @@ describe("reader document controls and source actions", () => {
     expect(aiPanel).toBeTruthy();
     expect(readerBody?.contains(aiPanel!)).toBe(true);
     expect(topbar?.parentElement).toBe(workspace);
-    const desktopTools = topbar?.querySelector<HTMLElement>('[aria-label="阅读工具"]');
-    expect(desktopTools).toBeTruthy();
-    expect(desktopTools?.querySelector('[aria-label="查找原文"]')).toBeTruthy();
-    expect(desktopTools?.querySelector('[aria-label^="我的标注"]')).toBeTruthy();
+    // Find stays in the top bar at every width; the rest of the reading tools
+    // belong to the strip inside the document they act on.
+    expect(topbar?.querySelector('[aria-label="查找原文"]')).toBeTruthy();
+    expect(topbar?.querySelector('[aria-label^="我的标注"]')).toBeNull();
+    expect(topbar?.querySelector('[aria-label^="打开资料目录"]')).toBeNull();
+    expect(topbar?.querySelector("[data-reader-region-trigger]")).toBeNull();
+    expect(topbar?.querySelector('[aria-label="PDF 阅读模式"]')).toBeNull();
   });
 
   it("keeps enough room for the reader when a narrow desktop resizes the AI panel", () => {
@@ -169,73 +173,78 @@ describe("reader document controls and source actions", () => {
     expect(defaultAiPanelWidthForViewport(null)).toBe(380);
   });
 
-  it("keeps desktop and compact reader tool state synchronized", async () => {
+  it("gives every reader tool a single trigger that tracks the panel it controls", async () => {
     const source = {
       ...props.source,
       text: "# 优化器基础\n\n## 学习率\n\n学习率决定每一步走多远。",
     };
     await render({ source, sources: [source] });
 
-    const desktopTools = host.querySelector<HTMLElement>(".reader-desktop-topbar-tools")!;
-    const compactTools = host.querySelector<HTMLElement>("[data-reader-document-tools]")!;
-    const toolPair = (selector: string) => {
-      const desktop = desktopTools.querySelector<HTMLButtonElement>(selector);
-      const compact = compactTools.querySelector<HTMLButtonElement>(selector);
-      expect(desktop, `desktop ${selector}`).toBeTruthy();
-      expect(compact, `compact ${selector}`).toBeTruthy();
-      return [desktop!, compact!] as const;
+    const topbar = host.querySelector<HTMLElement>(".reader-topbar")!;
+    const strip = host.querySelector<HTMLElement>("[data-reader-document-tools]")!;
+    const soleTool = (selector: string, owner: HTMLElement) => {
+      const all = host.querySelectorAll<HTMLButtonElement>(selector);
+      expect(all, selector).toHaveLength(1);
+      expect(owner.contains(all[0]!), `${selector} owner`).toBe(true);
+      return all[0]!;
     };
 
-    const [desktopSearch, compactSearch] = toolPair("[data-reader-search-trigger]");
-    await click(desktopSearch);
-    expect(desktopSearch.getAttribute("aria-expanded")).toBe("true");
-    expect(compactSearch.getAttribute("aria-expanded")).toBe("true");
+    const search = soleTool("[data-reader-search-trigger]", topbar);
+    expect(search.getAttribute("aria-controls")).toBe("reader-find-panel");
+    await click(search);
+    expect(search.getAttribute("aria-expanded")).toBe("true");
     expect(host.querySelector("#reader-find-panel")).toBeTruthy();
-    await click(compactSearch);
-    expect(desktopSearch.getAttribute("aria-expanded")).toBe("false");
-    expect(compactSearch.getAttribute("aria-expanded")).toBe("false");
+    await click(search);
+    expect(search.getAttribute("aria-expanded")).toBe("false");
     expect(host.querySelector("#reader-find-panel")).toBeNull();
 
-    const [desktopOutline, compactOutline] = toolPair("[data-reader-outline-trigger]");
-    await click(compactOutline);
-    expect(desktopOutline.getAttribute("aria-expanded")).toBe("true");
-    expect(compactOutline.getAttribute("aria-expanded")).toBe("true");
+    const outline = soleTool("[data-reader-outline-trigger]", strip);
+    await click(outline);
+    expect(outline.getAttribute("aria-expanded")).toBe("true");
     expect(host.querySelector("#reader-outline-panel")).toBeTruthy();
-    await click(desktopOutline);
-    expect(desktopOutline.getAttribute("aria-expanded")).toBe("false");
-    expect(compactOutline.getAttribute("aria-expanded")).toBe("false");
+    await click(outline);
+    expect(outline.getAttribute("aria-expanded")).toBe("false");
 
-    const [desktopAnnotations, compactAnnotations] = toolPair("[data-reader-annotation-trigger]");
-    expect(desktopAnnotations.getAttribute("aria-controls")).toBe("reader-annotations-panel");
-    expect(compactAnnotations.getAttribute("aria-controls")).toBe("reader-annotations-panel");
-    await click(desktopAnnotations);
-    expect(desktopAnnotations.getAttribute("aria-expanded")).toBe("true");
-    expect(compactAnnotations.getAttribute("aria-expanded")).toBe("true");
+    const annotations = soleTool("[data-reader-annotation-trigger]", strip);
+    expect(annotations.getAttribute("aria-controls")).toBe("reader-annotations-panel");
+    await click(annotations);
+    expect(annotations.getAttribute("aria-expanded")).toBe("true");
     expect(host.querySelector("#reader-annotations-panel")).toBeTruthy();
-    await click(compactAnnotations);
-    expect(desktopAnnotations.getAttribute("aria-expanded")).toBe("false");
-    expect(compactAnnotations.getAttribute("aria-expanded")).toBe("false");
+    await click(annotations);
+    expect(annotations.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("returns find focus to the reader tool that is visible after a breakpoint change", async () => {
-    const desktopSearch = host.querySelector<HTMLButtonElement>(
-      ".reader-desktop-topbar-tools [data-reader-search-trigger]",
-    )!;
-    const compactSearch = host.querySelector<HTMLButtonElement>(
-      "[data-reader-document-tools] [data-reader-search-trigger]",
-    )!;
-    Object.defineProperty(desktopSearch, "getClientRects", {
-      configurable: true,
-      value: () => [],
-    });
-    Object.defineProperty(compactSearch, "getClientRects", {
+  it("returns find focus to the trigger the reader can still see", async () => {
+    const search = host.querySelector<HTMLButtonElement>("[data-reader-search-trigger]")!;
+    Object.defineProperty(search, "getClientRects", {
       configurable: true,
       value: () => [{}],
     });
 
-    await click(desktopSearch);
+    await click(search);
     await click(host.querySelector<HTMLButtonElement>('[aria-label="关闭查找"]')!);
-    expect(document.activeElement).toBe(compactSearch);
+    expect(document.activeElement).toBe(search);
+  });
+
+  it("falls back to the tool strip control when a phone has collapsed the tools", async () => {
+    const source = {
+      ...props.source,
+      text: "# 优化器基础\n\n## 学习率\n\n学习率决定每一步走多远。",
+    };
+    await render({ source, sources: [source] });
+    const outline = host.querySelector<HTMLButtonElement>("[data-reader-outline-trigger]")!;
+    const stripToggle = host.querySelector<HTMLButtonElement>("[data-reader-toolstrip-toggle]")!;
+    // A collapsed strip hides its tools, so the outline trigger is no longer a
+    // place focus can land after the directory closes.
+    Object.defineProperty(outline, "getClientRects", { configurable: true, value: () => [] });
+    Object.defineProperty(stripToggle, "getClientRects", {
+      configurable: true,
+      value: () => [{}],
+    });
+
+    await click(outline);
+    await click(host.querySelector<HTMLButtonElement>('[aria-label="关闭资料目录"]')!);
+    expect(document.activeElement).toBe(stripToggle);
   });
 
   it("keeps desktop page and zoom controls in the bottom reader bar while preserving compact controls", async () => {
@@ -290,6 +299,12 @@ describe("reader document controls and source actions", () => {
     expect(topbar?.querySelector('[aria-label="资料版本记录"]')).toBeNull();
     expect(topbar?.querySelector('[aria-label="替换文件"]')).toBeNull();
     expect(topbar?.querySelector('[aria-label="下载原文件"]')).toBeNull();
+    // Four controls, whatever the format: back, find, Ask AI and more.
+    expect(
+      [...(topbar?.querySelectorAll<HTMLButtonElement>("button") || [])].map(
+        (button) => button.getAttribute("aria-label") || button.textContent?.replace(/\s+/gu, ""),
+      ),
+    ).toEqual(["返回资料库", "查找原文", "更多资料操作", "问AI"]);
 
     const toggle = moreToggle();
     expect(toggle.getAttribute("aria-expanded")).toBe("false");

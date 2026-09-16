@@ -1797,9 +1797,18 @@ export default function Reader(props: ReaderProps) {
     setSearchResult(null);
   }
 
+  /**
+   * Where focus belongs after a panel closes. A phone can have collapsed the
+   * tool strip while the panel was open, in which case the control that
+   * reopens that half is the nearest thing the learner can still see.
+   */
   function visibleReaderTool(selector: string, fallback: HTMLButtonElement | null) {
-    const candidates = readerWorkspace.current?.querySelectorAll<HTMLButtonElement>(selector) || [];
-    return [...candidates].find((button) => button.getClientRects().length > 0) || fallback;
+    const workspace = readerWorkspace.current;
+    const candidates = workspace?.querySelectorAll<HTMLButtonElement>(selector) || [];
+    const visible = [...candidates].find((button) => button.getClientRects().length > 0);
+    if (visible) return visible;
+    const strip = workspace?.querySelector<HTMLButtonElement>("[data-reader-toolstrip-toggle]");
+    return (strip?.getClientRects().length ? strip : null) || fallback;
   }
 
   function closeDocumentSearch() {
@@ -2100,17 +2109,10 @@ export default function Reader(props: ReaderProps) {
         mobileReadingStatus={mobileReadingStatus}
         mobileTab={mobileTab}
         aiOpen={aiOpen}
-        showText={showText}
-        outlineOpen={activePanel === "outline"}
-        outlineItems={outlineItems}
         searchOpen={activePanel === "find"}
-        annotationOpen={activePanel === "annotations"}
-        sourceAnnotations={sourceAnnotations}
         sourceActionsOpen={activePanel === "source-actions"}
         sourceActions={sourceActions}
         sourceActionsToggle={sourceActionsToggle}
-        regionCaptureActive={regionCaptureActive}
-        regionStudyBlockedMessage={regionStudyBlockedMessage}
         onBack={onBack}
         onStartComparison={props.onStartComparison}
         onRefreshWeb={props.onRefreshWeb}
@@ -2119,12 +2121,7 @@ export default function Reader(props: ReaderProps) {
         openAiPanel={openAiPanel}
         closeAiPanel={closeAiPanel}
         isCompactReaderLayout={isCompactReaderLayout}
-        pdfReadingModeControls={pdfReadingModeControls}
-        toggleOutline={toggleOutline}
-        togglePdfText={togglePdfText}
         toggleDocumentSearch={toggleDocumentSearch}
-        toggleRegionCapture={toggleRegionCapture}
-        setNotice={setNotice}
         panels={panels}
       />
       <div className="reader-mobile-tabs" role="tablist" aria-label="阅读工作区">
@@ -2391,7 +2388,6 @@ export default function Reader(props: ReaderProps) {
               togglePdfText={togglePdfText}
               toggleRegionCapture={toggleRegionCapture}
               toggleOutline={toggleOutline}
-              toggleDocumentSearch={toggleDocumentSearch}
               toggleAnnotations={() => togglePanel("annotations")}
             />
             {source.kind === "pdf" && !showText ? (

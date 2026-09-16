@@ -210,7 +210,6 @@ describe("reader panel slot", () => {
       "连续滚动",
       "解析文本",
       "框选区域交给 AI",
-      "查找原文",
       "我的标注（0）",
     ]);
 
@@ -232,7 +231,6 @@ describe("reader panel slot", () => {
         "100%",
         "放大",
         "资料阅读工具",
-        "查找原文",
         "我的标注（0）",
       ]);
       expect(toolstrip().querySelector(".reader-format")?.textContent, kind).toBe(

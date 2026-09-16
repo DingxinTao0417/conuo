@@ -8,7 +8,6 @@ import {
   Highlighter,
   Minus,
   Plus,
-  Search,
   Settings2,
 } from "lucide-react";
 import type { Source } from "@/lib/types";
@@ -32,7 +31,6 @@ export type ReaderToolstripProps = {
   togglePdfText: () => void;
   toggleRegionCapture: () => void;
   toggleOutline: (trigger: HTMLButtonElement) => void;
-  toggleDocumentSearch: (trigger: HTMLButtonElement) => void;
   toggleAnnotations: () => void;
 };
 
@@ -69,7 +67,6 @@ export default function ReaderToolstrip({
   togglePdfText,
   toggleRegionCapture,
   toggleOutline,
-  toggleDocumentSearch,
   toggleAnnotations,
 }: ReaderToolstripProps) {
   const [toolsExpanded, setToolsExpanded] = useState(false);
@@ -200,16 +197,6 @@ export default function ReaderToolstrip({
             目录
           </button>
         )}
-        <button
-          className="icon-btn"
-          data-reader-search-trigger
-          aria-label="查找原文"
-          aria-controls="reader-find-panel"
-          aria-expanded={activePanel === "find"}
-          onClick={(event) => toggleDocumentSearch(event.currentTarget)}
-        >
-          <Search size={16} />
-        </button>
         <button
           className="icon-btn"
           data-reader-annotation-trigger

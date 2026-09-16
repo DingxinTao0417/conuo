@@ -111,12 +111,8 @@
 .reader-ai-toggle {
   white-space: nowrap;
 }
-.reader-desktop-topbar-tools {
-  display: none;
-}
-.reader-compare-action {
+.reader-find-action {
   flex: 0 0 auto;
-  white-space: nowrap;
 }
 .reader-source-actions {
   position: relative;
@@ -2021,17 +2017,9 @@
   }
 }
 @media (max-width: 1024px) {
-  .reader-compare-action {
-    display: none;
-  }
   .reader-ai-resizer {
     display: none;
     pointer-events: none;
-  }
-}
-@media (min-width: 1025px) and (max-width: 1320px) {
-  .reader-workspace.reader-with-ai .reader-compare-action {
-    display: none;
   }
 }
 @media (min-width: 1025px) {
@@ -2074,15 +2062,9 @@
     padding: 8px 16px;
     gap: 8px;
   }
-  .reader-desktop-topbar-tools {
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 2px;
-  }
-  .reader-document-tools {
-    display: none;
-  }
+  /* Reading position and zoom keep their floating bar at the bottom of the
+     page on desktop, so the strip above the document carries only the tools
+     that used to crowd the top bar. */
   .reader-document-tools .reader-document-page-controls,
   .reader-document-tools .reader-document-zoom-divider,
   .reader-document-tools .reader-document-zoom-controls {
