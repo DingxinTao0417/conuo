@@ -255,9 +255,12 @@ describe("reader document controls and source actions", () => {
 
     expect(compactToolbar?.querySelector(".reader-document-page-controls")).toBeTruthy();
     expect(compactToolbar?.querySelector(".reader-document-zoom-controls")).toBeTruthy();
+    // The reading tool strip owns the name "阅读工具条"; the desktop bottom bar
+    // carries only reading position and zoom, so it says what it holds.
+    expect(compactToolbar?.getAttribute("aria-label")).toBe("阅读工具条");
     expect(bottomBar).toBeTruthy();
     expect(bottomBar?.getAttribute("role")).toBe("group");
-    expect(bottomBar?.getAttribute("aria-label")).toBe("阅读工具条");
+    expect(bottomBar?.getAttribute("aria-label")).toBe("页码与缩放");
     expect(bottomBar?.querySelector('[aria-label="上一页"]')).toBeTruthy();
     expect(bottomBar?.querySelector('[aria-label="下一页"]')).toBeTruthy();
     expect(bottomBar?.querySelector('[aria-label="跳转页码"]')).toBeTruthy();

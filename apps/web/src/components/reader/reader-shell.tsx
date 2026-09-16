@@ -28,8 +28,6 @@ import {
   Minus,
   MapPin,
   Plus,
-  Crop,
-  Search,
   Sparkles,
   StickyNote,
   UserRound,
@@ -113,6 +111,7 @@ import CitationPreviewPanel from "./panels/citation-preview-panel";
 import FindPanel from "./panels/find-panel";
 import MobileCitationPage from "./panels/mobile-citation-page";
 import OutlinePanel from "./panels/outline-panel";
+import ReaderToolstrip from "./reader-toolstrip";
 import ReaderTopbar from "./reader-topbar";
 import {
   clearReaderSearchHighlights,
@@ -1988,6 +1987,15 @@ export default function Reader(props: ReaderProps) {
     setRegionCaptureStart(null);
   }
 
+  function toggleRegionCapture() {
+    if (!regionCaptureActive) {
+      startRegionCapture();
+      return;
+    }
+    cancelRegionCapture();
+    setNotice("");
+  }
+
   function togglePdfText() {
     clearSearchResults();
     cancelRegionCapture();
@@ -2115,8 +2123,7 @@ export default function Reader(props: ReaderProps) {
         toggleOutline={toggleOutline}
         togglePdfText={togglePdfText}
         toggleDocumentSearch={toggleDocumentSearch}
-        startRegionCapture={startRegionCapture}
-        cancelRegionCapture={cancelRegionCapture}
+        toggleRegionCapture={toggleRegionCapture}
         setNotice={setNotice}
         panels={panels}
       />
@@ -2367,141 +2374,26 @@ export default function Reader(props: ReaderProps) {
             ref={textContainer}
             onScroll={saveReadingPosition}
           >
-            <div className="reader-document-tools" data-reader-document-tools>
-              <div
-                className={`reader-tool-group ${
-                  source.kind === "pdf"
-                    ? "reader-document-page-controls"
-                    : "reader-document-structure-controls"
-                }`}
-              >
-                {source.kind === "pdf" ? (
-                  <>
-                    <button
-                      className="icon-btn"
-                      aria-label="上一页"
-                      disabled={page <= 1 || showText}
-                      onClick={() => changePage(page - 1)}
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-                    <label className="reader-page-control">
-                      <input
-                        aria-label="跳转页码"
-                        type="number"
-                        min={1}
-                        max={pages}
-                        value={page}
-                        disabled={showText}
-                        onChange={(event) => changePage(Number(event.target.value))}
-                      />
-                      <span>/ {pages}</span>
-                    </label>
-                    <button
-                      className="icon-btn"
-                      aria-label="下一页"
-                      disabled={page >= pages || showText}
-                      onClick={() => changePage(page + 1)}
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="reader-format">
-                      <FileText size={15} />
-                      {source.kind === "web" ? "网页快照" : source.kind.toUpperCase()}
-                    </span>
-                    {outlineItems.length > 0 && (
-                      <button
-                        type="button"
-                        className="reader-tool-text reader-outline-trigger"
-                        data-reader-outline-trigger
-                        aria-label={`打开资料目录（${outlineItems.length} 项）`}
-                        aria-controls="reader-outline-panel"
-                        aria-expanded={activePanel === "outline"}
-                        onClick={(event) => toggleOutline(event.currentTarget)}
-                      >
-                        目录
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-              <span className="reader-tool-divider reader-document-zoom-divider" />
-              <div className="reader-tool-group reader-document-zoom-controls">
-                <button
-                  className="icon-btn"
-                  aria-label="缩小"
-                  disabled={zoom <= 60}
-                  onClick={() => setZoom(Math.max(60, zoom - 10))}
-                >
-                  <Minus size={15} />
-                </button>
-                <button className="reader-zoom" title="恢复默认缩放" onClick={() => setZoom(100)}>
-                  {zoom}%
-                </button>
-                <button
-                  className="icon-btn"
-                  aria-label="放大"
-                  disabled={zoom >= 200}
-                  onClick={() => setZoom(Math.min(200, zoom + 10))}
-                >
-                  <Plus size={15} />
-                </button>
-              </div>
-              <div className="reader-tool-spacer" />
-              {source.kind === "pdf" && !showText && pdfReadingModeControls()}
-              {source.kind === "pdf" && (
-                <button
-                  className="reader-tool-text"
-                  aria-pressed={showText}
-                  onClick={togglePdfText}
-                >
-                  {showText ? "原始 PDF" : "解析文本"}
-                </button>
-              )}
-              {source.kind === "pdf" && !showText && (
-                <button
-                  type="button"
-                  className="reader-tool-text reader-region-trigger"
-                  data-reader-region-trigger
-                  aria-label={regionCaptureActive ? "取消区域框选" : "框选区域交给 AI"}
-                  aria-pressed={regionCaptureActive}
-                  title={regionStudyBlockedMessage || "区域视觉学习"}
-                  disabled={Boolean(regionStudyBlockedMessage)}
-                  onClick={() => {
-                    if (regionCaptureActive) {
-                      cancelRegionCapture();
-                      setNotice("");
-                    } else startRegionCapture();
-                  }}
-                >
-                  <Crop size={14} aria-hidden="true" />
-                  <span>{regionCaptureActive ? "取消框选" : "区域学习"}</span>
-                </button>
-              )}
-              <button
-                className="icon-btn"
-                data-reader-search-trigger
-                aria-label="查找原文"
-                aria-controls="reader-find-panel"
-                aria-expanded={activePanel === "find"}
-                onClick={(event) => toggleDocumentSearch(event.currentTarget)}
-              >
-                <Search size={16} />
-              </button>
-              <button
-                className="icon-btn"
-                data-reader-annotation-trigger
-                aria-label={`我的标注（${sourceAnnotations.length}）`}
-                aria-controls="reader-annotations-panel"
-                aria-expanded={activePanel === "annotations"}
-                onClick={() => togglePanel("annotations")}
-              >
-                <Highlighter size={16} />
-              </button>
-            </div>
+            <ReaderToolstrip
+              source={source}
+              showText={showText}
+              page={page}
+              pages={pages}
+              zoom={zoom}
+              outlineItems={outlineItems}
+              annotationCount={sourceAnnotations.length}
+              activePanel={activePanel}
+              regionCaptureActive={regionCaptureActive}
+              regionStudyBlockedMessage={regionStudyBlockedMessage}
+              pdfReadingModeControls={pdfReadingModeControls}
+              changePage={changePage}
+              setZoom={setZoom}
+              togglePdfText={togglePdfText}
+              toggleRegionCapture={toggleRegionCapture}
+              toggleOutline={toggleOutline}
+              toggleDocumentSearch={toggleDocumentSearch}
+              toggleAnnotations={() => togglePanel("annotations")}
+            />
             {source.kind === "pdf" && !showText ? (
               <PdfReader
                 key={`${source.id}:${source.versionId}`}
@@ -2675,7 +2567,7 @@ export default function Reader(props: ReaderProps) {
             className="reader-desktop-bottom-controls"
             data-reader-desktop-bottom-controls
             role="group"
-            aria-label="阅读工具条"
+            aria-label="页码与缩放"
           >
             {source.kind === "pdf" && (
               <>

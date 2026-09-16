@@ -61,8 +61,7 @@ export type ReaderTopbarProps = {
   toggleOutline: (trigger: HTMLButtonElement) => void;
   togglePdfText: () => void;
   toggleDocumentSearch: (trigger: HTMLButtonElement) => void;
-  startRegionCapture: () => void;
-  cancelRegionCapture: () => void;
+  toggleRegionCapture: () => void;
   setNotice: (notice: string) => void;
   panels: ReaderPanels;
 };
@@ -72,7 +71,6 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
     aiOpen,
     annotationOpen,
     backLabel,
-    cancelRegionCapture,
     closeAiPanel,
     contextualBackLabel,
     download,
@@ -89,7 +87,6 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
     regionCaptureActive,
     regionStudyBlockedMessage,
     searchOpen,
-    setNotice,
     showText,
     source,
     sourceActions,
@@ -97,10 +94,10 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
     sourceActionsToggle,
     sourceAnnotations,
     space,
-    startRegionCapture,
     toggleDocumentSearch,
     toggleOutline,
     togglePdfText,
+    toggleRegionCapture,
   } = props;
   return (
     <header className="reader-topbar">
@@ -182,12 +179,7 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
             aria-pressed={regionCaptureActive}
             title={regionStudyBlockedMessage || "区域视觉学习"}
             disabled={Boolean(regionStudyBlockedMessage)}
-            onClick={() => {
-              if (regionCaptureActive) {
-                cancelRegionCapture();
-                setNotice("");
-              } else startRegionCapture();
-            }}
+            onClick={toggleRegionCapture}
           >
             <Crop size={16} />
           </button>

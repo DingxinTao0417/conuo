@@ -204,6 +204,25 @@
   align-items: center;
   gap: 2px;
 }
+/* The format-specific half of the strip. It is the part that runs out of room
+   first, so it scrolls sideways instead of wrapping the position and zoom
+   controls out of reach: the narrowest desktop case (a 1025px viewport whose
+   AI panel has taken its minimum 320px) leaves this strip 452px. */
+.reader-toolstrip-tools {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.reader-toolstrip-tools::-webkit-scrollbar {
+  display: none;
+}
+.reader-toolstrip-toggle {
+  display: none;
+}
 .reader-tool-divider {
   height: 18px;
   width: 1px;
@@ -1842,23 +1861,13 @@
   outline: 2px solid #8b7bfa;
   outline-offset: 2px;
 }
-.reader-document-tools:has(.reader-pdf-mode) {
-  flex-wrap: wrap;
-}
-.reader-document-tools > .reader-pdf-mode {
-  order: 2;
-  margin-top: 4px;
-}
 @media (max-width: 1024px) {
-  .reader-document-tools > .reader-pdf-mode {
-    margin-left: auto;
-  }
   .reader-pdf-mode button {
     min-height: 40px;
   }
 }
 @media (max-width: 620px) {
-  .reader-document-tools > .reader-pdf-mode {
+  .reader-toolstrip-tools > .reader-pdf-mode {
     display: none;
   }
   .reader-mobile-pdf-mode {
@@ -2220,6 +2229,42 @@
     width: 100%;
     margin-bottom: 12px;
     box-shadow: none;
+    flex-wrap: wrap;
+  }
+  /* A phone keeps reading position and zoom in place and moves the
+     format-specific tools behind one control, which is what makes the strip
+     fit the 336px of content a 360px phone has. */
+  .reader-toolstrip-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+    min-height: 32px;
+    padding: 4px 9px;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    background: #fff;
+    color: #525252;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .reader-toolstrip-toggle[aria-expanded="true"] {
+    border-color: #cdc5ff;
+    background: #f0eeff;
+    color: #4b3fe3;
+  }
+  .reader-toolstrip-tools {
+    display: none;
+  }
+  .reader-document-tools[data-tools-expanded="true"] .reader-toolstrip-tools {
+    display: flex;
+    flex-basis: 100%;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #f0f0f0;
+    overflow-x: visible;
   }
   .reader-ai-toggle {
     display: none;
