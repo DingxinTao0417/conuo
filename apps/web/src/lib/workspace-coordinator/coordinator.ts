@@ -10,12 +10,8 @@ import {
 } from "../local-store";
 import type { OrganizationInput, OrganizationStatus } from "../organization-runner";
 import type { OrganizationRequest } from "../organization-types";
-import {
-  previewPermanentSourceDeletionContent,
-  type PermanentSourceDeletionSelection,
-} from "../permanent-deletion";
+import type { PermanentSourceDeletionSelection } from "../permanent-deletion";
 import { createEmptyWorkspace } from "../seed";
-import { sameSourcePurgeSelection, sourcePurgeSelectionSchema } from "../source-purge-contract";
 import { getSourceVersion } from "../source-versions";
 import { assertWorkspaceOwner, workspaceSchema } from "../supabase/validation";
 import {
@@ -38,7 +34,6 @@ import {
   errorText,
   exceedsCloudWorkspaceCapacity,
   OriginalSyncError,
-  PurgeLocalPersistenceError,
   workspaceSaveNeedsReadBack,
 } from "./errors";
 import { ImportsController } from "./imports";
@@ -60,11 +55,11 @@ import {
 import {
   mergeOriginalPath,
   originalIdentity,
-  originalKeys,
   OriginalsController,
   pendingFileKeys,
   verifyOriginal,
 } from "./originals";
+import { PurgeController } from "./purge";
 import { QuestionsController } from "./questions";
 import type {
   ImportPipeline,
@@ -125,6 +120,8 @@ export class WorkspaceCoordinator {
   readonly imports = new ImportsController(this);
   /** Original bytes: local reads/writes, cloud download and reference checks. */
   readonly originals = new OriginalsController(this);
+  /** Permanent deletion of a source or one of its historical versions. */
+  readonly purge = new PurgeController(this);
   // Recovery snapshots are intentionally independent from ordinary workspace
   // persistence, but account deletion still has to await them before clearing
   // IndexedDB. Keep only live writes for the owning session.
@@ -1637,380 +1634,6 @@ export class WorkspaceCoordinator {
     return true;
   }
 
-  private assertPurgeReady(session: Session, sourceId: string, token: number): Source {
-    this.assertWorkspaceWritable(session);
-    if (!this.isActive(session) || !session.user || !session.ready || session.token !== token)
-      throw new Error("当前账号已改变，请重新打开回收站后再操作。");
-    if (session.purging) throw new Error("这份资料正在彻底删除，请等待当前操作完成后再继续。");
-    if (
-      session.pumping ||
-      session.checking ||
-      session.localDirty ||
-      session.cloudDirty ||
-      session.blocked ||
-      !session.knownRevision ||
-      !session.confirmedCloud ||
-      !sameData(session.data, session.confirmedCloud)
-    )
-      throw new Error("请等待当前资料同步完成，再查看彻底删除的影响范围。");
-    if (this.aiBusy(token) || this.imports.hasSession(session))
-      throw new Error("请等待当前问答、整理或导入结束后再彻底删除资料。");
-    const source = session.data.sources.find((item) => item.id === sourceId);
-    if (!source?.deletedAt) throw new Error("请先将资料移入回收站，再执行彻底删除。");
-    return source;
-  }
-
-  private assertSourceVersionPurgeReady(
-    session: Session,
-    sourceId: string,
-    versionId: string,
-    token: number,
-  ): { source: Source; version: NonNullable<Source["versions"]>[number] } {
-    this.assertWorkspaceWritable(session);
-    if (!this.isActive(session) || !session.user || !session.ready || session.token !== token)
-      throw new Error("当前账号已改变，请重新打开版本记录后再操作。");
-    if (session.purging) throw new Error("正在清理资料版本，请等待当前操作完成后再继续。");
-    if (
-      session.pumping ||
-      session.checking ||
-      session.localDirty ||
-      session.cloudDirty ||
-      session.blocked ||
-      !session.knownRevision ||
-      !session.confirmedCloud ||
-      !sameData(session.data, session.confirmedCloud)
-    )
-      throw new Error("请等待资料同步完成，再查看历史版本清理的影响范围。");
-    if (this.aiBusy(token) || this.imports.hasSession(session))
-      throw new Error("请等待当前问答、整理或导入结束后再清理历史版本。");
-    const source = session.data.sources.find((item) => item.id === sourceId);
-    if (!source || source.deletedAt) throw new Error("这份资料已不可用，请返回资料库检查。");
-    if (source.versionId === versionId)
-      throw new Error("当前版本不能单独清理，请先恢复其他版本或彻底删除资料。");
-    const versions = source.versions?.filter((item) => item.versionId === versionId) ?? [];
-    if (versions.length !== 1) throw new Error("这个历史版本已改变，请刷新版本记录后重试。");
-    return { source, version: versions[0] };
-  }
-
-  /** The server owns the preview so browser state cannot omit a dependency. */
-  async previewSourcePurge(
-    sourceId: string,
-    token: number,
-    selection?: PermanentSourceDeletionSelection,
-    signal?: AbortSignal,
-  ): Promise<SourcePurgePreview> {
-    const session = this.active;
-    if (!session) throw new Error("当前账号已改变，请重新打开回收站后再操作。");
-    const source = this.assertPurgeReady(session, sourceId, token);
-    if (signal?.aborted) throw new Error("删除范围核对已停止，请重新核对后再确认。");
-    const choices =
-      selection === undefined
-        ? undefined
-        : previewPermanentSourceDeletionContent(session.data, sourceId, selection).selection;
-    if (!this.io.previewSourcePurge)
-      throw new Error("当前云端尚未支持彻底删除，请完成数据库迁移后重试。");
-    const snapshot = session.data;
-    const revision = session.revision;
-    const preview =
-      choices === undefined && signal === undefined
-        ? await this.io.previewSourcePurge(source.id, session.user!.id)
-        : await this.io.previewSourcePurge(source.id, session.user!.id, choices, signal);
-    if (signal?.aborted) throw new Error("删除范围核对已停止，请重新核对后再确认。");
-    if (
-      !this.isActive(session) ||
-      session.data !== snapshot ||
-      session.revision !== revision ||
-      session.purging
-    )
-      throw new Error("资料或账号已改变，请重新查看彻底删除的影响范围。");
-    if (preview.revision !== revision || preview.impact.source.id !== source.id)
-      throw new Error("云端资料已变化，请重新查看彻底删除的影响范围。");
-    if (
-      choices &&
-      (!preview.contentSelection ||
-        !sameSourcePurgeSelection(preview.contentSelection.selection, choices))
-    )
-      throw new Error("云端核对范围与删除选择不一致，请重新查看后再确认。");
-    if (
-      !choices &&
-      preview.contentSelection &&
-      (preview.contentSelection.selection.noteIds.length ||
-        preview.contentSelection.selection.conversationIds.length)
-    )
-      throw new Error("默认预览不能预选另存内容，请重新核对删除范围。");
-    return preview;
-  }
-
-  /**
-   * Do not route this through the regular snapshot pump. The database makes
-   * the metadata change atomically, then this coordinator persists exactly
-   * that returned snapshot before it considers any local original removable.
-   */
-  async purgeSource(sourceId: string, preview: SourcePurgePreview, token: number): Promise<void> {
-    const session = this.active;
-    if (!session) throw new Error("当前账号已改变，请重新打开回收站后再操作。");
-    const source = this.assertPurgeReady(session, sourceId, token);
-    if (!this.io.requestSourcePurge)
-      throw new Error("当前云端尚未支持彻底删除，请完成数据库迁移后重试。");
-    if (preview.revision !== session.revision || preview.impact.source.id !== source.id)
-      throw new Error("删除影响范围已过期，请重新查看后再确认。");
-    if (preview.blockers.annotations.length || preview.blockers.conceptRelations.length)
-      throw new Error("所选范围仍有需要另存或明确删除的批注／手工关系，请先处理后重新核对。");
-    let choices: PermanentSourceDeletionSelection | undefined;
-    if (preview.contentSelection) {
-      const parsed = sourcePurgeSelectionSchema.safeParse(preview.contentSelection.selection);
-      if (!parsed.success) throw new Error("删除选择格式已改变，请重新核对影响范围。");
-      choices = previewPermanentSourceDeletionContent(
-        session.data,
-        sourceId,
-        parsed.data,
-      ).selection;
-    }
-    const userId = session.user!.id;
-    const localKeys = originalKeys(source);
-    session.purging = true;
-    session.ready = false;
-    session.status = "saving";
-    session.error = "";
-    this.remember(session);
-    // A disabled session rejects late import/AI writes while the server holds
-    // its deletion transaction. We only enter this state when no regular pump
-    // or async write is already in flight.
-    this.publish(session);
-    try {
-      const args = [source.id, session.revision, preview.fingerprint, userId] as const;
-      const result = choices
-        ? await this.io.requestSourcePurge(...args, structuredClone(choices))
-        : await this.io.requestSourcePurge(...args);
-      if (!this.isActive(session) || session.user?.id !== userId)
-        throw new Error("账号已改变，云端资料已刷新；请重新打开当前账号的资料库。");
-      if (result.data.sources.some((item) => item.id === source.id))
-        throw new Error("云端彻底删除结果不完整，已暂停同步，请刷新资料库后重试。");
-      if (
-        result.revision <= session.revision ||
-        (choices &&
-          (choices.noteIds.some((id) => result.data.notes.some((note) => note.id === id)) ||
-            choices.conversationIds.some((id) =>
-              result.data.conversations.some((conversation) => conversation.id === id),
-            )))
-      )
-        throw new Error("云端所选内容的删除结果尚未确认，已暂停同步，请刷新资料库后重试。");
-      session.data = result.data;
-      session.confirmedCloud = structuredClone(result.data);
-      session.revision = result.revision;
-      session.knownRevision = true;
-      session.localDirty = true;
-      session.cloudDirty = false;
-      session.blocked = null;
-      session.recovery = null;
-      session.recoveryRevision = null;
-      this.remember(session);
-      try {
-        // Keeping ready=false here prevents a late editor callback from writing
-        // the former source while IndexedDB still contains the old snapshot.
-        await this.persist(session);
-      } catch (cause) {
-        if (!this.isActive(session) || session.user?.id !== userId)
-          throw new PurgeLocalPersistenceError(
-            "账号已改变；云端已完成彻底删除，但原账号新的本机副本未能确认保存：" +
-              errorText(cause) +
-              "。请重新打开原账号核对并重试保存。",
-          );
-        session.purging = false;
-        session.ready = true;
-        session.blocked = "error";
-        session.status = "error";
-        session.error =
-          "云端已完成彻底删除，但新的本地副本尚未保存：" +
-          errorText(cause) +
-          "。已暂停同步，请先重试保存。";
-        this.remember(session);
-        this.publish(session);
-        throw new PurgeLocalPersistenceError(session.error);
-      }
-      if (!this.isActive(session) || session.user?.id !== userId)
-        throw new Error("账号已改变，云端已完成彻底删除；请重新打开原账号查看结果。");
-      session.purging = false;
-      session.ready = true;
-      session.status = "cloud";
-      session.error = result.cleanupPending
-        ? "资料元数据已彻底删除；云端原件正在后台清理。"
-        : "资料已彻底删除。";
-      this.remember(session);
-      this.publish(session);
-      for (const key of localKeys) {
-        if (this.originals.referencesBlob(key) || !this.io.deleteUnreferencedBlob) continue;
-        try {
-          await this.originals.deleteLocalOriginal(session, key);
-        } catch {
-          // The deletion is already durable. A future reference-safe cleanup
-          // may retry; never report a physical local cleanup we cannot prove.
-        }
-        if (!this.isActive(session) || session.user?.id !== userId)
-          throw new Error("账号已改变，云端已完成彻底删除；请重新打开原账号查看结果。");
-      }
-      if (!this.isActive(session) || session.user?.id !== userId)
-        throw new Error("账号已改变，云端已完成彻底删除；请重新打开原账号查看结果。");
-    } catch (cause) {
-      if (!this.isActive(session)) throw cause;
-      // The server has already returned its committed snapshot. Preserve the
-      // more precise local-persistence state instead of downgrading it to an
-      // ambiguous network outcome.
-      if (cause instanceof PurgeLocalPersistenceError) throw cause;
-      session.purging = false;
-      session.ready = true;
-      session.blocked = "error";
-      session.status = "error";
-      session.error =
-        "无法确认云端是否已完成彻底删除，已暂停同步。" +
-        errorText(cause) +
-        " 请刷新资料库后再继续。";
-      this.remember(session);
-      this.publish(session);
-      throw cause;
-    }
-  }
-
-  /**
-   * The server owns the exact dependency preview. A historical version cannot be
-   * removed locally because its normalized chunks and Storage object must follow the
-   * same transaction and cleanup outbox as the browser snapshot.
-   */
-  async previewSourceVersionPurge(
-    sourceId: string,
-    versionId: string,
-    token: number,
-  ): Promise<SourceVersionPurgePreview> {
-    const session = this.active;
-    if (!session) throw new Error("当前账号已改变，请重新打开版本记录后再操作。");
-    const target = this.assertSourceVersionPurgeReady(session, sourceId, versionId, token);
-    if (!this.io.previewSourceVersionPurge)
-      throw new Error("当前云端尚未支持历史版本清理，请完成数据库迁移后重试。");
-    const snapshot = session.data;
-    const revision = session.revision;
-    const preview = await this.io.previewSourceVersionPurge(
-      target.source.id,
-      target.version.versionId,
-      session.user!.id,
-    );
-    if (
-      !this.isActive(session) ||
-      session.data !== snapshot ||
-      session.revision !== revision ||
-      session.purging
-    )
-      throw new Error("资料版本或账号已改变，请重新查看历史版本清理的影响范围。");
-    if (
-      preview.revision !== revision ||
-      preview.impact.source.id !== target.source.id ||
-      preview.impact.version.versionId !== target.version.versionId
-    )
-      throw new Error("云端资料版本已变化，请重新查看历史版本清理的影响范围。");
-    return preview;
-  }
-
-  async purgeSourceVersion(
-    sourceId: string,
-    versionId: string,
-    preview: SourceVersionPurgePreview,
-    token: number,
-  ): Promise<void> {
-    const session = this.active;
-    if (!session) throw new Error("当前账号已改变，请重新打开版本记录后再操作。");
-    const target = this.assertSourceVersionPurgeReady(session, sourceId, versionId, token);
-    if (!this.io.requestSourceVersionPurge)
-      throw new Error("当前云端尚未支持历史版本清理，请完成数据库迁移后重试。");
-    if (
-      preview.revision !== session.revision ||
-      preview.impact.source.id !== target.source.id ||
-      preview.impact.version.versionId !== target.version.versionId
-    )
-      throw new Error("历史版本清理影响范围已过期，请重新查看后再确认。");
-    const userId = session.user!.id;
-    const localKeys = target.version.blobKey ? [target.version.blobKey] : [];
-    session.purging = true;
-    session.ready = false;
-    session.status = "saving";
-    session.error = "";
-    this.remember(session);
-    this.publish(session);
-    try {
-      const result = await this.io.requestSourceVersionPurge(
-        target.source.id,
-        target.version.versionId,
-        session.revision,
-        preview.fingerprint,
-        userId,
-      );
-      if (!this.isActive(session) || session.user?.id !== userId)
-        throw new Error("账号已改变，云端资料已刷新；请重新打开当前账号的资料库。");
-      const source = result.data.sources.find((item) => item.id === target.source.id);
-      if (
-        !source ||
-        source.versionId !== target.source.versionId ||
-        source.versions?.some((item) => item.versionId === target.version.versionId)
-      )
-        throw new Error("云端历史版本清理结果不完整，已暂停同步，请刷新资料库后重试。");
-      session.data = result.data;
-      session.confirmedCloud = structuredClone(result.data);
-      session.revision = result.revision;
-      session.knownRevision = true;
-      session.localDirty = true;
-      session.cloudDirty = false;
-      session.blocked = null;
-      session.recovery = null;
-      session.recoveryRevision = null;
-      this.remember(session);
-      try {
-        await this.persist(session);
-      } catch (cause) {
-        if (!this.isActive(session)) return;
-        session.purging = false;
-        session.ready = true;
-        session.blocked = "error";
-        session.status = "error";
-        session.error =
-          "云端已完成历史版本清理，但新的本地副本尚未保存：" +
-          errorText(cause) +
-          "。已暂停同步，请先重试保存。";
-        this.remember(session);
-        this.publish(session);
-        throw new PurgeLocalPersistenceError(session.error);
-      }
-      if (!this.isActive(session)) return;
-      session.purging = false;
-      session.ready = true;
-      session.status = "cloud";
-      session.error = result.cleanupPending
-        ? "历史版本元数据已清理；云端原件正在后台清理。"
-        : "历史版本已清理。";
-      this.remember(session);
-      this.publish(session);
-      for (const key of localKeys) {
-        if (this.originals.referencesBlob(key) || !this.io.deleteUnreferencedBlob) continue;
-        try {
-          await this.originals.deleteLocalOriginal(session, key);
-        } catch {
-          // The cloud metadata is durable. A later reference-safe cleanup may retry.
-        }
-      }
-    } catch (cause) {
-      if (!this.isActive(session)) throw cause;
-      if (cause instanceof PurgeLocalPersistenceError) throw cause;
-      session.purging = false;
-      session.ready = true;
-      session.blocked = "error";
-      session.status = "error";
-      session.error =
-        "无法确认云端是否已完成历史版本清理，已暂停同步。" +
-        errorText(cause) +
-        " 请刷新资料库后再继续。";
-      this.remember(session);
-      this.publish(session);
-      throw cause;
-    }
-  }
-
   /** Resolves after the added copy is persisted locally; cloud sync keeps its usual status. */
   async restoreBackup(plan: RestorePlan, token: number): Promise<void> {
     const session = this.active;
@@ -3451,6 +3074,36 @@ export class WorkspaceCoordinator {
     this.remember(session);
     this.publish(session);
     await this.pump(session);
+  }
+
+  previewSourcePurge(
+    sourceId: string,
+    token: number,
+    selection?: PermanentSourceDeletionSelection,
+    signal?: AbortSignal,
+  ): Promise<SourcePurgePreview> {
+    return this.purge.previewSourcePurge(sourceId, token, selection, signal);
+  }
+
+  purgeSource(sourceId: string, preview: SourcePurgePreview, token: number): Promise<void> {
+    return this.purge.purgeSource(sourceId, preview, token);
+  }
+
+  previewSourceVersionPurge(
+    sourceId: string,
+    versionId: string,
+    token: number,
+  ): Promise<SourceVersionPurgePreview> {
+    return this.purge.previewSourceVersionPurge(sourceId, versionId, token);
+  }
+
+  purgeSourceVersion(
+    sourceId: string,
+    versionId: string,
+    preview: SourceVersionPurgePreview,
+    token: number,
+  ): Promise<void> {
+    return this.purge.purgeSourceVersion(sourceId, versionId, preview, token);
   }
 
   sourceBlob(
