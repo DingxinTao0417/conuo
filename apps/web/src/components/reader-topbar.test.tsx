@@ -299,12 +299,26 @@ describe("reader document controls and source actions", () => {
     expect(topbar?.querySelector('[aria-label="资料版本记录"]')).toBeNull();
     expect(topbar?.querySelector('[aria-label="替换文件"]')).toBeNull();
     expect(topbar?.querySelector('[aria-label="下载原文件"]')).toBeNull();
-    // Four controls, whatever the format: back, find, Ask AI and more.
-    expect(
-      [...(topbar?.querySelectorAll<HTMLButtonElement>("button") || [])].map(
+    // Four controls, whatever the format: back, find, Ask AI and more. A PDF
+    // used to add four of its own here, so a text source showed the same bar
+    // with holes in it.
+    const controls = () =>
+      [...host.querySelectorAll<HTMLButtonElement>(".reader-topbar button")].map(
         (button) => button.getAttribute("aria-label") || button.textContent?.replace(/\s+/gu, ""),
-      ),
-    ).toEqual(["返回资料库", "查找原文", "更多资料操作", "问AI"]);
+      );
+    expect(controls()).toEqual(["返回资料库", "查找原文", "更多资料操作", "问AI"]);
+
+    const pdf = {
+      ...props.source,
+      id: "topbar-pdf",
+      versionId: "topbar-pdf-version",
+      kind: "pdf" as const,
+      mime: "application/pdf",
+      pageCount: 24,
+    };
+    await render({ source: pdf, sources: [pdf] });
+    expect(controls()).toEqual(["返回资料库", "查找原文", "更多资料操作", "问AI"]);
+    await render({ source: props.source, sources: [props.source] });
 
     const toggle = moreToggle();
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
