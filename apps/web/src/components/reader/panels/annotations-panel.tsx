@@ -20,7 +20,7 @@ export type AnnotationsPanelProps = {
   setEditingAnnotationNote: (note: string) => void;
   setFocusedAnnotationId: (id: string | null) => void;
   setAnnotationFocusEpoch: (epoch: number | ((current: number) => number)) => void;
-  setFocusedCitation: (citation: null) => void;
+  clearCitation: () => void;
   setAiOpen: (open: boolean) => void;
   setMobileTab: (tab: "reading" | "ai" | "citation") => void;
 };
@@ -42,7 +42,7 @@ export default function AnnotationsPanel({
   setEditingAnnotationNote,
   setFocusedAnnotationId,
   setAnnotationFocusEpoch,
-  setFocusedCitation,
+  clearCitation,
   setAiOpen,
   setMobileTab,
 }: AnnotationsPanelProps) {
@@ -68,7 +68,7 @@ export default function AnnotationsPanel({
               aria-label={`定位批注：${markdownQuoteText(source, item.quote).slice(0, 32)}`}
               onClick={() => {
                 if (item.page) changePage(item.page);
-                setFocusedCitation(null);
+                clearCitation();
                 setFocusedAnnotationId(item.id);
                 setAnnotationFocusEpoch((current) => current + 1);
                 setMobileTab("reading");

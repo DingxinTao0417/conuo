@@ -5,15 +5,13 @@ import type { Citation } from "@/lib/types";
 export type CitationPreviewPanelProps = {
   focusedCitation: Citation;
   citationError: string;
-  setFocusedCitation: (citation: Citation | null) => void;
-  setCitationError: (message: string) => void;
+  onClose: () => void;
 };
 
 export default function CitationPreviewPanel({
   focusedCitation,
   citationError,
-  setFocusedCitation,
-  setCitationError,
+  onClose,
 }: CitationPreviewPanelProps) {
   return (
     <div
@@ -30,14 +28,7 @@ export default function CitationPreviewPanel({
         <blockquote>{focusedCitation.quote}</blockquote>
         {citationError && <p>{citationError}</p>}
       </div>
-      <button
-        className="icon-btn"
-        aria-label="关闭引用定位"
-        onClick={() => {
-          setFocusedCitation(null);
-          setCitationError("");
-        }}
-      >
+      <button className="icon-btn" aria-label="关闭引用定位" onClick={onClose}>
         <X size={15} />
       </button>
     </div>

@@ -93,6 +93,7 @@ import {
   maxAiPanelWidthForWorkspace,
 } from "./ai-panel-width";
 import { Markdown, noteEvidenceProblem } from "./answer-markdown";
+import { useReaderPanels } from "./hooks/use-reader-panels";
 import {
   EMPTY_NOTES,
   FOLLOW_UP_PROMPTS,
@@ -234,10 +235,20 @@ export default function Reader(props: ReaderProps) {
     run: runAsk,
   } = askConversation;
   const [notice, setNotice] = useState("");
-  const [webPanel, setWebPanel] = useState<"history" | "refresh" | "replace" | null>(null);
-  const [sourceActionsOpen, setSourceActionsOpen] = useState(false);
-  const [retainedPositionsOpen, setRetainedPositionsOpen] = useState(false);
-  const [annotationOpen, setAnnotationOpen] = useState(false);
+  const panels = useReaderPanels();
+  const {
+    active: activePanel,
+    versionsMode,
+    citation: focusedCitation,
+    citationError,
+    setCitationError,
+    open: openPanel,
+    toggle: togglePanel,
+    close: closePanel,
+    focusCitation,
+    clearCitation,
+    reset: resetPanels,
+  } = panels;
   const [annotationDraft, setAnnotationDraft] = useState<Pick<
     Annotation,
     "quote" | "page" | "textAnchor"
@@ -247,12 +258,8 @@ export default function Reader(props: ReaderProps) {
   const [annotationNote, setAnnotationNote] = useState("");
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [editingAnnotationNote, setEditingAnnotationNote] = useState("");
-  const [outlineOpen, setOutlineOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchResult, setSearchResult] = useState<ReaderSearchResult | null>(null);
-  const [focusedCitation, setFocusedCitation] = useState<Citation | null>(null);
-  const [citationError, setCitationError] = useState("");
   const [excerptKnowledgeTarget, setExcerptKnowledgeTarget] =
     useState<ExcerptKnowledgeTarget | null>(null);
   const [excerptKnowledgePageTargetId, setExcerptKnowledgePageTargetId] = useState("");
@@ -435,8 +442,8 @@ export default function Reader(props: ReaderProps) {
   );
   useEffect(() => () => clearReaderSearchHighlights(), []);
   useEffect(() => {
-    if (searchOpen) searchInput.current?.focus();
-  }, [searchOpen]);
+    if (activePanel === "find") searchInput.current?.focus();
+  }, [activePanel]);
   useEffect(() => {
     if (excerptKnowledgeTarget) excerptSaveDialog.current?.focus();
   }, [excerptKnowledgeTarget]);
@@ -485,7 +492,7 @@ export default function Reader(props: ReaderProps) {
     pendingReadPage.current = null;
     savedReadOffset.current = source.readOffset || 0;
     savedReadPage.current = source.readPage || 1;
-    setFocusedCitation(null);
+    clearCitation();
     setFocusedAnnotationId(null);
     locatedReaderTarget.current = null;
 
@@ -535,29 +542,31 @@ export default function Reader(props: ReaderProps) {
     setAnnotationNote("");
     setEditingAnnotationId(null);
     setEditingAnnotationNote("");
-    setOutlineOpen(false);
-    setSearchOpen(false);
     setSearch("");
     setSearchResult(null);
     clearReaderSearchHighlights();
-    setFocusedCitation(null);
+    resetPanels();
     setFocusedAnnotationId(null);
     setPlainSelectionAnchor(null);
-    setCitationError("");
     setExcerptKnowledgeTarget(null);
     setExcerptKnowledgePageTargetId("");
-    setSourceActionsOpen(false);
-    setRetainedPositionsOpen(false);
-  }, [resetAskConversation, source.id, source.versionId, source.pageCount, source.readPage]);
+  }, [
+    resetPanels,
+    resetAskConversation,
+    source.id,
+    source.versionId,
+    source.pageCount,
+    source.readPage,
+  ]);
 
   useEffect(() => {
-    if (!sourceActionsOpen) return;
+    if (activePanel !== "source-actions") return;
     const closeOnOutsidePress = (event: PointerEvent) => {
-      if (!sourceActions.current?.contains(event.target as Node)) setSourceActionsOpen(false);
+      if (!sourceActions.current?.contains(event.target as Node)) closePanel();
     };
     document.addEventListener("pointerdown", closeOnOutsidePress);
     return () => document.removeEventListener("pointerdown", closeOnOutsidePress);
-  }, [sourceActionsOpen]);
+  }, [activePanel, closePanel]);
 
   useEffect(() => {
     if (historical) return;
@@ -618,8 +627,7 @@ export default function Reader(props: ReaderProps) {
     pendingCitation.current = null;
     const problem = citationProblem(citation, sources);
     // Apply an explicit navigation request after the parent has loaded its exact source.
-    setFocusedCitation(citation);
-    setCitationError(problem || "");
+    focusCitation(citation, problem || "");
     setMobileTab(isPhoneReaderLayout() ? "citation" : "reading");
     if (!problem && citation.page) {
       pageRef.current = citation.page;
@@ -627,7 +635,7 @@ export default function Reader(props: ReaderProps) {
       setPdfNavigationRequest((value) => value + 1);
     }
     if (initialCitation) onCitationConsumed?.();
-  }, [source.id, source.versionId, sources, initialCitation, onCitationConsumed]);
+  }, [focusCitation, source.id, source.versionId, sources, initialCitation, onCitationConsumed]);
 
   useEffect(() => {
     if (mobileTab !== "citation") return;
@@ -844,10 +852,7 @@ export default function Reader(props: ReaderProps) {
 
   function changePage(value: number, preserveCitation = false) {
     setFocusedAnnotationId(null);
-    if (!preserveCitation) {
-      setFocusedCitation(null);
-      setCitationError("");
-    }
+    if (!preserveCitation) clearCitation();
     locatedReaderTarget.current = null;
     const next = Math.max(1, Math.min(value || 1, pages));
     clearSearchResults();
@@ -997,7 +1002,7 @@ export default function Reader(props: ReaderProps) {
   }
 
   function closeRetainedPositions() {
-    setRetainedPositionsOpen(false);
+    closePanel();
     requestAnimationFrame(() => sourceActionsToggle.current?.focus());
   }
 
@@ -1024,7 +1029,7 @@ export default function Reader(props: ReaderProps) {
     clearSearchResults();
     setSelection("");
     setSelectionToolbar(null);
-    setFocusedCitation(null);
+    clearCitation();
     setFocusedAnnotationId(null);
     locatedReaderTarget.current = null;
     if (source.kind === "pdf") {
@@ -1036,7 +1041,7 @@ export default function Reader(props: ReaderProps) {
       setPage(next);
       setPdfNavigationRequest((value) => value + 1);
     }
-    setRetainedPositionsOpen(false);
+    closePanel();
     onSourceChange(patch);
     reportPendingReading(false);
 
@@ -1222,8 +1227,7 @@ export default function Reader(props: ReaderProps) {
     setFocusedAnnotationId(null);
     const problem = citationProblem(citation, sources);
     const phoneLayout = isPhoneReaderLayout();
-    setFocusedCitation(citation);
-    setCitationError(problem || "");
+    focusCitation(citation, problem || "");
     if (problem) {
       if (phoneLayout) setMobileTab("citation");
       return;
@@ -1435,7 +1439,7 @@ export default function Reader(props: ReaderProps) {
       textAnchor: { ...textAnchor },
     });
     setAnnotationNote("");
-    setAnnotationOpen(true);
+    openPanel("annotations");
   }
 
   async function copySelection() {
@@ -1801,23 +1805,23 @@ export default function Reader(props: ReaderProps) {
 
   function closeDocumentSearch() {
     clearSearchResults();
-    setSearchOpen(false);
+    closePanel();
     visibleReaderTool("[data-reader-search-trigger]", searchToggle.current)?.focus();
   }
 
   function toggleDocumentSearch(trigger: HTMLButtonElement) {
     searchToggle.current = trigger;
-    if (searchOpen) closeDocumentSearch();
-    else setSearchOpen(true);
+    if (activePanel === "find") closeDocumentSearch();
+    else openPanel("find");
   }
 
   function toggleOutline(trigger: HTMLButtonElement) {
     outlineToggle.current = trigger;
-    setOutlineOpen((current) => !current);
+    togglePanel("outline");
   }
 
   function closeOutline() {
-    setOutlineOpen(false);
+    closePanel();
     visibleReaderTool("[data-reader-outline-trigger]", outlineToggle.current)?.focus();
   }
 
@@ -1890,7 +1894,7 @@ export default function Reader(props: ReaderProps) {
     }
     if (target) {
       target.scrollIntoView({ behavior: "smooth", block: "center" });
-      setOutlineOpen(false);
+      closePanel();
       setSelection("");
       setSelectionToolbar(null);
       target.tabIndex = -1;
@@ -1907,7 +1911,7 @@ export default function Reader(props: ReaderProps) {
       return;
     }
     range.startContainer.parentElement?.scrollIntoView({ behavior: "smooth", block: "center" });
-    setOutlineOpen(false);
+    closePanel();
     setSelection("");
     setSelectionToolbar(null);
     const rangeTarget = range.startContainer.parentElement;
@@ -2037,9 +2041,9 @@ export default function Reader(props: ReaderProps) {
       return;
     }
     clearSearchResults();
-    setOutlineOpen(false);
-    setSearchOpen(false);
-    setAnnotationOpen(false);
+    // Framing takes over pointer handling inside the page, so no drawer may
+    // stay on top of the area the learner is about to select.
+    closePanel();
     setSelection("");
     setSelectionToolbar(null);
     setRegionCapture(null);
@@ -2089,12 +2093,12 @@ export default function Reader(props: ReaderProps) {
         mobileTab={mobileTab}
         aiOpen={aiOpen}
         showText={showText}
-        outlineOpen={outlineOpen}
+        outlineOpen={activePanel === "outline"}
         outlineItems={outlineItems}
-        searchOpen={searchOpen}
-        annotationOpen={annotationOpen}
+        searchOpen={activePanel === "find"}
+        annotationOpen={activePanel === "annotations"}
         sourceAnnotations={sourceAnnotations}
-        sourceActionsOpen={sourceActionsOpen}
+        sourceActionsOpen={activePanel === "source-actions"}
         sourceActions={sourceActions}
         sourceActionsToggle={sourceActionsToggle}
         regionCaptureActive={regionCaptureActive}
@@ -2114,10 +2118,7 @@ export default function Reader(props: ReaderProps) {
         startRegionCapture={startRegionCapture}
         cancelRegionCapture={cancelRegionCapture}
         setNotice={setNotice}
-        setAnnotationOpen={setAnnotationOpen}
-        setRetainedPositionsOpen={setRetainedPositionsOpen}
-        setSourceActionsOpen={setSourceActionsOpen}
-        setWebPanel={setWebPanel}
+        panels={panels}
       />
       <div className="reader-mobile-tabs" role="tablist" aria-label="阅读工作区">
         <button
@@ -2180,31 +2181,31 @@ export default function Reader(props: ReaderProps) {
       )}
       <div className="reader-body">
         <section id="reader-document-pane" className="reader-document" aria-label="资料阅读区">
-          {webPanel && (
+          {versionsMode && (
             <WebVersionPanel
-              key={`${source.id}:${source.versionId}:${webPanel}`}
+              key={`${source.id}:${source.versionId}:${versionsMode}`}
               source={liveSource}
               displayedVersionId={source.versionId}
               spaceId={space.id}
               cloudUserId={props.cloudUserId}
-              initialMode={webPanel}
+              initialMode={versionsMode}
               onOpenSource={onOpenSource}
               onRefreshWeb={props.onRefreshWeb}
               onReplaceFile={props.onReplaceFile}
               onRestoreVersion={props.onRestoreVersion}
               onPreviewRemoveVersion={props.onPreviewRemoveVersion}
               onRemoveVersion={props.onRemoveVersion}
-              onClose={() => setWebPanel(null)}
+              onClose={closePanel}
             />
           )}
-          {outlineOpen && outlineItems.length > 0 && (
+          {activePanel === "outline" && outlineItems.length > 0 && (
             <OutlinePanel
               outlineItems={outlineItems}
               closeOutline={closeOutline}
               jumpToOutlineItem={jumpToOutlineItem}
             />
           )}
-          {searchOpen && (
+          {activePanel === "find" && (
             <FindPanel
               search={search}
               searchResult={searchResult}
@@ -2217,12 +2218,11 @@ export default function Reader(props: ReaderProps) {
               findInDocument={findInDocument}
             />
           )}
-          {focusedCitation && (
+          {activePanel === "citation" && focusedCitation && (
             <CitationPreviewPanel
               focusedCitation={focusedCitation}
               citationError={citationError}
-              setFocusedCitation={setFocusedCitation}
-              setCitationError={setCitationError}
+              onClose={clearCitation}
             />
           )}
           {selection && selectionToolbar && (
@@ -2328,7 +2328,7 @@ export default function Reader(props: ReaderProps) {
               </div>
             </form>
           )}
-          {annotationOpen && (
+          {activePanel === "annotations" && (
             <AnnotationsPanel
               sourceAnnotations={sourceAnnotations}
               source={source}
@@ -2346,7 +2346,7 @@ export default function Reader(props: ReaderProps) {
               setEditingAnnotationNote={setEditingAnnotationNote}
               setFocusedAnnotationId={setFocusedAnnotationId}
               setAnnotationFocusEpoch={setAnnotationFocusEpoch}
-              setFocusedCitation={setFocusedCitation}
+              clearCitation={clearCitation}
               setAiOpen={setAiOpen}
               setMobileTab={setMobileTab}
             />
@@ -2419,7 +2419,7 @@ export default function Reader(props: ReaderProps) {
                         data-reader-outline-trigger
                         aria-label={`打开资料目录（${outlineItems.length} 项）`}
                         aria-controls="reader-outline-panel"
-                        aria-expanded={outlineOpen}
+                        aria-expanded={activePanel === "outline"}
                         onClick={(event) => toggleOutline(event.currentTarget)}
                       >
                         目录
@@ -2486,7 +2486,7 @@ export default function Reader(props: ReaderProps) {
                 data-reader-search-trigger
                 aria-label="查找原文"
                 aria-controls="reader-find-panel"
-                aria-expanded={searchOpen}
+                aria-expanded={activePanel === "find"}
                 onClick={(event) => toggleDocumentSearch(event.currentTarget)}
               >
                 <Search size={16} />
@@ -2496,8 +2496,8 @@ export default function Reader(props: ReaderProps) {
                 data-reader-annotation-trigger
                 aria-label={`我的标注（${sourceAnnotations.length}）`}
                 aria-controls="reader-annotations-panel"
-                aria-expanded={annotationOpen}
-                onClick={() => setAnnotationOpen(!annotationOpen)}
+                aria-expanded={activePanel === "annotations"}
+                onClick={() => togglePanel("annotations")}
               >
                 <Highlighter size={16} />
               </button>
@@ -3077,7 +3077,7 @@ export default function Reader(props: ReaderProps) {
           </button>
         )}
       </nav>
-      {retainedPositionsOpen && (source.readingPositionAlternatives?.length ?? 0) > 0 && (
+      {activePanel === "positions" && (source.readingPositionAlternatives?.length ?? 0) > 0 && (
         <Modal title="已保留阅读位置" onClose={closeRetainedPositions} wide>
           <div className="modal-body sync-conflict-modal">
             <p className="sync-conflict-intro">

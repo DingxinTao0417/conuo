@@ -24,6 +24,7 @@ import type { Annotation, SaveState, Source, Space } from "@/lib/types";
 import type { ReaderOutlineItem } from "../reader-outline";
 import { sourcePresentationStatus } from "@/lib/source-coverage";
 import { sourceStatusLabel } from "./reader-constants";
+import type { ReaderPanels } from "./hooks/use-reader-panels";
 import type { ReaderProps } from "./reader-types";
 
 export type ReaderTopbarProps = {
@@ -63,10 +64,7 @@ export type ReaderTopbarProps = {
   startRegionCapture: () => void;
   cancelRegionCapture: () => void;
   setNotice: (notice: string) => void;
-  setAnnotationOpen: (open: boolean) => void;
-  setRetainedPositionsOpen: (open: boolean) => void;
-  setSourceActionsOpen: (open: boolean | ((current: boolean) => boolean)) => void;
-  setWebPanel: (panel: "history" | "refresh" | "replace" | null) => void;
+  panels: ReaderPanels;
 };
 
 export default function ReaderTopbar(props: ReaderTopbarProps) {
@@ -86,15 +84,12 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
     openAiPanel,
     outlineItems,
     outlineOpen,
+    panels,
     pdfReadingModeControls,
     regionCaptureActive,
     regionStudyBlockedMessage,
     searchOpen,
-    setAnnotationOpen,
     setNotice,
-    setRetainedPositionsOpen,
-    setSourceActionsOpen,
-    setWebPanel,
     showText,
     source,
     sourceActions,
@@ -217,7 +212,7 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
           aria-controls="reader-annotations-panel"
           aria-expanded={annotationOpen}
           title="我的标注"
-          onClick={() => setAnnotationOpen(!annotationOpen)}
+          onClick={() => panels.toggle("annotations")}
         >
           <Highlighter size={16} />
         </button>
@@ -231,11 +226,11 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
           aria-controls="reader-source-actions-menu"
           aria-expanded={sourceActionsOpen}
           title="更多资料操作"
-          onClick={() => setSourceActionsOpen((open) => !open)}
+          onClick={() => panels.toggle("source-actions")}
           onKeyDown={(event) => {
             if (event.key !== "Escape" || !sourceActionsOpen) return;
             event.preventDefault();
-            setSourceActionsOpen(false);
+            panels.close();
           }}
         >
           <MoreHorizontal size={18} />
@@ -249,17 +244,14 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
             onKeyDown={(event) => {
               if (event.key !== "Escape") return;
               event.preventDefault();
-              setSourceActionsOpen(false);
+              panels.close();
               sourceActionsToggle.current?.focus();
             }}
           >
             <button
               type="button"
               className="reader-source-action-item"
-              onClick={() => {
-                setSourceActionsOpen(false);
-                setWebPanel("history");
-              }}
+              onClick={() => panels.openVersions("history")}
             >
               <History size={16} aria-hidden="true" />
               {source.kind === "web" ? "网页版本记录" : "资料版本记录"}
@@ -269,10 +261,7 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
                 type="button"
                 className="reader-source-action-item"
                 aria-label="已保留阅读位置"
-                onClick={() => {
-                  setSourceActionsOpen(false);
-                  setRetainedPositionsOpen(true);
-                }}
+                onClick={() => panels.open("positions")}
               >
                 <MapPin size={16} aria-hidden="true" />
                 已保留阅读位置（{source.readingPositionAlternatives?.length}）
@@ -282,10 +271,7 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
               <button
                 type="button"
                 className="reader-source-action-item"
-                onClick={() => {
-                  setSourceActionsOpen(false);
-                  setWebPanel("refresh");
-                }}
+                onClick={() => panels.openVersions("refresh")}
               >
                 <RotateCcw size={16} aria-hidden="true" />
                 刷新网页
@@ -295,10 +281,7 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
               <button
                 type="button"
                 className="reader-source-action-item"
-                onClick={() => {
-                  setSourceActionsOpen(false);
-                  setWebPanel("replace");
-                }}
+                onClick={() => panels.openVersions("replace")}
               >
                 <FileUp size={16} aria-hidden="true" />
                 替换文件
@@ -308,7 +291,7 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
               type="button"
               className="reader-source-action-item"
               onClick={() => {
-                setSourceActionsOpen(false);
+                panels.close();
                 void download();
               }}
             >
