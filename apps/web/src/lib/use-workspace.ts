@@ -1,6 +1,5 @@
 "use client";
 import { isAccountDeletionPendingError } from "./account-deletion";
-import { subscribeConfirmedAccountDeletions } from "./account-deletion-observer";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type {
   AnswerNoteEvidence,
@@ -16,49 +15,12 @@ import type {
   SourceVersionPurgePreview,
 } from "./cloud";
 import { createEmptyWorkspace } from "./seed";
-import { webSessionStore } from "./web-session-store";
 import {
-  commitLocalImport,
-  getBlob,
-  loadLocalWorkspaceRecord,
-  saveLocalWorkspace,
-  subscribeLocalWorkspaceCommits,
-  putBlobIfAbsent,
-  deleteUnreferencedBlob,
-  clearAccountLocalCache,
   LocalAccountDeletedError,
-  isAccountLocallyDeleted,
-  markAccountLocalDeletion,
-  subscribeLocalAccountDeletions,
-  shareAnonymousOriginals,
   type LocalWorkspaceCommitEvent,
   type StoredLocalWorkspace,
 } from "./local-store";
-import {
-  askCloud,
-  cancelOrganizationJob as cancelOrganizationJobCloud,
-  cancelImportParse,
-  claimImportParse,
-  downloadSourceBlob,
-  enqueueOrganizationJob as enqueueOrganizationJobCloud,
-  finishImportParse,
-  heartbeatImportParse,
-  isCloudConfigured,
-  loadCloudWorkspace,
-  loadCloudWorkspaceRevision,
-  getModelStatus,
-  organizeCloud,
-  previewSourcePurge as previewSourcePurgeCloud,
-  previewSourceVersionPurge as previewSourceVersionPurgeCloud,
-  requestSourcePurge as requestSourcePurgeCloud,
-  requestSourceVersionPurge as requestSourceVersionPurgeCloud,
-  reconcileOrganizationJobs as reconcileOrganizationJobsCloud,
-  releaseImportParse,
-  retryImportParse,
-  saveCloudWorkspace,
-  subscribeSession,
-  uploadSourceBlob,
-} from "./cloud";
+import { isCloudConfigured, subscribeSession } from "./cloud";
 import {
   resolveAnswerNoteEvidence,
   retrieveEvidence,
@@ -69,9 +31,8 @@ import {
 import { answerStreamEventSchema, streamedAnswerSchema } from "./answer-stream";
 import type { OnAnswerProgress } from "./answer-stream-types";
 import { getSourceVersion, replaceFileSource } from "./source-versions";
-import { parseImportSource, prepareImportFile } from "./import";
 import { assessImportQuota } from "./import-quota";
-import { assertWorkspaceOwner, MAX_WORKSPACE_BYTES, workspaceSchema } from "./supabase/validation";
+import { assertWorkspaceOwner, workspaceSchema } from "./supabase/validation";
 import { startForegroundCloudUpdateChecks } from "./foreground-cloud-updates";
 import {
   previewPermanentSourceDeletionContent,
@@ -140,6 +101,32 @@ import {
   sameDataOutsideNotes,
   withoutAnonymousCloudPaths,
 } from "./workspace-coordinator/merge";
+import {
+  BackupRestoreContextError,
+  conflictError,
+  conflictRecordId,
+  errorText,
+  exceedsCloudWorkspaceCapacity,
+  OriginalSyncError,
+  PurgeLocalPersistenceError,
+  workspaceSaveNeedsReadBack,
+} from "./workspace-coordinator/errors";
+import {
+  accountKey,
+  createWebCloudWorkspaceIO,
+  defaultImportPipeline,
+  defaultIO,
+  unpack,
+} from "./workspace-coordinator/io";
+import {
+  mergeOriginalPath,
+  originalIdentity,
+  originalKeys,
+  pendingFileKeys,
+  verifyOriginal,
+} from "./workspace-coordinator/originals";
+
+export { createWebCloudWorkspaceIO } from "./workspace-coordinator/io";
 import type {
   AtomicPreparedImportResult,
   ImportPipeline,
@@ -219,163 +206,6 @@ function reconcileDurableOrganizationProjections(
   return changed ? { ...local, organizationJobs: jobs } : local;
 }
 
-const defaultImportPipeline: ImportPipeline = {
-  prepare: prepareImportFile,
-  parse: parseImportSource,
-};
-
-function parseSyncMeta(value: unknown): SyncMeta | null {
-  if (
-    !value ||
-    typeof value !== "object" ||
-    !("revision" in value) ||
-    !Number.isSafeInteger(value.revision) ||
-    Number(value.revision) < 0 ||
-    !("dirty" in value) ||
-    typeof value.dirty !== "boolean"
-  )
-    return null;
-
-  const revision = Number(value.revision);
-  const meta: SyncMeta = { revision, dirty: value.dirty };
-  if (
-    value.dirty &&
-    "baseRevision" in value &&
-    value.baseRevision === revision &&
-    "base" in value
-  ) {
-    const parsed = workspaceSchema.safeParse(value.base);
-    if (parsed.success) {
-      meta.baseRevision = revision;
-      meta.base = parsed.data;
-    }
-  }
-  return meta;
-}
-function readLegacyMeta(id: string): SyncMeta | null {
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem("conuo.sync." + id) || "null");
-    return parseSyncMeta(value);
-  } catch {
-    return null;
-  }
-}
-const defaultIO: WorkspaceIO = {
-  // Keep these adapters lazy so focused tests can provide a smaller
-  // local-store module mock while injecting their own WorkspaceIO.
-  loadLocal: (accountId) => loadLocalWorkspaceRecord(accountId),
-  saveLocal: saveLocalWorkspace,
-  commitLocalImport: (accountId, blobKey, blob, merge) =>
-    commitLocalImport(accountId, blobKey, blob, merge),
-  subscribeLocalCommits: subscribeLocalWorkspaceCommits,
-  loadCloud: loadCloudWorkspace,
-  loadCloudRevision: (accountId, signal) => loadCloudWorkspaceRevision(accountId, signal),
-  saveCloud: saveCloudWorkspace,
-  getBlob,
-  getAccountBlob: (key, accountId) => getBlob(key, accountId),
-  putBlobIfAbsent: (key, blob) => putBlobIfAbsent(key, blob),
-  putAccountBlobIfAbsent: (key, blob, accountId) => putBlobIfAbsent(key, blob, accountId),
-  shareAnonymousOriginals: (accountId, keys) => shareAnonymousOriginals(accountId, keys),
-  deleteUnreferencedBlob: (key) => deleteUnreferencedBlob(key),
-  deleteAccountUnreferencedBlob: (key, accountId) => deleteUnreferencedBlob(key, accountId),
-  clearAccountLocalCache: (accountId) => clearAccountLocalCache(accountId),
-  isAccountLocallyDeleted: (accountId) => isAccountLocallyDeleted(accountId),
-  markAccountLocalDeletion: (accountId) => markAccountLocalDeletion(accountId),
-  subscribeLocalAccountDeletions: (accountId, listener) =>
-    subscribeLocalAccountDeletions(accountId, listener),
-  subscribeConfirmedAccountDeletions: (listener) => subscribeConfirmedAccountDeletions(listener),
-  uploadBlob: uploadSourceBlob,
-  downloadBlob: downloadSourceBlob,
-  previewSourcePurge: previewSourcePurgeCloud,
-  requestSourcePurge: requestSourcePurgeCloud,
-  previewSourceVersionPurge: previewSourceVersionPurgeCloud,
-  requestSourceVersionPurge: requestSourceVersionPurgeCloud,
-  claimImportParse,
-  heartbeatImportParse,
-  releaseImportParse,
-  finishImportParse,
-  cancelImportParse,
-  retryImportParse,
-  enqueueOrganizationJob: enqueueOrganizationJobCloud,
-  cancelOrganizationJob: cancelOrganizationJobCloud,
-  reconcileOrganizationJobs: reconcileOrganizationJobsCloud,
-  askCloud,
-  organizeCloud,
-  getModelStatus,
-  readLegacyMeta,
-};
-/** Web business data is durable only after the existing cloud queue acknowledges it. */
-export function createWebCloudWorkspaceIO(): WorkspaceIO {
-  return {
-    ...defaultIO,
-    beginSession: webSessionStore.beginSession,
-    clearSession: webSessionStore.clearSession,
-    loadLocal: webSessionStore.loadLocal,
-    saveLocal: webSessionStore.saveLocal,
-    commitLocalImport: webSessionStore.commitLocalImport,
-    subscribeLocalCommits: undefined,
-    getBlob: webSessionStore.getBlob,
-    getAccountBlob: webSessionStore.getBlob,
-    putBlobIfAbsent: webSessionStore.putBlobIfAbsent,
-    putAccountBlobIfAbsent: webSessionStore.putBlobIfAbsent,
-    deleteUnreferencedBlob: webSessionStore.deleteUnreferencedBlob,
-    deleteAccountUnreferencedBlob: webSessionStore.deleteUnreferencedBlob,
-    shareAnonymousOriginals: undefined,
-    clearAccountLocalCache: webSessionStore.clearAccountLocalCache,
-    isAccountLocallyDeleted: webSessionStore.isAccountLocallyDeleted,
-    markAccountLocalDeletion: webSessionStore.markAccountLocalDeletion,
-    subscribeLocalAccountDeletions: webSessionStore.subscribeLocalAccountDeletions,
-    readLegacyMeta: () => null,
-  };
-}
-const accountKey = (user: User | null) => user?.id || "local";
-function unpack(stored: WorkspaceData | null): {
-  data: WorkspaceData | null;
-  meta: SyncMeta | null;
-  localRevision: number;
-} {
-  if (!stored) return { data: null, meta: null, localRevision: 0 };
-  const { _conuoSync, _conuoLocalRevision, ...data } = stored as StoredWorkspace;
-  const localRevision =
-    Number.isSafeInteger(_conuoLocalRevision) && Number(_conuoLocalRevision) >= 0
-      ? Number(_conuoLocalRevision)
-      : 0;
-  return { data, meta: parseSyncMeta(_conuoSync), localRevision };
-}
-function conflictRecordId(prefix: string): string {
-  const uuid = globalThis.crypto?.randomUUID?.();
-  return `${prefix}:${uuid || `${Date.now()}:${Math.random().toString(36).slice(2)}`}`;
-}
-function errorText(cause: unknown): string {
-  return cause instanceof Error ? cause.message : "保存失败，请重试。";
-}
-function exceedsCloudWorkspaceCapacity(data: WorkspaceData): boolean {
-  return new TextEncoder().encode(JSON.stringify(data)).byteLength > MAX_WORKSPACE_BYTES;
-}
-function conflictError(cause: unknown): boolean {
-  if (cause instanceof OriginalSyncError) return false;
-  if (cause && typeof cause === "object" && "status" in cause && cause.status === 409) return true;
-  return /409|conflict|冲突|版本/i.test(errorText(cause));
-}
-
-/**
- * A response that explicitly rejects the write before it can commit does not
- * need an immediate read-back. Transport failures, server failures and an
- * invalid success body can all hide a committed transaction, so they do.
- */
-function workspaceSaveNeedsReadBack(cause: unknown): boolean {
-  if (cause instanceof OriginalSyncError) return false;
-  if (!cause || typeof cause !== "object") return !conflictError(cause);
-  const status = "status" in cause && typeof cause.status === "number" ? cause.status : null;
-  const code = "code" in cause && typeof cause.code === "string" ? cause.code : "";
-  if (status === 409 || code === "REVISION_CONFLICT" || code === "40001") return false;
-  if (code === "WORKSPACE_BUSY") return false;
-  if (status === null && !code) return !conflictError(cause);
-  return status === null || status === 0 || status >= 500;
-}
-
-// Shared across coordinators in this page; IndexedDB's atomic add handles other tabs.
-const pendingFileKeys = new Set<string>();
 // SHA-256 identity is the user-visible duplicate rule. Serialize only the
 // short reservation/persistence transaction so two simultaneous file picks
 // cannot both miss the same existing source before either one is published.
@@ -419,70 +249,6 @@ async function withImportAccountReservation<T>(
     if (importAccountQueues.get(accountId) === current) importAccountQueues.delete(accountId);
   }
 }
-class OriginalSyncError extends Error {}
-class BackupRestoreContextError extends Error {}
-class PurgeLocalPersistenceError extends Error {}
-function originalIdentity(source: Pick<Source, "kind" | "blobKey" | "hash" | "size">): string {
-  return JSON.stringify([source.kind, source.blobKey, source.hash, source.size]);
-}
-async function verifyOriginal(source: Pick<Source, "hash" | "size">, blob: Blob): Promise<void> {
-  if (source.size !== blob.size || !/^[a-f0-9]{64}$/i.test(source.hash))
-    throw new OriginalSyncError(
-      "原文件大小或内容指纹与已解析版本不符，尚未上传或替换，请重新选择文件。",
-    );
-  const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
-  const actual = Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-  if (actual !== source.hash.toLowerCase())
-    throw new OriginalSyncError("原文件内容与已解析版本不符，尚未上传或替换，请重新选择文件。");
-}
-
-/** A completed upload follows its original into history, never another version or changed file. */
-function mergeOriginalPath(
-  data: WorkspaceData,
-  uploaded: Source,
-  storagePath: string,
-): WorkspaceData {
-  const live = data.sources.find((source) => source.id === uploaded.id);
-  if (!live) return data;
-  const current = getSourceVersion(live, uploaded.versionId);
-  if (!current) return data;
-  if (
-    originalIdentity(current) !== originalIdentity(uploaded) ||
-    (current.storagePath && current.storagePath !== storagePath)
-  )
-    throw new OriginalSyncError(
-      "上传期间原件记录已变化，未将上传结果绑定到其他内容。请检查资料并重试。",
-    );
-  if (current.storagePath === storagePath) return data;
-  return {
-    ...data,
-    sources: data.sources.map((source) =>
-      source.id !== uploaded.id
-        ? source
-        : source.versionId === uploaded.versionId
-          ? { ...source, storagePath }
-          : {
-              ...source,
-              versions: source.versions!.map((version) =>
-                version.versionId === uploaded.versionId ? { ...version, storagePath } : version,
-              ),
-            },
-    ),
-  };
-}
-
-function originalKeys(source: Source): string[] {
-  return [
-    ...new Set(
-      [source, ...(source.versions ?? [])].flatMap((version) =>
-        version.blobKey ? [version.blobKey] : [],
-      ),
-    ),
-  ];
-}
-
 /**
  * Account-scoped save coordinator. React callbacks carry an activation token,
  * so an upload/edit callback from a previous account cannot edit a new account.
