@@ -348,7 +348,15 @@ export class PurgeController {
       try {
         await this.core.persist(session);
       } catch (cause) {
-        if (!this.core.isActive(session)) return;
+        // Report the unconfirmed local copy even when the account moved on, the
+        // way a full source purge does. Returning quietly here would resolve as
+        // success and hide that this account still has to retry its save.
+        if (!this.core.isActive(session) || session.user?.id !== userId)
+          throw new PurgeLocalPersistenceError(
+            "账号已改变；云端已完成历史版本清理，但原账号新的本机副本未能确认保存：" +
+              errorText(cause) +
+              "。请重新打开原账号核对并重试保存。",
+          );
         session.purging = false;
         session.ready = true;
         session.blocked = "error";
@@ -361,7 +369,8 @@ export class PurgeController {
         this.core.publish(session);
         throw new PurgeLocalPersistenceError(session.error);
       }
-      if (!this.core.isActive(session)) return;
+      if (!this.core.isActive(session) || session.user?.id !== userId)
+        throw new Error("账号已改变，云端已完成历史版本清理；请重新打开原账号查看结果。");
       session.purging = false;
       session.ready = true;
       session.status = "cloud";

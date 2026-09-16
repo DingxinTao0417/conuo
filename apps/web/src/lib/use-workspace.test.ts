@@ -5929,6 +5929,83 @@ describe("server-coordinated permanent source purge", () => {
     expect(io.deleteUnreferencedBlob).toHaveBeenCalledWith(historical.blobKey);
     expect(blobs.has(historical.blobKey)).toBe(false);
   });
+
+  it.each(["resolve", "reject"] as const)(
+    "reports an unconfirmed local copy when accounts switch while a version purge saves (%s)",
+    async (settlement) => {
+      const { coordinator, io, disk, remote, blobs } = setup();
+      const workspace = createDemoWorkspace();
+      const live = workspace.sources[0];
+      const historical = {
+        versionId: "version-old",
+        title: live.title,
+        filename: "old.txt",
+        kind: live.kind,
+        mime: live.mime,
+        size: live.size,
+        hash: live.hash,
+        status: live.status,
+        text: live.text,
+        chunks: live.chunks.map((chunk) => ({ ...chunk, versionId: "version-old" })),
+        createdAt: "2026-09-13T12:00:00.000Z",
+        archivedAt: "2026-09-13T13:00:00.000Z",
+        blobKey: "version-switch-original",
+        storagePath: "A/version-old/source.txt",
+      } as const;
+      workspace.sources[0] = { ...live, versions: [historical] };
+      remote.set(accountA.id, { data: structuredClone(workspace), revision: 5 });
+      remote.set(accountB.id, { data: workspaceWithNote("B", "B_PRIVATE_TEXT"), revision: 1 });
+      blobs.set(historical.blobKey, new Blob(["historical original"]));
+      await coordinator.activate(accountA);
+      const confirmed = versionPreview(live.id, historical.versionId, 5);
+      vi.mocked(io.requestSourceVersionPurge!).mockImplementation(async () => {
+        const data = structuredClone(workspace);
+        data.sources[0].versions = [];
+        remote.set(accountA.id, { data, revision: 6 });
+        return { data, revision: 6, purgeId: "version-switch", cleanupPending: false };
+      });
+      const localWrite = deferred<void>();
+      const started = deferred<void>();
+      const saveLocal = io.saveLocal;
+      io.saveLocal = vi.fn(async (snapshot, id, expectedRevision) => {
+        if (id === accountA.id) {
+          started.resolve();
+          await localWrite.promise;
+        }
+        return saveLocal(snapshot, id, expectedRevision);
+      });
+
+      const outcome = coordinator
+        .purgeSourceVersion(
+          live.id,
+          historical.versionId,
+          confirmed,
+          coordinator.getSnapshot().token,
+        )
+        .then(
+          () => ({ error: null }),
+          (error: unknown) => ({ error }),
+        );
+      await started.promise;
+      await coordinator.activate(accountB);
+      const activeB = structuredClone(coordinator.getSnapshot());
+      if (settlement === "resolve") localWrite.resolve();
+      else localWrite.reject(new Error("A local save failed"));
+
+      // Resolving quietly would read as a confirmed cleanup, while this account
+      // still has to verify or retry its own local copy. A full source purge
+      // already reports this; both purge paths must agree.
+      const completed = await outcome;
+      expect(completed.error).toBeInstanceOf(Error);
+      expect((completed.error as Error).message).toContain("账号已改变");
+      expect((completed.error as Error).message).toContain("历史版本清理");
+      expect(coordinator.getSnapshot()).toEqual(activeB);
+      expect(disk.get(accountB.id)?.notes[0].content).toBe("B_PRIVATE_TEXT");
+      expect(io.deleteUnreferencedBlob).not.toHaveBeenCalled();
+      expect(blobs.has(historical.blobKey)).toBe(true);
+      io.saveLocal = saveLocal;
+    },
+  );
 });
 
 function durableRequest(data: WorkspaceData, id: string): DurableOrganizationRequest {
