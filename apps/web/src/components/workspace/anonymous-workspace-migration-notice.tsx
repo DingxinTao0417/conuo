@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { ChevronRight, FolderOpen } from "lucide-react";
 import type { AnonymousWorkspaceMigrationState } from "@/lib/use-workspace";
+import "./anonymous-workspace-migration-notice.css";
 
 export default function AnonymousWorkspaceMigrationNotice({
   migration,
