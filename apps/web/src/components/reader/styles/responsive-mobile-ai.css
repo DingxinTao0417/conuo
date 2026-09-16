@@ -1,0 +1,189 @@
+@media (max-width: 620px) {
+  .reader-workspace.reader-mobile-android .reader-topbar {
+    min-height: 52px;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .reader-workspace.reader-mobile-android .reader-breadcrumb > span,
+  .reader-workspace.reader-mobile-android .reader-breadcrumb > svg,
+  .reader-workspace.reader-mobile-android .reader-status {
+    display: none;
+  }
+  .reader-workspace.reader-mobile-android .reader-breadcrumb strong {
+    color: #262626;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .reader-workspace.reader-mobile-android .reader-save-status {
+    width: 32px;
+    height: 32px;
+    justify-content: center;
+  }
+  .reader-workspace.reader-mobile-android .reader-save-status > span {
+    display: none;
+  }
+  .reader-workspace.reader-mobile-android .reader-mobile-reading-meta {
+    display: none;
+  }
+  .reader-workspace.reader-mobile-android .reader-android-mode {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 18px;
+    min-height: 43px;
+    padding: 0 16px;
+    border-bottom: 1px solid #ececec;
+    background: #fff;
+  }
+  .reader-workspace.reader-mobile-android .reader-android-mode > button {
+    position: relative;
+    align-self: stretch;
+    border: 0;
+    padding: 0 1px;
+    background: transparent;
+    color: #737373;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .reader-workspace.reader-mobile-android .reader-android-mode > button[aria-pressed="true"] {
+    color: #4b3fe3;
+    font-weight: 600;
+  }
+  .reader-workspace.reader-mobile-android
+    .reader-android-mode
+    > button[aria-pressed="true"]::after {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: #4b3fe3;
+    content: "";
+  }
+  .reader-workspace.reader-mobile-android .reader-mobile-askbar,
+  .reader-workspace.reader-mobile-android .reader-mobile-primary-nav {
+    display: none;
+  }
+  .reader-workspace.reader-mobile-android .reader-android-ai-peek {
+    z-index: 3;
+    display: block;
+    flex: 0 0 150px;
+    overflow: hidden;
+    border-top: 1px solid #e4e2ec;
+    border-radius: 16px 16px 0 0;
+    background: #fff;
+    box-shadow: 0 -8px 28px rgb(29 25 48 / 10%);
+  }
+  .reader-workspace.reader-mobile-android .reader-android-ai-peek > button {
+    display: flex;
+    width: 100%;
+    height: 150px;
+    flex-direction: column;
+    align-items: flex-start;
+    overflow: hidden;
+    border: 0;
+    padding: 0 16px 16px;
+    background: #fff;
+    color: #262626;
+    text-align: left;
+  }
+  .reader-workspace.reader-mobile-android .reader-android-ai-peek > button:hover {
+    background: #fcfbff;
+  }
+  .reader-workspace.reader-mobile-android .reader-android-ai-peek-grab {
+    width: 36px;
+    height: 4px;
+    flex: 0 0 auto;
+    margin: 8px auto 7px;
+    border-radius: 999px;
+    background: #d8d6df;
+  }
+  .reader-workspace.reader-mobile-android .reader-android-ai-peek-title {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+  .reader-workspace.reader-mobile-android .reader-android-ai-peek-hint {
+    margin-top: 2px;
+    color: #737373;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .reader-workspace.reader-mobile-android .reader-android-ai-peek-text {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    overflow: hidden;
+    color: #525252;
+    font-size: 13px;
+    line-height: 1.5;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .reader-workspace.reader-mobile-android .reader-android-ask-fab {
+    position: absolute;
+    right: 16px;
+    bottom: 166px;
+    z-index: 20;
+    display: inline-flex;
+    width: 56px;
+    height: 56px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px;
+    background: #4b3fe3;
+    box-shadow: 0 8px 24px rgb(75 63 227 / 36%);
+    color: #fff;
+  }
+  .reader-workspace.reader-mobile-android .reader-android-ask-fab:hover {
+    background: #3f31c6;
+  }
+  .reader-workspace.reader-mobile-android.reader-mobile-ai .reader-android-ai-peek,
+  .reader-workspace.reader-mobile-android.reader-mobile-citation .reader-android-ai-peek,
+  .reader-workspace.reader-mobile-android.reader-mobile-ai .reader-android-ask-fab,
+  .reader-workspace.reader-mobile-android.reader-mobile-citation .reader-android-ask-fab {
+    display: none;
+  }
+  .reader-workspace.reader-mobile-android.reader-mobile-ai .reader-ai {
+    inset: auto 0 0;
+    width: auto;
+    max-width: none;
+    height: min(64%, 590px);
+    min-height: 360px;
+    border: 1px solid #e4e2ec;
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 30px rgb(29 25 48 / 16%);
+  }
+  .reader-workspace.reader-mobile-android.reader-mobile-ai .reader-ai-sheet-grab {
+    display: block;
+    width: 36px;
+    height: 4px;
+    flex: 0 0 auto;
+    margin: 8px auto -3px;
+    border-radius: 999px;
+    background: #d8d6df;
+  }
+  .reader-workspace.reader-mobile-android.reader-mobile-ai .reader-ai-header {
+    padding: 12px 16px 10px;
+  }
+  .reader-workspace.reader-mobile-android.reader-mobile-ai .reader-messages {
+    padding: 16px;
+  }
+  .reader-workspace.reader-mobile-android.reader-mobile-ai .reader-composer {
+    padding: 10px 16px 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reader-document-scroll {
+    scroll-behavior: auto;
+  }
+  .reader-spin {
+    animation: none;
+  }
+  .reader-workspace * {
+    transition: none !important;
+  }
+}

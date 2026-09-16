@@ -1,0 +1,60 @@
+.reader-selection-actions {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  max-width: calc(100vw - 24px);
+  padding: 4px;
+  border: 1px solid #dedaf9;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow:
+    0 8px 24px #34257c24,
+    0 1px 4px #34257c12;
+  transform: translate(-50%, -100%);
+}
+.reader-selection-actions-below {
+  transform: translateX(-50%);
+}
+.reader-selection-divider {
+  width: 1px;
+  height: 17px;
+  margin: 0 2px;
+  background: #e4e0f7;
+  flex: 0 0 auto;
+}
+.reader-selection-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #625b75;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.reader-selection-actions button:hover:not(:disabled) {
+  background: #f2efff;
+  color: #4b3fe3;
+}
+.reader-selection-actions .reader-selection-ask {
+  background: #4b3fe3;
+  color: #fff;
+}
+.reader-selection-actions .reader-selection-ask:hover:not(:disabled) {
+  background: #3f31c6;
+  color: #fff;
+}
+.reader-selection-actions .icon-btn {
+  width: 30px;
+  padding: 0;
+  color: #777080;
+}
+.reader-selection-actions button:disabled {
+  opacity: 0.45;
+}

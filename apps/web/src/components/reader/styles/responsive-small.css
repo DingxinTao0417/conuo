@@ -1,0 +1,219 @@
+@media (max-width: 560px) {
+  .reader-topbar {
+    padding: 10px 12px;
+    gap: 8px;
+    min-height: 54px;
+  }
+  .reader-breadcrumb {
+    font-size: 11px;
+  }
+  .reader-breadcrumb strong {
+    font-size: 12px;
+  }
+  .reader-breadcrumb > span:not(.reader-mobile-reading-meta) {
+    display: none;
+  }
+  .reader-breadcrumb > svg {
+    display: none;
+  }
+  .reader-inline-citation {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    white-space: normal;
+    line-height: 1.35;
+    text-align: left;
+  }
+  .reader-inline-citation > svg {
+    flex: 0 0 auto;
+    margin-top: 1px;
+  }
+  .reader-inline-citation-title {
+    max-width: none;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+  }
+  .reader-inline-citation-location {
+    white-space: normal;
+  }
+  .reader-document-scroll {
+    --reader-document-scroll-top: 16px;
+    padding: 16px 12px 32px;
+  }
+  .reader-paper {
+    padding: 26px 22px;
+    border-radius: 8px;
+  }
+  .reader-paper h1 {
+    font-size: 21px;
+  }
+  .reader-paper-meta {
+    font-size: 10px;
+  }
+  .reader-paper-header {
+    margin-bottom: 23px;
+  }
+  .reader-prose {
+    line-height: 1.85;
+  }
+  .reader-document-tools {
+    min-height: 45px;
+    padding: 6px 9px;
+    gap: 2px;
+  }
+  .reader-tool-divider {
+    margin: 0 2px;
+  }
+  .reader-document-tools .icon-btn {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    padding: 5px;
+  }
+  .reader-zoom {
+    padding: 4px;
+    min-width: 36px;
+  }
+  .reader-tool-text {
+    padding: 4px;
+    font-size: 10px !important;
+  }
+  .reader-ai-header {
+    padding: 15px 16px;
+  }
+  .reader-messages {
+    padding: 19px 16px;
+  }
+  .reader-composer {
+    padding: 9px 12px 12px;
+  }
+  .reader-ai-empty {
+    padding: 26px 8px 24px;
+  }
+  .reader-ai-empty h2 {
+    font-size: 20px;
+  }
+  .reader-ai-empty p {
+    font-size: 13px;
+    max-width: 300px;
+  }
+  .reader-ai-empty > div:last-child button {
+    font-size: 12px;
+    padding: 13px;
+  }
+  .reader-message-content {
+    font-size: 14px;
+  }
+  .reader-input-box textarea {
+    font-size: 14px;
+    min-height: 76px;
+  }
+  .reader-input-footer > span {
+    font-size: 10px;
+  }
+  .reader-send {
+    width: 31px;
+    height: 31px;
+  }
+  .reader-notice {
+    font-size: 11px;
+    padding: 8px 12px;
+  }
+  .reader-selection-actions {
+    gap: 2px;
+    max-width: calc(100vw - 16px);
+    padding: 3px;
+  }
+  .reader-selection-actions button {
+    min-height: 30px;
+    padding: 5px 7px;
+    font-size: 11px;
+  }
+  .reader-selection-actions .icon-btn {
+    width: 30px;
+  }
+  .reader-selection-knowledge-label {
+    display: none;
+  }
+  .reader-selection-divider {
+    margin: 0 1px;
+  }
+  .reader-excerpt-dialog-layer {
+    align-items: end;
+    padding: 12px;
+  }
+  .reader-excerpt-dialog {
+    max-height: min(680px, calc(100vh - 24px));
+    padding: 18px 16px;
+    border-radius: 14px;
+  }
+  .reader-excerpt-dialog-heading h2 {
+    font-size: 16px;
+  }
+  .reader-excerpt-dialog-quote {
+    max-height: 145px;
+    font-size: 12px;
+  }
+  .reader-excerpt-dialog-actions .btn {
+    flex: 1 1 auto;
+  }
+  .reader-citation-target {
+    padding: 11px 13px;
+    max-height: 160px;
+  }
+  .reader-annotations {
+    padding: 13px 16px;
+  }
+  .reader-find {
+    padding: 8px 12px;
+    gap: 5px;
+  }
+  .reader-find-count {
+    min-width: 42px;
+    font-size: 10px;
+  }
+  .reader-find input {
+    font-size: 16px;
+  }
+  .reader-find .icon-btn {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    padding: 5px;
+  }
+  .reader-pdf-tip {
+    font-size: 9px;
+  }
+  .reader-document-tools .reader-tool-spacer {
+    min-width: 0;
+  }
+  .reader-outline {
+    max-height: min(250px, 44vh);
+  }
+  .reader-outline-header {
+    padding: 9px 12px 7px;
+  }
+  .reader-outline-header span {
+    font-size: 10px;
+  }
+  .reader-outline-list {
+    padding: 5px 6px 8px;
+  }
+  .reader-outline-item {
+    min-height: 34px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+  .reader-page-control input {
+    width: 26px;
+  }
+  .reader-page-control {
+    font-size: 10px;
+  }
+}
+
+/*
+ * Android gets its own phone presentation only when Reader opts into it. The
+ * class is applied from an explicit prop or the Android user agent; generic
+ * and iOS phone readers retain their full-screen AI flow below.
+ */

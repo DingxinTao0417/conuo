@@ -1,0 +1,208 @@
+@media (min-width: 1500px) {
+  .reader-document-scroll {
+    --reader-document-scroll-top: 40px;
+    padding-top: 40px;
+  }
+}
+@media (max-width: 1180px) {
+  .reader-document-scroll {
+    --reader-document-scroll-top: 24px;
+    padding: 24px 20px 36px;
+  }
+  .reader-paper {
+    padding: 32px;
+  }
+  .reader-topbar {
+    padding: 13px 18px;
+  }
+  .reader-status {
+    display: none;
+  }
+  .reader-document-tools {
+    padding: 8px 12px;
+    gap: 4px;
+  }
+  .reader-outline-header {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .reader-outline-list {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+@media (max-width: 1024px) {
+  .reader-ai-resizer {
+    display: none;
+    pointer-events: none;
+  }
+}
+@media (min-width: 1025px) {
+  /*
+   * Keep the document chrome in the middle column while the AI panel starts
+   * at the reader workspace edge. Compact layouts retain the ordinary flow
+   * below, where their drawers deliberately begin below the top chrome.
+   */
+  .reader-workspace.reader-with-ai > .reader-topbar,
+  .reader-workspace.reader-with-ai > .reader-historical-banner,
+  .reader-workspace.reader-with-ai > .reader-notice {
+    margin-right: calc(var(--reader-ai-width, 380px) + 12px);
+  }
+  .reader-workspace.reader-with-ai > .reader-body {
+    position: static;
+    margin-right: calc(var(--reader-ai-width, 380px) + 12px);
+    overflow: visible;
+  }
+  .reader-workspace.reader-with-ai .reader-ai-resizer {
+    position: absolute;
+    top: 0;
+    right: var(--reader-ai-width, 380px);
+    bottom: 0;
+    width: 12px;
+    margin-right: 0;
+  }
+  .reader-workspace.reader-with-ai .reader-ai {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+  }
+  .reader-topbar {
+    position: relative;
+    z-index: 20;
+    box-sizing: border-box;
+    height: 52px;
+    min-height: 52px;
+    padding: 8px 16px;
+    gap: 8px;
+  }
+  /* Reading position and zoom keep their floating bar at the bottom of the
+     page on desktop, so the strip above the document carries only the tools
+     that used to crowd the top bar. */
+  .reader-document-tools .reader-document-page-controls,
+  .reader-document-tools .reader-document-zoom-divider,
+  .reader-document-tools .reader-document-zoom-controls {
+    display: none;
+  }
+  .reader-desktop-bottom-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+    width: fit-content;
+    max-width: calc(100% - 32px);
+    min-height: 42px;
+    margin: 0 auto 12px;
+    padding: 6px 8px;
+    overflow-x: auto;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 4px 16px rgb(23 23 23 / 8%);
+  }
+  .reader-desktop-bottom-controls .reader-tool-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .reader-bottom-page-status {
+    min-width: 76px;
+    color: #525252;
+    font-size: 11px;
+    text-align: center;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .reader-bottom-page-jump {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #737373;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .reader-bottom-page-jump input {
+    width: 42px;
+    padding: 4px 1px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: #f7f7f7;
+    color: #404040;
+    font-size: 11px;
+    text-align: center;
+    appearance: textfield;
+    font-variant-numeric: tabular-nums;
+  }
+  .reader-bottom-page-jump input::-webkit-inner-spin-button {
+    appearance: none;
+  }
+}
+@media (min-width: 1025px) and (max-width: 1199px) {
+  .reader-status {
+    display: none;
+  }
+  .reader-document-scroll {
+    --reader-document-scroll-top: 20px;
+    padding: 20px;
+  }
+  .reader-paper {
+    padding: 32px 40px;
+  }
+}
+@media (min-width: 621px) and (max-width: 1024px) {
+  .reader-mobile-tabs {
+    display: none;
+  }
+  .reader-mobile-reading .reader-ai {
+    display: none;
+  }
+  .reader-mobile-ai .reader-ai-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 31;
+    display: block;
+    border: 0;
+    background: rgb(30 30 40 / 12%);
+  }
+  .reader-mobile-ai .reader-ai {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: 32;
+    width: min(380px, 86%);
+    max-width: 86%;
+    flex: 0 0 auto;
+    border-left: 1px solid #e7e7e7;
+    box-shadow: -12px 0 32px rgb(20 20 30 / 12%);
+  }
+  .reader-ai-header {
+    padding: 15px 24px;
+  }
+  .reader-messages {
+    padding: 22px 24px;
+  }
+  .reader-composer {
+    padding: 10px 24px 16px;
+  }
+  .reader-ai-empty {
+    max-width: 420px;
+    margin: 0 auto;
+    padding-top: 40px;
+  }
+  .reader-topbar {
+    box-sizing: border-box;
+    height: 52px;
+    min-height: 52px;
+    padding: 8px 16px;
+    gap: 8px;
+  }
+  .reader-messages > .reader-message,
+  .reader-messages > .reader-answer-progress {
+    max-width: 650px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .reader-citation-target {
+    max-height: 185px;
+  }
+}

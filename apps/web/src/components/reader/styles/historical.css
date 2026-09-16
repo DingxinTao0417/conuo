@@ -1,0 +1,51 @@
+.reader-historical-banner {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 12px 20px;
+  border-bottom: 1px solid #e6ddee;
+  background: #faf7fd;
+  color: #927b9f;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.reader-historical-banner > svg {
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.reader-historical-banner > div {
+  flex: 1;
+  min-width: 180px;
+}
+.reader-historical-banner strong {
+  display: block;
+  color: #7c648b;
+  font-size: 12px;
+  font-weight: 500;
+}
+.reader-historical-banner span {
+  display: block;
+  margin-top: 3px;
+  color: #a590af;
+  overflow-wrap: anywhere;
+}
+.reader-historical-banner code {
+  font-size: 10px;
+}
+.reader-historical-banner p {
+  margin-top: 4px;
+}
+.reader-historical-banner .btn {
+  font-size: 11px;
+}
+@media (max-width: 560px) {
+  .reader-historical-banner {
+    padding: 10px 12px;
+    gap: 7px;
+  }
+  .reader-historical-banner .btn {
+    margin-left: 23px;
+  }
+}

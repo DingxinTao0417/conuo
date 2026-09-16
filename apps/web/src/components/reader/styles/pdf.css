@@ -1,0 +1,143 @@
+.reader-pdf-wrap {
+  width: 100%;
+  max-width: 950px;
+  margin: 0 auto;
+}
+.reader-pdf-mode {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  background: #f5f5f7;
+}
+.reader-pdf-mode button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 5px;
+  padding: 4px 9px;
+  background: transparent;
+  color: #737373;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.reader-pdf-mode button[aria-pressed="true"] {
+  background: #fff;
+  color: #4b3fe3;
+  box-shadow: 0 1px 3px #0000000d;
+}
+.reader-pdf-mode button:focus-visible {
+  outline: 2px solid #8b7bfa;
+  outline-offset: 2px;
+}
+@media (max-width: 1024px) {
+  .reader-pdf-mode button {
+    min-height: 40px;
+  }
+}
+@media (max-width: 620px) {
+  .reader-pdf-mode button {
+    min-height: 44px;
+    padding: 4px 14px;
+    font-size: 12px;
+  }
+}
+.reader-pdf-continuous {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.reader-pdf-placeholder {
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: #a3a3a3;
+  font-size: 12px;
+}
+.reader-pdf-page-label {
+  margin: 0 auto 8px;
+  color: #89849b;
+  font-size: 11px;
+  text-align: center;
+}
+.reader-pdf-overflow {
+  overflow: auto;
+  max-width: 100%;
+  padding-bottom: 4px;
+  position: relative;
+}
+.reader-pdf-page {
+  position: relative;
+  background: white;
+  margin: 0 auto;
+  box-shadow: 0 2px 10px #0000000c;
+}
+.reader-pdf-page canvas {
+  display: block;
+}
+.reader-pdf-status {
+  position: sticky;
+  left: 12px;
+  bottom: 12px;
+  background: #ffffffed;
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: #737373;
+}
+.reader-pdf-tip {
+  font-size: 10px;
+  text-align: center;
+  color: #a3a3a3;
+  line-height: 1.7;
+  margin-top: 16px;
+}
+.reader-pdf-text {
+  color-scheme: only light;
+  position: absolute;
+  inset: 0;
+  text-align: initial;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 1;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.reader-pdf-text :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+  user-select: text;
+}
+.reader-pdf-text > :not(.markedContent),
+.reader-pdf-text .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.reader-pdf-text .markedContent {
+  display: contents;
+}
+.reader-pdf-text span[role="img"] {
+  user-select: none;
+  cursor: default;
+}
+.reader-pdf-text ::selection {
+  background: #9486ff66;
+  color: transparent;
+}

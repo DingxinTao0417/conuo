@@ -1,0 +1,65 @@
+.reader-pdf-text[data-main-rotation="90"] {
+  transform: rotate(90deg) translateY(-100%);
+}
+.reader-pdf-text[data-main-rotation="180"] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+.reader-pdf-text[data-main-rotation="270"] {
+  transform: rotate(270deg) translateX(-100%);
+}
+.reader-web-snapshot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 14px 0;
+  color: #73758a;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.reader-web-snapshot a,
+.reader-web-snapshot p {
+  flex-basis: 100%;
+  min-width: 0;
+  margin: 0;
+}
+.reader-web-snapshot a {
+  color: var(--brand);
+}
+.reader-selection-source-format {
+  margin-top: var(--spacer-8);
+  color: var(--text-secondary);
+}
+.reader-selection-source-format summary {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  cursor: pointer;
+  color: var(--text-brand);
+}
+.reader-selection-source-format blockquote {
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1024px) {
+  .reader-annotation-actions button,
+  .reader-annotation-form-actions button {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .reader-selection-source-format summary {
+    min-height: 40px;
+  }
+}
+@media (max-width: 620px) {
+  .reader-annotation-actions button,
+  .reader-annotation-form-actions button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .reader-selection-source-format summary {
+    min-height: 44px;
+  }
+}

@@ -1,0 +1,110 @@
+.reader-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+.reader-document {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  background: #f5f5f5;
+}
+.reader-document-scroll {
+  --reader-document-scroll-top: 28px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 28px 32px 28px;
+  scroll-behavior: smooth;
+}
+.reader-document-tools {
+  position: sticky;
+  top: calc(-1 * var(--reader-document-scroll-top));
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: min(100%, 760px);
+  margin: 0 auto 16px;
+  flex-shrink: 0;
+  min-height: 42px;
+  padding: 6px 8px;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgb(23 23 23 / 8%);
+}
+.reader-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+/* The format-specific half of the strip. It is the part that runs out of room
+   first, so it scrolls sideways instead of wrapping the position and zoom
+   controls out of reach: the narrowest desktop case (a 1025px viewport whose
+   AI panel has taken its minimum 320px) leaves this strip 452px. */
+.reader-toolstrip-tools {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.reader-toolstrip-tools::-webkit-scrollbar {
+  display: none;
+}
+.reader-toolstrip-toggle {
+  display: none;
+}
+.reader-tool-divider {
+  height: 18px;
+  width: 1px;
+  background: #e5e5e5;
+  margin: 0 5px;
+}
+.reader-tool-spacer {
+  flex: 1;
+}
+.reader-tool-text,
+.reader-zoom {
+  border: 0;
+  background: transparent;
+  color: #525252;
+  padding: 6px;
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+.reader-region-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 6px;
+}
+.reader-region-trigger[aria-pressed="true"] {
+  color: #574bc9;
+  background: #f0edff;
+}
+.reader-zoom {
+  min-width: 40px;
+  font-variant-numeric: tabular-nums;
+}
+.reader-tool-text[aria-pressed="true"] {
+  color: #4b3fe3;
+  background: #f0eeff;
+  border-radius: 6px;
+}
+.reader-format {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #737373;
+}

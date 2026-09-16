@@ -1,0 +1,215 @@
+.reader-citation-target {
+  display: flex;
+  gap: 10px;
+  background: #f6f4ff;
+  border-bottom: 1px solid #e4dfff;
+  color: #53459a;
+  padding: 13px 20px;
+  font-size: 12px;
+  max-height: 220px;
+  overflow: auto;
+  flex-shrink: 0;
+}
+.reader-citation-target > div {
+  flex: 1;
+  min-width: 0;
+}
+.reader-citation-target strong {
+  font-size: 11px;
+  font-weight: 500;
+}
+.reader-citation-target blockquote {
+  margin: 7px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.reader-citation-target p {
+  color: #925d19;
+  font-size: 11px;
+  margin: 8px 0 0;
+}
+.reader-citation-warning {
+  background: #fffaf1;
+  border-color: #eee1cd;
+}
+.reader-citation-target > .icon-btn {
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+.reader-ai {
+  width: var(--reader-ai-width, 380px);
+  flex: 0 0 var(--reader-ai-width, 380px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #e7e7e7;
+  background: #fff;
+}
+.reader-ai-resizer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 0 0 12px;
+  align-items: center;
+  justify-content: center;
+  margin-right: -1px;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+.reader-ai-resizer::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: #e7e7e7;
+  content: "";
+  transition:
+    background 120ms ease,
+    width 120ms ease;
+}
+.reader-ai-resizer > span {
+  position: relative;
+  width: 3px;
+  height: 26px;
+  border-radius: 999px;
+  background: #c9c4f8;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    background 120ms ease;
+}
+.reader-ai-resizer:hover::before,
+.reader-ai-resizer:focus-visible::before,
+.reader-ai-resizing .reader-ai-resizer::before {
+  width: 2px;
+  background: #4b3fe3;
+}
+.reader-ai-resizer:hover > span,
+.reader-ai-resizer:focus-visible > span,
+.reader-ai-resizing .reader-ai-resizer > span {
+  opacity: 1;
+  background: #4b3fe3;
+}
+.reader-ai-resizer:focus-visible {
+  outline: 2px solid #4b3fe3;
+  outline-offset: -2px;
+}
+.reader-ai-resizing,
+.reader-ai-resizing * {
+  cursor: col-resize !important;
+}
+.reader-ai-backdrop,
+.reader-ai-sheet-grab {
+  display: none;
+}
+.reader-ai-header {
+  padding: 17px 18px 13px;
+  border-bottom: 1px solid #ececec;
+  flex-shrink: 0;
+}
+.reader-ai-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.reader-ai-heading > strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.reader-ai-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4b3fe3;
+}
+.reader-ai-header > p {
+  font-size: 11px;
+  color: #8a8a8a;
+  margin: 7px 0 12px;
+}
+.reader-scope {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #e7e7e7;
+  border-radius: 8px;
+  padding: 5px 8px 5px 10px;
+  background: #f7f7f7;
+  font-size: 11px;
+}
+.reader-scope > span {
+  color: #737373;
+  white-space: nowrap;
+}
+.reader-scope select {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #404040;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 0;
+  cursor: pointer;
+}
+/* A surface with exactly one allowed range states it instead of offering a
+   picker, so the range stays visible without implying it can be widened. */
+.reader-scope-fixed {
+  margin: 0;
+}
+.reader-scope-fixed strong {
+  color: #404040;
+  font-size: 12px;
+  font-weight: 500;
+}
+.reader-source-picker {
+  margin: 10px 0 0;
+  padding: 9px 10px;
+  border: 1px solid #e7e7e7;
+  border-radius: 7px;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 11px;
+}
+.reader-source-picker legend {
+  padding: 0 5px;
+  color: #737373;
+}
+.reader-source-picker label {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 5px 0;
+  line-height: 1.6;
+}
+.reader-source-picker input {
+  accent-color: #4b3fe3;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.reader-source-picker span {
+  overflow-wrap: anywhere;
+}
+.reader-selected-quote {
+  border-left: 2px solid #ccc5ff;
+  background: #faf9ff;
+  margin-top: 11px;
+  padding: 8px 10px;
+  max-height: 110px;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #737373;
+}
+.reader-selected-quote blockquote {
+  margin: 0;
+}
+.reader-ai-header > .reader-scope-warning {
+  font-size: 10px;
+  line-height: 1.6;
+  color: #9a783d;
+  margin: 8px 0 0;
+}

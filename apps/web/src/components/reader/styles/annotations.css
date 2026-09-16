@@ -1,0 +1,149 @@
+.reader-annotations {
+  max-height: 240px;
+  overflow: auto;
+  border-bottom: 1px solid #e5e5e5;
+  padding: 16px 24px;
+  background: #fffef9;
+  flex-shrink: 0;
+}
+.reader-annotations h3,
+.reader-history h3 {
+  font-size: 12px;
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+.reader-annotations h3 span {
+  color: #737373;
+  font-weight: 400;
+}
+.reader-annotation-compose {
+  flex-shrink: 0;
+  padding: 14px 24px;
+  border-bottom: 1px solid #e5e0ff;
+  background: #faf9ff;
+}
+.reader-annotation-compose > div:first-child {
+  border-left: 2px solid #b9aff8;
+  padding-left: 10px;
+}
+.reader-annotation-compose strong {
+  display: block;
+  color: #4d4388;
+  font-size: 12px;
+  font-weight: 600;
+}
+.reader-annotation-compose blockquote,
+.reader-annotations blockquote {
+  font-size: 12px;
+  line-height: 1.7;
+  max-height: 64px;
+  overflow: hidden;
+  margin: 6px 0 0;
+}
+.reader-annotation-compose label {
+  display: block;
+  color: #595569;
+  font-size: 11px;
+  margin-top: 11px;
+}
+.reader-annotation-compose label span {
+  color: #9894a6;
+}
+.reader-annotation-compose textarea,
+.reader-annotation-editor textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 68px;
+  resize: vertical;
+  border: 1px solid #dbd7ed;
+  border-radius: 6px;
+  outline: 0;
+  margin-top: 5px;
+  padding: 8px 9px;
+  color: #45424f;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.reader-annotation-compose textarea:focus,
+.reader-annotation-editor textarea:focus {
+  border-color: #a99ff1;
+  box-shadow: 0 0 0 2px #4b3fe312;
+}
+.reader-annotation-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 9px;
+}
+.reader-annotation-form-actions button,
+.reader-annotation-actions button {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  padding: 5px 7px;
+  color: #665baf;
+  font-size: 11px;
+}
+.reader-annotation-form-actions .btn-primary {
+  background: #4b3fe3;
+  color: #fff;
+}
+.reader-annotation-card {
+  margin-top: 8px;
+  overflow: hidden;
+  border: 1px solid #e9e4d5;
+  border-radius: 6px;
+  background: #fff;
+}
+.reader-annotation-locate {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 10px 12px 7px;
+  text-align: left;
+}
+.reader-annotation-locate:hover {
+  background: #fffdf6;
+}
+.reader-annotation-locate blockquote {
+  margin-top: 0;
+}
+.reader-annotation-meta {
+  display: block;
+  font-size: 10px;
+  color: #a3a3a3;
+}
+.reader-annotation-note {
+  margin: 0;
+  padding: 2px 12px 7px;
+  color: #56515e;
+  font-size: 11px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+.reader-annotation-editor {
+  padding: 0 12px 8px;
+}
+.reader-annotation-editor textarea {
+  margin-top: 0;
+}
+.reader-annotation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  border-top: 1px solid #f1eee7;
+  padding: 3px 6px;
+}
+.reader-annotation-actions button:last-child {
+  color: #ad6554;
+}
+.reader-annotation-actions button:disabled {
+  color: #b7b4bd;
+}
+.reader-annotations > p {
+  font-size: 12px;
+}

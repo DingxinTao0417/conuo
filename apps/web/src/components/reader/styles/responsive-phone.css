@@ -1,0 +1,349 @@
+@media (max-width: 620px) {
+  .reader-topbar {
+    box-sizing: border-box;
+    height: 52px;
+    min-height: 52px;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .reader-topbar .reader-back-button-context {
+    width: 30px;
+    padding: 0;
+  }
+  .reader-topbar .reader-back-button-context > span {
+    display: none;
+  }
+  .reader-document-tools {
+    position: static;
+    width: 100%;
+    margin-bottom: 12px;
+    box-shadow: none;
+    flex-wrap: wrap;
+  }
+  /* A phone keeps reading position and zoom in place and moves the
+     format-specific tools behind one control, which is what makes the strip
+     fit the 336px of content a 360px phone has. */
+  .reader-toolstrip-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+    min-height: 32px;
+    padding: 4px 9px;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    background: #fff;
+    color: #525252;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .reader-toolstrip-toggle[aria-expanded="true"] {
+    border-color: #cdc5ff;
+    background: #f0eeff;
+    color: #4b3fe3;
+  }
+  .reader-toolstrip-tools {
+    display: none;
+  }
+  .reader-document-tools[data-tools-expanded="true"] .reader-toolstrip-tools {
+    display: flex;
+    flex-basis: 100%;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #f0f0f0;
+    overflow-x: visible;
+  }
+  .reader-ai-toggle {
+    display: none;
+  }
+  .reader-breadcrumb {
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: stretch;
+    justify-content: center;
+    gap: 1px;
+  }
+  .reader-breadcrumb > span:not(.reader-mobile-reading-meta),
+  .reader-breadcrumb > svg {
+    display: none;
+  }
+  .reader-breadcrumb strong {
+    width: 100%;
+    line-height: 1.25;
+  }
+  .reader-mobile-reading-meta {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    color: #8a8a8a;
+    font-size: 10px;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .reader-save-status {
+    min-width: 0;
+    height: 32px;
+    gap: 4px;
+    padding: 0 2px;
+    justify-content: center;
+  }
+  .reader-save-status > span {
+    overflow: hidden;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .reader-mobile-tabs {
+    display: none;
+  }
+  .reader-mobile-reading .reader-ai {
+    display: none;
+  }
+  .reader-mobile-citation .reader-ai,
+  .reader-mobile-citation .reader-ai-backdrop {
+    display: none;
+  }
+  .reader-mobile-ai .reader-ai-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 31;
+    display: block;
+    border: 0;
+    background: rgb(30 30 40 / 12%);
+  }
+  .reader-mobile-ai .reader-ai {
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 32;
+    width: auto;
+    max-width: none;
+    height: min(64dvh, 590px);
+    min-height: min(360px, 100%);
+    flex: 0 0 auto;
+    border: 1px solid #e4e2ec;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 30px rgb(29 25 48 / 16%);
+  }
+  .reader-mobile-ai .reader-ai-sheet-grab {
+    display: block;
+    width: 36px;
+    height: 4px;
+    flex: 0 0 auto;
+    margin: 8px auto -3px;
+    border-radius: 999px;
+    background: #d8d6df;
+  }
+  .reader-mobile-askbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    border-top: 1px solid #e7e7e7;
+    background: #fff;
+  }
+  .reader-mobile-ask-input {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px 12px;
+    overflow: hidden;
+    border: 1px solid #e6e4ec;
+    border-radius: 999px;
+    background: #fafafa;
+    color: #737373;
+    text-align: left;
+  }
+  .reader-mobile-ask-input:hover {
+    border-color: #d7d1ff;
+    background: #f7f5ff;
+    color: #4b3fe3;
+  }
+  .reader-mobile-ask-input > span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .reader-mobile-ask-send {
+    display: inline-flex;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: #4b3fe3;
+    color: #fff;
+  }
+  .reader-mobile-ask-send:hover {
+    background: #3e32cc;
+  }
+  .reader-mobile-ask-send:active {
+    background: #362aac;
+  }
+  .reader-mobile-ai .reader-mobile-askbar,
+  .reader-mobile-citation .reader-mobile-askbar {
+    display: none;
+  }
+  .reader-mobile-primary-nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    flex: 0 0 auto;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid #e7e7e7;
+    background: #fff;
+  }
+  .reader-mobile-primary-nav-three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .reader-mobile-primary-nav > button {
+    display: flex;
+    min-width: 0;
+    min-height: 56px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: 0;
+    background: transparent;
+    color: #737373;
+    font-size: 11px;
+    line-height: 1.3;
+  }
+  .reader-mobile-primary-nav > button:hover {
+    background: #fafafa;
+    color: #4b3fe3;
+  }
+  .reader-mobile-primary-nav > button > svg {
+    flex: 0 0 auto;
+  }
+  .reader-mobile-primary-nav > .reader-mobile-primary-nav-active {
+    color: #4b3fe3;
+    font-weight: 600;
+  }
+  .reader-mobile-ai .reader-mobile-primary-nav,
+  .reader-mobile-citation .reader-mobile-primary-nav {
+    display: none;
+  }
+  .reader-mobile-citation-page {
+    position: absolute;
+    inset: 0;
+    z-index: 34;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: #fff;
+  }
+  .reader-mobile-citation-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 56px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #ececec;
+  }
+  .reader-mobile-citation-header > div {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+  }
+  .reader-mobile-citation-header span {
+    color: #737373;
+    font-size: 11px;
+  }
+  .reader-mobile-citation-header strong {
+    overflow: hidden;
+    color: #262626;
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .reader-mobile-citation-open-source {
+    min-width: 58px;
+    height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #4b3fe3;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .reader-mobile-citation-open-source:hover {
+    background: #f3f1ff;
+  }
+  .reader-mobile-citation-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 22px 18px max(24px, env(safe-area-inset-bottom));
+  }
+  .reader-mobile-citation-location {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0 0 16px;
+    color: #737373;
+    font-size: 12px;
+  }
+  .reader-mobile-citation-excerpt {
+    padding: 18px;
+    border: 1px solid #e7e5ff;
+    border-radius: 12px;
+    background: #faf9ff;
+  }
+  .reader-mobile-citation-excerpt > span {
+    display: block;
+    margin-bottom: 10px;
+    color: #4b3fe3;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .reader-mobile-citation-excerpt blockquote {
+    margin: 0;
+    color: #262626;
+    font-size: 17px;
+    line-height: 1.75;
+  }
+  .reader-mobile-citation-excerpt > p {
+    margin: 14px 0 0;
+    color: #737373;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .reader-mobile-citation-excerpt-warning {
+    border-color: #fed7aa;
+    background: #fffaf2;
+  }
+  .reader-mobile-citation-excerpt-warning > span,
+  .reader-mobile-citation-excerpt-warning > p {
+    color: #b54708;
+  }
+  .reader-mobile-citation-footer {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 18px max(16px, env(safe-area-inset-bottom));
+    border-top: 1px solid #ececec;
+    background: #fff;
+  }
+  .reader-mobile-citation-footer .btn {
+    justify-content: center;
+    min-height: 42px;
+  }
+}

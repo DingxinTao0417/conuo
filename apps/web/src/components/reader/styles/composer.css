@@ -1,0 +1,132 @@
+.reader-composer {
+  padding: 10px 16px 14px;
+  background: #fff;
+  flex-shrink: 0;
+}
+.reader-input-box {
+  border: 1px solid #dadada;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 3px #00000005;
+}
+.reader-input-box:focus-within {
+  border-color: #b7acf8;
+  box-shadow: 0 0 0 2px #4b3fe30a;
+}
+.reader-input-box textarea {
+  display: block;
+  width: 100%;
+  resize: none;
+  min-height: 75px;
+  max-height: 200px;
+  border: 0;
+  outline: 0 !important;
+  box-sizing: border-box;
+  padding: 12px 12px 6px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #404040;
+  background: transparent;
+}
+.reader-input-box textarea::placeholder {
+  color: #a3a3a3;
+}
+.reader-input-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 9px 9px;
+}
+.reader-input-footer > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: #939393;
+  min-width: 0;
+}
+.reader-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  background: #4b3fe3;
+  color: #fff;
+  border: 0;
+  border-radius: 7px;
+}
+.reader-send:hover {
+  background: #3f31c6;
+}
+.reader-send:disabled {
+  background: #d6d1f7;
+  opacity: 1;
+}
+.reader-stop {
+  background: #525252;
+}
+.reader-ai-footnote {
+  font-size: 9px;
+  text-align: center;
+  line-height: 1.7;
+  color: #a3a3a3;
+  margin: 9px 0 0;
+}
+.reader-form-error {
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 0 0 9px;
+  color: #a66642;
+}
+.reader-message-draft {
+  border-left: 2px solid #d8d2fa;
+  padding-left: 12px;
+}
+.reader-draft-sources {
+  margin-top: 12px;
+  color: #62606b;
+  font-size: 11px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.reader-draft-sources summary {
+  cursor: pointer;
+  color: #6153b8;
+}
+.reader-draft-sources ol {
+  padding-left: 20px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.reader-draft-note-evidence {
+  margin: 0;
+  padding-left: 20px;
+  color: #477564;
+}
+.reader-draft-sources p {
+  white-space: pre-wrap;
+  margin: 4px 0 12px;
+}
+.reader-draft-notice {
+  color: #737078;
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 12px 0 0;
+}
+.reader-mobile-tabs {
+  display: none;
+}
+.reader-mobile-askbar,
+.reader-mobile-citation-page,
+.reader-mobile-primary-nav {
+  display: none;
+}
+.reader-android-mode,
+.reader-android-ai-peek,
+.reader-android-ask-fab {
+  display: none;
+}
