@@ -21,6 +21,7 @@ import {
   OriginalSyncError,
   workspaceSaveNeedsReadBack,
 } from "./errors";
+import { AccountController } from "./account";
 import { BackupRestoreController } from "./backup-restore";
 import { CloudSyncController } from "./cloud-sync";
 import { ImportsController } from "./imports";
@@ -66,7 +67,7 @@ import type {
 export class WorkspaceCoordinator {
   /** Internal to this directory: sub-controllers read the live session here. */
   active: Session | null = null;
-  private token = 0;
+  token = 0;
   listeners = new Set<() => void>();
   queues = new Map<string, Promise<void>>();
   /** Defers same-page full-snapshot saves until an atomic import is adopted. */
@@ -79,16 +80,8 @@ export class WorkspaceCoordinator {
   // A removed session may still be unwinding an IndexedDB or model promise.
   // Never let that continuation re-register a stale in-memory snapshot.
   discardedSessions = new WeakSet<Session>();
-  /** Identity-only fences survive switches; no deleted account body remains in memory. */
-  private discardedAccounts = new Set<string>();
-  /** Temporary uncertainty blocks access without discarding unsynced account data. */
-  private unverifiedAccounts = new Set<string>();
-  private accountDeletionTasks = new Map<string, Promise<void>>();
-  private accountDeletionErrors = new Map<string, string>();
-  private accountDeletionView: { accountId: string; token: number } | null = null;
-  private accountDeletionUnsubscribe: (() => void) | null = null;
-  private confirmedAccountDeletionUnsubscribe: (() => void) | null = null;
-  private deletionMarkerChecks = new WeakMap<Session, Promise<void>>();
+  /** Account access fences, local deletion and its retry surface. */
+  readonly account = new AccountController(this);
   /** Question requests and their evidence-boundary fences. */
   readonly questions = new QuestionsController(this);
   /** Page-run and durable organization tasks. */
@@ -111,7 +104,7 @@ export class WorkspaceCoordinator {
   pendingRecoveryWrites = new Map<Session, Set<Promise<void>>>();
   private localCommitUnsubscribe: (() => void) | null = null;
   private localReloadTasks = new WeakMap<Session, Promise<boolean>>();
-  private view: View = {
+  view: View = {
     data: createEmptyWorkspace(),
     user: null,
     status: "loading",
@@ -196,20 +189,21 @@ export class WorkspaceCoordinator {
             const body = owner.slice("recovery:".length);
             owner = body.slice(0, body.lastIndexOf(":", body.lastIndexOf(":") - 1));
           }
-          if (this.discardedAccounts.has(owner)) throw new LocalAccountDeletedError();
-          if (this.unverifiedAccounts.has(owner))
+          if (this.account.isDiscarded(owner)) throw new LocalAccountDeletedError();
+          if (this.account.isUnverified(owner))
             throw new Error("本机账号状态尚未核验，已暂停访问；请重新核验后继续。");
           try {
             const result: unknown = await Reflect.apply(value, target, args);
-            if (this.discardedAccounts.has(owner)) throw new LocalAccountDeletedError();
-            if (this.unverifiedAccounts.has(owner))
+            if (this.account.isDiscarded(owner)) throw new LocalAccountDeletedError();
+            if (this.account.isUnverified(owner))
               throw new Error("本机账号状态尚未核验，已暂停访问；请重新核验后继续。");
             return result;
           } catch (cause) {
             const confirmed =
               isAccountDeletionPendingError(cause) ||
               (cause instanceof Error && "code" in cause && cause.code === "LOCAL_ACCOUNT_DELETED");
-            if (owner !== "local" && confirmed) void this.discardAccount(owner).catch(() => {});
+            if (owner !== "local" && confirmed)
+              void this.account.discardAccount(owner).catch(() => {});
             throw cause;
           }
         };
@@ -252,7 +246,7 @@ export class WorkspaceCoordinator {
     if (session.localUpdateRevision !== null && session.localUpdateRevision <= localRevision)
       session.localUpdateRevision = null;
   }
-  private stopLocalCommitSubscription(): void {
+  stopLocalCommitSubscription(): void {
     const unsubscribe = this.localCommitUnsubscribe;
     this.localCommitUnsubscribe = null;
     try {
@@ -291,14 +285,7 @@ export class WorkspaceCoordinator {
   /** Releases browser resources owned by the coordinator when its hook unmounts. */
   dispose(): void {
     this.stopLocalCommitSubscription();
-    this.stopAccountDeletionSubscription();
-    const unsubscribe = this.confirmedAccountDeletionUnsubscribe;
-    this.confirmedAccountDeletionUnsubscribe = null;
-    try {
-      unsubscribe?.();
-    } catch {
-      /* Disposal never authorizes old writes. */
-    }
+    this.account.dispose();
     if (this.active) this.cloudSync.abortCloudUpdate(this.active);
     if (this.cloudOnly) {
       this.active = null;
@@ -311,11 +298,11 @@ export class WorkspaceCoordinator {
       this.active === session &&
       !session.exiting &&
       !session.accountAccessVerificationFailed &&
-      !this.discardedAccounts.has(accountKey(session.user))
+      !this.account.isDiscarded(accountKey(session.user))
     );
   }
   isCurrent(session: Session): boolean {
-    return this.active === session && !this.discardedAccounts.has(accountKey(session.user));
+    return this.active === session && !this.account.isDiscarded(accountKey(session.user));
   }
   private signOutState(session: Session): WorkspaceSignOutState {
     if (!session.user) return { kind: "ready", canSync: false, canKeepLocalDraft: false };
@@ -397,7 +384,7 @@ export class WorkspaceCoordinator {
     // A signing-out session deliberately rejects writes but still needs to
     // publish its frozen status while the Auth event replaces it.
     if (!this.isCurrent(session)) return;
-    this.accountDeletionView = null;
+    this.account.clearDeletionView();
     // Updates, cloud reconciliation, recovery and account changes all publish
     // through here. Stop old evidence requests as soon as their boundary changes.
     this.questions.abortInvalidated();
@@ -447,7 +434,7 @@ export class WorkspaceCoordinator {
   }
   remember(session: Session) {
     if (this.cloudOnly && this.active !== session) return;
-    if (this.discardedSessions.has(session) || this.discardedAccounts.has(accountKey(session.user)))
+    if (this.discardedSessions.has(session) || this.account.isDiscarded(accountKey(session.user)))
       return;
     const id = accountKey(session.user);
     const previous = this.memory.get(id);
@@ -515,10 +502,10 @@ export class WorkspaceCoordinator {
     return "此浏览器的本机副本暂时无法读取，当前仅可查看已确认的云端资料。请重新连接后再编辑、导入或整理。";
   }
   assertWritable(session: Session): void {
-    if (this.discardedAccounts.has(accountKey(session.user))) throw new LocalAccountDeletedError();
+    if (this.account.isDiscarded(accountKey(session.user))) throw new LocalAccountDeletedError();
     if (
       session.accountAccessVerificationFailed ||
-      this.unverifiedAccounts.has(accountKey(session.user))
+      this.account.isUnverified(accountKey(session.user))
     )
       throw new Error("本机账号状态尚未核验，已暂停访问；请重新核验后继续。");
     if (this.isCloudReadOnly(session)) throw new Error(this.readOnlyMessage());
@@ -526,13 +513,13 @@ export class WorkspaceCoordinator {
   persist(session: Session): Promise<void> {
     if (
       session.accountAccessVerificationFailed ||
-      this.unverifiedAccounts.has(accountKey(session.user))
+      this.account.isUnverified(accountKey(session.user))
     )
       return Promise.reject(new Error("本机账号状态尚未核验，已暂停访问；请重新核验后继续。"));
     if (this.isCloudReadOnly(session)) return Promise.reject(new Error(this.readOnlyMessage()));
     if (this.hasNewerLocalUpdate(session))
       return Promise.reject(new Error("另一个标签页已保存更新。请先载入最新数据，再继续编辑。"));
-    if (this.discardedSessions.has(session) || this.discardedAccounts.has(accountKey(session.user)))
+    if (this.discardedSessions.has(session) || this.account.isDiscarded(accountKey(session.user)))
       return Promise.reject(new LocalAccountDeletedError());
     const atomicBarrier = this.atomicLocalWriteBarriers.get(session);
     if (atomicBarrier) return atomicBarrier.then(() => this.persist(session));
@@ -559,8 +546,8 @@ export class WorkspaceCoordinator {
       if (this.cloudOnly && this.active !== session) return;
       // A write that had not reached IndexedDB when account deletion began
       // must not recreate the just-cleared account document.
-      if (this.discardedSessions.has(session) || this.discardedAccounts.has(id)) return;
-      if (session.accountAccessVerificationFailed || this.unverifiedAccounts.has(id))
+      if (this.discardedSessions.has(session) || this.account.isDiscarded(id)) return;
+      if (session.accountAccessVerificationFailed || this.account.isUnverified(id))
         throw new Error("本机账号状态尚未核验，已暂停访问；请重新核验后继续。");
       const savedRevision = await this.io.saveLocal(stored, id, session.localRevision);
       if (typeof savedRevision === "number") this.setLocalRevision(session, savedRevision);
@@ -577,7 +564,7 @@ export class WorkspaceCoordinator {
         this.remember(session);
       })
       .catch(async (cause) => {
-        if (this.discardedAccounts.has(id)) throw cause;
+        if (this.account.isDiscarded(id)) throw cause;
         session.localDirty = true;
         if (
           (cause instanceof Error &&
@@ -635,244 +622,6 @@ export class WorkspaceCoordinator {
     return write;
   }
 
-  private stopAccountDeletionSubscription(): void {
-    const unsubscribe = this.accountDeletionUnsubscribe;
-    this.accountDeletionUnsubscribe = null;
-    try {
-      unsubscribe?.();
-    } catch {
-      /* Authoritative checks do not rely on notifications. */
-    }
-  }
-
-  private startAccountDeletionSubscription(session: Session, accountId: string): void {
-    this.stopAccountDeletionSubscription();
-    if (!session.user) return;
-    let unsubscribe: (() => void) | undefined;
-    try {
-      unsubscribe = this.io.subscribeLocalAccountDeletions?.(accountId, () => {
-        void this.discardAccount(accountId).catch(() => {});
-      });
-    } catch {
-      /* Focus and activation still check the authoritative marker. */
-    }
-    const check = () => {
-      if (this.isCurrent(session) && !session.exiting)
-        void this.checkAccountDeletionMarker(session).catch(() => {});
-    };
-    const visibility = () => {
-      if (document.visibilityState === "visible") check();
-    };
-    if (typeof window !== "undefined") window.addEventListener("focus", check);
-    if (typeof window !== "undefined") window.addEventListener("pageshow", check);
-    if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibility);
-    this.accountDeletionUnsubscribe = () => {
-      unsubscribe?.();
-      if (typeof window !== "undefined") window.removeEventListener("focus", check);
-      if (typeof window !== "undefined") window.removeEventListener("pageshow", check);
-      if (typeof document !== "undefined")
-        document.removeEventListener("visibilitychange", visibility);
-    };
-  }
-
-  private checkAccountDeletionMarker(session: Session): Promise<void> {
-    const existing = this.deletionMarkerChecks.get(session);
-    if (existing) return existing;
-    const task = (async () => {
-      const accountId = session.user?.id;
-      if (!accountId || !this.io.isAccountLocallyDeleted) return;
-      try {
-        if (await this.io.isAccountLocallyDeleted(accountId)) await this.discardAccount(accountId);
-        else if (this.isCurrent(session)) {
-          this.unverifiedAccounts.delete(accountId);
-          if (session.accountAccessVerificationFailed) await this.activate(session.user);
-        }
-      } catch (cause) {
-        if (this.isCurrent(session)) {
-          this.unverifiedAccounts.add(accountId);
-          // A fresh activation has not read account data yet. It must not
-          // replace a retained dirty session with its empty loading snapshot.
-          if (session.ready) this.remember(session);
-          session.accountAccessVerificationFailed = true;
-          session.ready = false;
-          this.cloudSync.abortCloudUpdate(session);
-          session.status = "error";
-          session.error = "无法核验本机账号注销状态，已暂停访问：" + errorText(cause);
-          this.publish(session);
-        }
-        throw cause;
-      }
-    })();
-    this.deletionMarkerChecks.set(session, task);
-    const release = () => this.deletionMarkerChecks.delete(session);
-    void task.then(release, release);
-    return task;
-  }
-
-  private redactDeletedAccount(accountId: string): {
-    sessions: Set<Session>;
-    token: number | null;
-  } {
-    this.discardedAccounts.add(accountId);
-    this.unverifiedAccounts.delete(accountId);
-    const sessions = new Set<Session>();
-    const collect = (session: Session) => {
-      if (session.user?.id === accountId) sessions.add(session);
-    };
-    if (this.active) collect(this.active);
-    for (const session of this.memory.values()) collect(session);
-    for (const session of this.pendingLocalPersists.keys()) collect(session);
-    for (const session of this.pendingRecoveryWrites.keys()) collect(session);
-    for (const session of this.pumpTasks.keys()) collect(session);
-    this.questions.collectSessions(collect);
-    this.organization.collectSessions(collect);
-    this.imports.collectSessions(collect);
-    this.memory.delete(accountId);
-    const visible = this.active?.user?.id === accountId;
-    if (visible) {
-      this.stopLocalCommitSubscription();
-      this.stopAccountDeletionSubscription();
-      this.active = null;
-    }
-    for (const session of sessions) {
-      this.discardedSessions.add(session);
-      this.pendingLocalPersists.delete(session);
-      this.backupRestore.redactSession(session);
-      this.cloudSync.abortCloudUpdate(session);
-      session.data = { ...createEmptyWorkspace(), spaces: [] };
-      session.recovery = null;
-      session.recoveryRevision = null;
-      session.confirmedCloud = null;
-      session.anonymousWorkspace = null;
-      session.anonymousMigration = noAnonymousWorkspaceMigration();
-      session.error = "";
-      session.accountAccessVerificationFailed = false;
-      session.ready = false;
-      session.localDirty = false;
-      session.cloudDirty = false;
-      session.purging = false;
-      this.imports.redactSession(session);
-    }
-    const stopped = new DOMException("账号注销请求已提交，本次操作已停止。", "AbortError");
-    this.questions.redactAccount(accountId, stopped);
-    this.organization.redactAccount(accountId, stopped);
-    this.imports.redactAccount(accountId, stopped);
-    if (!visible) {
-      const prior = this.accountDeletionView;
-      if (prior?.accountId === accountId && this.view.token === prior.token && !this.active) {
-        this.view = {
-          ...this.view,
-          accountDeletionState: "clearing",
-          error: "账号已停止访问，正在重试本机清理。",
-        };
-        this.listeners.forEach((listener) => listener());
-        return { sessions, token: prior.token };
-      }
-      return { sessions, token: null };
-    }
-    const token = ++this.token;
-    this.accountDeletionView = { accountId, token };
-    this.view = {
-      ...this.view,
-      data: { ...createEmptyWorkspace(), spaces: [] },
-      user: null,
-      status: "error",
-      error: "账号已提交注销，本机资料已停止访问，正在清理本机副本。",
-      ready: false,
-      recovery: null,
-      recoveryRevision: null,
-      noteSyncPlan: null,
-      readingProgressSyncPlan: null,
-      token,
-      purging: false,
-      organizationStatus: { ready: false, running: false, message: "账号已停止访问。" },
-      localCacheMode: "normal",
-      localUpdateRevision: null,
-      loadingLocalUpdate: false,
-      cloudUpdateRevision: null,
-      checkingCloudUpdate: false,
-      loadingCloudUpdate: false,
-      cloudUpdateError: "",
-      cloudAdoptionSequence: 0,
-      signOutState: { kind: "ready", canSync: false, canKeepLocalDraft: false },
-      anonymousMigration: noAnonymousWorkspaceMigration(),
-      accountDeletionState: "clearing",
-      accountAccessVerificationFailed: false,
-    };
-    this.listeners.forEach((listener) => listener());
-    return { sessions, token };
-  }
-
-  /** Fence and redact synchronously, then persist the marker before draining old writes. */
-  async discardAccount(accountId: string): Promise<void> {
-    if (
-      !accountId ||
-      accountId.trim() !== accountId ||
-      accountId === "local" ||
-      accountId.startsWith("recovery:")
-    )
-      throw new Error("清理失败：账户身份无效。");
-    const { sessions, token } = this.redactDeletedAccount(accountId);
-    let task = this.accountDeletionTasks.get(accountId);
-    if (!task) {
-      task = (async () => {
-        const errors: string[] = [];
-        try {
-          await this.io.markAccountLocalDeletion?.(accountId);
-        } catch (cause) {
-          errors.push("本机注销标记保存失败：" + errorText(cause));
-        }
-        for (;;) {
-          const tail = this.queues.get(accountId);
-          await tail?.catch(() => {});
-          if (this.queues.get(accountId) === tail) break;
-        }
-        const recoveryWrites = [...sessions].flatMap((session) => [
-          ...(this.pendingRecoveryWrites.get(session) ?? []),
-        ]);
-        await Promise.all(recoveryWrites.map((write) => write.catch(() => {})));
-        try {
-          await this.io.clearAccountLocalCache?.(accountId);
-        } catch (cause) {
-          errors.push("本机副本清理失败：" + errorText(cause));
-        }
-        if (errors.length) {
-          this.accountDeletionErrors.set(accountId, errors.join("；"));
-          throw new Error(errors.join("；"));
-        }
-        this.accountDeletionErrors.delete(accountId);
-      })();
-      this.accountDeletionTasks.set(accountId, task);
-      const release = () => {
-        if (this.accountDeletionTasks.get(accountId) === task)
-          this.accountDeletionTasks.delete(accountId);
-      };
-      void task.then(release, release);
-    }
-    try {
-      await task;
-    } finally {
-      if (token !== null && this.view.token === token && !this.active) {
-        const error = this.accountDeletionErrors.get(accountId);
-        this.view = {
-          ...this.view,
-          accountDeletionState: error ? "cleanup-failed" : "blocked",
-          error: error
-            ? "账号已停止访问，但本机清理尚未完成：" + error
-            : "账号已提交注销，本机副本已清理并停止访问。",
-        };
-        this.listeners.forEach((listener) => listener());
-      }
-    }
-  }
-
-  async retryAccountLocalDeletion(): Promise<void> {
-    const target = this.accountDeletionView;
-    if (!target || this.view.token !== target.token || this.active)
-      throw new Error("当前账号状态已改变，请重新打开账号设置核对。");
-    await this.discardAccount(target.accountId);
-  }
-
   writesBlocked(session: Session): boolean {
     return (
       this.isCloudReadOnly(session) ||
@@ -894,11 +643,7 @@ export class WorkspaceCoordinator {
   }
 
   async activate(user: User | null): Promise<void> {
-    if (!this.confirmedAccountDeletionUnsubscribe && this.io.subscribeConfirmedAccountDeletions) {
-      this.confirmedAccountDeletionUnsubscribe = this.io.subscribeConfirmedAccountDeletions(
-        (accountId) => this.discardAccount(accountId),
-      );
-    }
+    this.account.watchConfirmedDeletions();
     const previous = this.active;
     if (previous) this.cloudSync.abortCloudUpdate(previous);
     if (
@@ -911,7 +656,7 @@ export class WorkspaceCoordinator {
       void this.persist(previous).catch(() => {});
     }
     this.stopLocalCommitSubscription();
-    this.stopAccountDeletionSubscription();
+    this.account.stopAccountDeletionSubscription();
     const id = accountKey(user);
     const retained = this.memory.get(id);
     const session: Session = {
@@ -962,13 +707,13 @@ export class WorkspaceCoordinator {
     }
     this.startLocalCommitSubscription(session, id);
     this.publish(session);
-    this.startAccountDeletionSubscription(session, id);
-    if (user && this.discardedAccounts.has(id)) {
-      await this.discardAccount(id).catch(() => {});
+    this.account.startAccountDeletionSubscription(session, id);
+    if (user && this.account.isDiscarded(id)) {
+      await this.account.discardAccount(id).catch(() => {});
       return;
     }
     try {
-      await this.checkAccountDeletionMarker(session);
+      await this.account.checkAccountDeletionMarker(session);
     } catch {
       return;
     }
@@ -1984,6 +1729,14 @@ export class WorkspaceCoordinator {
       // A failed reconnect must not block local persistence of edits.
       if (session.localDirty) await this.pump(session);
     }
+  }
+
+  discardAccount(accountId: string): Promise<void> {
+    return this.account.discardAccount(accountId);
+  }
+
+  retryAccountLocalDeletion(): Promise<void> {
+    return this.account.retryAccountLocalDeletion();
   }
 
   migrateAnonymousWorkspace(token: number): Promise<void> {
