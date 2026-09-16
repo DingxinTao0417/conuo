@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import type {
   AnswerNoteEvidence,
   AnswerRequest,
-  SaveState,
   Source,
   SourceBlobReadOptions,
   WorkspaceData,
@@ -129,133 +128,51 @@ import {
   planNoteSyncConflicts,
   rebaseIndependentWorkspaceChanges,
   resolveNoteSyncConflict,
-  type NoteConflictResolutionChoice,
   type NoteSyncPlan,
-  type ReadingProgressConflictChoice,
   type ReadingProgressSyncPlan,
 } from "./sync-conflicts";
+import {
+  anonymousMigrationSummary,
+  hasMeaningfulWorkspaceContent,
+  mergeConcurrentWorkspace,
+  noAnonymousWorkspaceMigration,
+  sameData,
+  sameDataOutsideNotes,
+  withoutAnonymousCloudPaths,
+} from "./workspace-coordinator/merge";
+import type {
+  AtomicPreparedImportResult,
+  ImportPipeline,
+  ImportStartResult,
+  LocalCacheMode,
+  NoteSyncConflictSelection,
+  PendingImport,
+  PendingLocalPersist,
+  PendingOrganization,
+  PendingQuestion,
+  QueuedImport,
+  ReadingProgressSyncSelection,
+  RecoverableImportTransition,
+  RemoteWorkspace,
+  Session,
+  StoredWorkspace,
+  SyncMeta,
+  User,
+  View,
+  WorkspaceIO,
+  WorkspaceSignOutState,
+} from "./workspace-coordinator/types";
 
-type User = { id: string; email: string };
-type SyncMeta = {
-  revision: number;
-  dirty: boolean;
-  /** Exact cloud snapshot acknowledged at `baseRevision`; persisted only while dirty. */
-  base?: WorkspaceData;
-  baseRevision?: number;
-};
-type StoredWorkspace = WorkspaceData & {
-  _conuoSync?: SyncMeta;
-  _conuoLocalRevision?: number;
-};
-type RemoteWorkspace = { data: WorkspaceData | null; revision: number };
-/**
- * The account panel uses this to decide whether signing out can safely happen
- * now, or whether the current account needs an explicit protection choice.
- */
-export type WorkspaceSignOutState = {
-  kind: "ready" | "syncing" | "unsynced" | "conflict" | "local-error";
-  message?: string;
-  canSync: boolean;
-  canKeepLocalDraft: boolean;
-};
-
-/**
- * A logged-in account never silently absorbs the browser's anonymous library.
- * The UI can use this state to present one explicit migration decision before
- * normal account writes are allowed to bootstrap an otherwise empty workspace.
- */
-export type AnonymousWorkspaceMigrationState = {
-  kind:
-    "none" | "pending" | "migrating" | "migrated" | "dismissed" | "requires-export" | "unavailable";
-  canMigrate: boolean;
-  message?: string;
-  sourceCount?: number;
-  noteCount?: number;
-  /** True only after a local migration has been confirmed but cloud sync is still pending. */
-  pendingCloudConfirmation?: boolean;
-};
-
-/**
- * `cloud-readonly` is a recovery state, not an alternate persistence mode.
- * We show only an already-confirmed remote snapshot while IndexedDB cannot be
- * read, and never use that condition as permission to write a replacement.
- */
-export type LocalCacheMode = "normal" | "cloud-readonly";
-
-function noAnonymousWorkspaceMigration(): AnonymousWorkspaceMigrationState {
-  return { kind: "none", canMigrate: false };
-}
-
-type View = {
-  accountDeletionState?: "clearing" | "blocked" | "cleanup-failed" | null;
-  accountAccessVerificationFailed?: boolean;
-  data: WorkspaceData;
-  user: User | null;
-  status: SaveState;
-  error: string;
-  ready: boolean;
-  recovery: WorkspaceData | null;
-  /** Revision of the remote snapshot held for an explicit conflict decision. */
-  recoveryRevision: number | null;
-  /** Present only when the conflict is limited to safely reviewable live notes. */
-  noteSyncPlan: NoteSyncPlan | null;
-  /** Present only when both browsers changed otherwise-identical reading positions. */
-  readingProgressSyncPlan: ReadingProgressSyncPlan | null;
-  token: number;
-  organizationStatus: OrganizationStatus;
-  /** Server-side purge locks the workspace until its atomic result is persisted locally. */
-  purging: boolean;
-  /** Whether this browser can safely write its account-scoped local cache. */
-  localCacheMode: LocalCacheMode;
-  /** Newest committed IndexedDB revision announced by another browser tab. */
-  localUpdateRevision: number | null;
-  /** Locks edits while the explicit cross-tab reload coordinates pending writes. */
-  loadingLocalUpdate: boolean;
-  cloudUpdateRevision: number | null;
-  checkingCloudUpdate: boolean;
-  /** Coordinates the short local commit; ordinary editor input is still retained. */
-  loadingCloudUpdate: boolean;
-  cloudUpdateError: string;
-  /** Increments only after a newer authoritative snapshot is durably adopted. */
-  cloudAdoptionSequence: number;
-  signOutState: WorkspaceSignOutState;
-  anonymousMigration: AnonymousWorkspaceMigrationState;
-};
-type Session = Omit<View, "noteSyncPlan" | "readingProgressSyncPlan" | "signOutState"> & {
-  /** IndexedDB compare-and-swap revision for this account's local workspace record. */
-  localRevision: number;
-  revision: number;
-  knownRevision: boolean;
-  localDirty: boolean;
-  cloudDirty: boolean;
-  blocked: "error" | "conflict" | null;
-  pumping: boolean;
-  checking: boolean;
-  /** Prevents late UI, import and model callbacks from changing a just-exited account. */
-  exiting: boolean;
-  confirmedCloud: WorkspaceData | null;
-  /** Kept only while an explicit anonymous-library decision is pending. */
-  anonymousWorkspace: WorkspaceData | null;
-};
-type PendingLocalPersist = {
-  data: WorkspaceData;
-  revision: number;
-  cloudDirty: boolean;
-  confirmedCloud: WorkspaceData | null;
-  promise: Promise<void>;
-};
-type PendingQuestion = {
-  session: Session;
-  request: AnswerRequest;
-  contextKey: string;
-  controller: AbortController;
-};
-type PendingOrganization = {
-  session: Session;
-  request: OrganizationRequest;
-  contextKey: string;
-  controller: AbortController;
-};
+export type {
+  AnonymousWorkspaceMigrationState,
+  ImportPipeline,
+  ImportStartResult,
+  LocalCacheMode,
+  NoteSyncConflictSelection,
+  ReadingProgressSyncSelection,
+  WorkspaceIO,
+  WorkspaceSignOutState,
+} from "./workspace-coordinator/types";
 
 function keepsRunningAfterBrowserExit(job: OrganizationJob): boolean {
   return (
@@ -302,122 +219,11 @@ function reconcileDurableOrganizationProjections(
   return changed ? { ...local, organizationJobs: jobs } : local;
 }
 
-type PendingImport = {
-  session: Session;
-  jobId: string;
-  controller: AbortController;
-  lease?: ActiveImportLease;
-  /**
-   * A terminal or restart transition has staged this exact pair locally. It
-   * keeps the normal import-state observer from aborting the transition just
-   * because the job has left its running state.
-   */
-  transitionTarget?: { source: Source; job: ImportJob };
-  /** A user cancellation owns the transition until its fenced RPC settles. */
-  cancelling?: boolean;
-};
-type QueuedImport = Pick<PendingImport, "session" | "jobId">;
-type ActiveImportLease = {
-  sourceId: string;
-  versionId: string;
-  token: string;
-  leaseUntil: string;
-  heartbeatTimer?: ReturnType<typeof setTimeout>;
-  renewing: boolean;
-  /** A renewal or ownership fence failed, so the worker must discard its output. */
-  lost?: Error;
-  release?: Promise<void>;
-};
-type ImportTransitionAction = "finish" | "cancel" | "retry";
-type RecoverableImportTransition = {
-  action: ImportTransitionAction;
-  jobId: string;
-  sourceId: string;
-  versionId: string;
-};
-
-export type NoteSyncConflictSelection = {
-  conflictId: string;
-  choice: NoteConflictResolutionChoice;
-  /** Empty string is a valid manually merged note body. */
-  content?: string;
-};
-
-export type ReadingProgressSyncSelection = {
-  conflictId: string;
-  choice: ReadingProgressConflictChoice;
-};
-
-export type ImportStartResult =
-  { kind: "duplicate"; source: Source } | { kind: "queued"; job: ImportJob };
-type AtomicPreparedImportResult = {
-  start: ImportStartResult;
-  /** Exact source written or associated by the transaction, used to repair an in-flight page edit. */
-  source: Source;
-  job?: ImportJob;
-  changed: boolean;
-};
-export interface ImportPipeline {
-  prepare: typeof prepareImportFile;
-  parse: typeof parseImportSource;
-}
 const defaultImportPipeline: ImportPipeline = {
   prepare: prepareImportFile,
   parse: parseImportSource,
 };
 
-export interface WorkspaceIO {
-  beginSession?: (accountId: string) => void;
-  clearSession?: (accountId?: string) => void;
-  loadLocal: (accountId?: string) => Promise<StoredLocalWorkspace | null>;
-  saveLocal: (
-    data: WorkspaceData,
-    accountId?: string,
-    expectedLocalRevision?: number,
-  ) => Promise<number | void>;
-  /** Atomically rechecks and publishes one prepared import against the newest local snapshot. */
-  commitLocalImport?: typeof commitLocalImport;
-  /** Account-scoped invalidation only; workspace contents remain in IndexedDB. */
-  subscribeLocalCommits?: typeof subscribeLocalWorkspaceCommits;
-  loadCloud: typeof loadCloudWorkspace;
-  loadCloudRevision?: typeof loadCloudWorkspaceRevision;
-  saveCloud: typeof saveCloudWorkspace;
-  getBlob: typeof getBlob;
-  /** Production local reads require provenance recorded with the bytes. */
-  getAccountBlob?: typeof getBlob;
-  putBlobIfAbsent?: typeof putBlobIfAbsent;
-  putAccountBlobIfAbsent?: typeof putBlobIfAbsent;
-  shareAnonymousOriginals?: typeof shareAnonymousOriginals;
-  deleteUnreferencedBlob?: typeof deleteUnreferencedBlob;
-  deleteAccountUnreferencedBlob?: typeof deleteUnreferencedBlob;
-  /** Removes a deleted cloud account's IndexedDB snapshot and safe-to-delete originals. */
-  clearAccountLocalCache?: typeof clearAccountLocalCache;
-  isAccountLocallyDeleted?: typeof isAccountLocallyDeleted;
-  markAccountLocalDeletion?: typeof markAccountLocalDeletion;
-  subscribeLocalAccountDeletions?: typeof subscribeLocalAccountDeletions;
-  subscribeConfirmedAccountDeletions?: typeof subscribeConfirmedAccountDeletions;
-  uploadBlob: typeof uploadSourceBlob;
-  downloadBlob: typeof downloadSourceBlob;
-  previewSourcePurge?: typeof previewSourcePurgeCloud;
-  requestSourcePurge?: typeof requestSourcePurgeCloud;
-  previewSourceVersionPurge?: typeof previewSourceVersionPurgeCloud;
-  requestSourceVersionPurge?: typeof requestSourceVersionPurgeCloud;
-  /** Optional to preserve a safe local-only import path in tests and offline mode. */
-  claimImportParse?: typeof claimImportParse;
-  heartbeatImportParse?: typeof heartbeatImportParse;
-  releaseImportParse?: typeof releaseImportParse;
-  finishImportParse?: typeof finishImportParse;
-  cancelImportParse?: typeof cancelImportParse;
-  retryImportParse?: typeof retryImportParse;
-  /** Optional while an older deployed API has not yet received the durable-task migration. */
-  enqueueOrganizationJob?: typeof enqueueOrganizationJobCloud;
-  cancelOrganizationJob?: typeof cancelOrganizationJobCloud;
-  reconcileOrganizationJobs?: typeof reconcileOrganizationJobsCloud;
-  askCloud: typeof askCloud;
-  organizeCloud: typeof organizeCloud;
-  getModelStatus: typeof getModelStatus;
-  readLegacyMeta: (id: string) => SyncMeta | null;
-}
 function parseSyncMeta(value: unknown): SyncMeta | null {
   if (
     !value ||
@@ -535,201 +341,6 @@ function unpack(stored: WorkspaceData | null): {
       ? Number(_conuoLocalRevision)
       : 0;
   return { data, meta: parseSyncMeta(_conuoSync), localRevision };
-}
-function sameData(left: WorkspaceData, right: WorkspaceData): boolean {
-  // JSONB and schema parsing may reorder object keys. Array order remains meaningful.
-  const canonical = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(canonical);
-    if (value && typeof value === "object")
-      return Object.fromEntries(
-        Object.entries(value)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([key, item]) => [key, canonical(item)]),
-      );
-    return value;
-  };
-  return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
-}
-
-function hasOwn(value: object, key: PropertyKey): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key);
-}
-
-function sameWorkspaceField(
-  left: WorkspaceData,
-  right: WorkspaceData,
-  key: keyof WorkspaceData,
-): boolean {
-  return (
-    hasOwn(left, key) === hasOwn(right, key) &&
-    JSON.stringify(left[key]) === JSON.stringify(right[key])
-  );
-}
-
-function sameOptionalRecord<T>(left: T | undefined, right: T | undefined): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
-
-/**
- * Three-way merges identity collections without guessing through a true
- * two-sided conflict. Atomic imports normally add a fresh source/job while an
- * editor changes an unrelated record, so those independent changes combine.
- */
-function mergeConcurrentRecords<T extends { id: string }>(
-  current: T[],
-  committed: T[],
-  boundary: T[],
-): T[] | null {
-  const currentById = new Map(current.map((record) => [record.id, record]));
-  const committedById = new Map(committed.map((record) => [record.id, record]));
-  const boundaryById = new Map(boundary.map((record) => [record.id, record]));
-  const ids = new Set([
-    ...committed.map((record) => record.id),
-    ...current.map((record) => record.id),
-    ...boundary.map((record) => record.id),
-  ]);
-  const selected = new Map<string, T>();
-
-  for (const id of ids) {
-    const before = boundaryById.get(id);
-    const local = currentById.get(id);
-    const incoming = committedById.get(id);
-    const localChanged = !sameOptionalRecord(local, before);
-    const incomingChanged = !sameOptionalRecord(incoming, before);
-    if (localChanged && incomingChanged && !sameOptionalRecord(local, incoming)) return null;
-    const value = localChanged ? local : incomingChanged ? incoming : before;
-    if (value) selected.set(id, value);
-  }
-
-  const ordered: T[] = [];
-  for (const record of [...committed, ...current]) {
-    const value = selected.get(record.id);
-    if (!value || ordered.some((item) => item.id === record.id)) continue;
-    ordered.push(value);
-  }
-  return ordered;
-}
-
-/**
- * Replays changes made by this page while an atomic import transaction waited,
- * while retaining independent fields already committed by another tab. A true
- * two-sided change is left unresolved so a stale full snapshot is never saved.
- */
-function mergeConcurrentWorkspace(
-  current: WorkspaceData,
-  committed: WorkspaceData,
-  boundary: WorkspaceData,
-): WorkspaceData | null {
-  const mergedSources = mergeConcurrentRecords(
-    current.sources,
-    committed.sources,
-    boundary.sources,
-  );
-  if (!mergedSources) return null;
-  const mergedJobs = mergeConcurrentRecords(
-    current.importJobs ?? [],
-    committed.importJobs ?? [],
-    boundary.importJobs ?? [],
-  );
-  if (!mergedJobs) return null;
-
-  const merged = structuredClone(committed) as WorkspaceData;
-  const mergedRecord = merged as unknown as Record<string, unknown>;
-  const currentRecord = current as unknown as Record<string, unknown>;
-  const keys = new Set<keyof WorkspaceData>([
-    ...(Object.keys(boundary) as (keyof WorkspaceData)[]),
-    ...(Object.keys(current) as (keyof WorkspaceData)[]),
-    ...(Object.keys(committed) as (keyof WorkspaceData)[]),
-  ]);
-  keys.delete("sources");
-  keys.delete("importJobs");
-
-  for (const key of keys) {
-    const localChanged = !sameWorkspaceField(current, boundary, key);
-    const incomingChanged = !sameWorkspaceField(committed, boundary, key);
-    if (localChanged && incomingChanged && !sameWorkspaceField(current, committed, key))
-      return null;
-    if (!localChanged) continue;
-    if (hasOwn(current, key)) mergedRecord[key] = structuredClone(currentRecord[key]);
-    else delete mergedRecord[key];
-  }
-
-  merged.sources = mergedSources;
-  if (
-    mergedJobs.length ||
-    hasOwn(current, "importJobs") ||
-    hasOwn(committed, "importJobs") ||
-    hasOwn(boundary, "importJobs")
-  )
-    merged.importJobs = mergedJobs;
-  else delete merged.importJobs;
-  return merged;
-}
-function sameDataOutsideNotes(left: WorkspaceData, right: WorkspaceData): boolean {
-  const withoutNotes = (data: WorkspaceData) =>
-    Object.fromEntries(Object.entries(data).filter(([key]) => key !== "notes"));
-  return JSON.stringify(withoutNotes(left)) === JSON.stringify(withoutNotes(right));
-}
-
-/**
- * `createEmptyWorkspace()` always contains one default space, so a simple
- * `spaces.length` check would turn every fresh browser into a migration prompt.
- * Treat any user-visible material, non-default library configuration, or a
- * changed initial space as actual data that must never be silently replaced.
- */
-function hasMeaningfulWorkspaceContent(data: WorkspaceData): boolean {
-  if (
-    data.sources.length ||
-    data.notes.length ||
-    data.annotations.length ||
-    data.conversations.length ||
-    data.importJobs?.length ||
-    data.organizationJobs?.length ||
-    data.conceptRelations?.length ||
-    data.aiEnabled !== true ||
-    data.semanticSearch === true ||
-    data.autoOrganize === true
-  )
-    return true;
-  if (data.spaces.length !== 1) return true;
-  const [space] = data.spaces;
-  return (
-    !space ||
-    space.name !== "我的学习空间" ||
-    !!space.goal.trim() ||
-    space.color !== "#4B3FE3" ||
-    space.archived
-  );
-}
-
-function anonymousMigrationSummary(
-  kind: AnonymousWorkspaceMigrationState["kind"],
-  data: WorkspaceData,
-  message: string,
-  canMigrate = false,
-): AnonymousWorkspaceMigrationState {
-  return {
-    kind,
-    canMigrate,
-    message,
-    sourceCount: data.sources.length,
-    noteCount: data.notes.length,
-  };
-}
-
-/**
- * Anonymous snapshots have no trustworthy cloud ownership. Retain their local
- * Blob references, but never carry a Storage path into a newly signed-in
- * account. The normal pump then uploads each available original under the
- * current account's canonical path.
- */
-function withoutAnonymousCloudPaths(data: WorkspaceData): WorkspaceData {
-  const migrated = structuredClone(data);
-  for (const source of migrated.sources) {
-    delete source.storagePath;
-    for (const version of source.versions ?? []) delete version.storagePath;
-  }
-  return migrated;
 }
 function conflictRecordId(prefix: string): string {
   const uuid = globalThis.crypto?.randomUUID?.();
