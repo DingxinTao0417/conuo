@@ -1,4 +1,10 @@
 @media (min-width: 621px) and (max-width: 1024px) {
+  .topbar-tasks,
+  .topbar-search-trigger,
+  .topbar-account {
+    min-width: 40px;
+    min-height: 40px;
+  }
   .editor-toolbar .icon-btn,
   .content-toolbar > .icon-btn {
     width: 40px;

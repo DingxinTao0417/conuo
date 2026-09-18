@@ -62,7 +62,7 @@
     height: 44px;
   }
   .topbar {
-    height: 51px;
+    height: var(--workspace-header-height);
     padding: 0 12px;
     gap: 6px;
   }
@@ -83,6 +83,7 @@
     gap: 5px;
   }
   .topbar-search-trigger,
+  .topbar-tasks,
   .topbar-account {
     justify-content: center;
     width: 44px;
@@ -126,7 +127,7 @@
     min-height: 44px;
   }
   .content-scroll {
-    padding: 25px 20px 45px;
+    padding: 24px 20px calc(76px + env(safe-area-inset-bottom));
   }
   .page-heading {
     margin-bottom: 25px;
@@ -151,13 +152,18 @@
     font-size: 15px;
   }
   .welcome-card p {
-    font-size: 11px;
+    font-size: 13px;
+    color: var(--text-tertiary);
+  }
+  .home-workspace .welcome-card .btn,
+  .home-workspace .continue-empty .text-button {
+    min-height: 44px;
   }
   .button-row {
     gap: 8px;
   }
   .button-row .btn {
-    font-size: 11px;
+    font-size: 13px;
   }
   .library-tools {
     flex-wrap: wrap;
@@ -207,21 +213,25 @@
     height: 39px;
   }
   .source-open b {
-    font-size: 12px;
+    font-size: 14px;
   }
   .source-row > .badge {
     position: absolute;
     bottom: 14px;
     left: 54px;
-    font-size: 8px;
+    font-size: 11px;
     padding: 0 5px;
   }
   .source-open p {
     margin-bottom: 18px;
-    font-size: 8px;
+    font-size: 12px;
   }
   .source-open .tag {
-    font-size: 8px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
   }
   .source-row > .star-btn,
   .source-row > .icon-btn:last-child {
@@ -260,7 +270,7 @@
     grid-template-columns: 1fr;
   }
   .note-card {
-    min-height: 210px;
+    min-height: 200px;
   }
   .note-paper {
     margin: 0;
@@ -378,7 +388,7 @@
     font-size: 11px;
   }
   .setting-row p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .conversation-row {
     flex-wrap: wrap;
@@ -390,14 +400,14 @@
   }
   .conversation-row > .btn {
     margin-left: 31px;
-    font-size: 10px;
-    min-height: 27px;
+    font-size: 12px;
+    min-height: 44px;
   }
   .empty-state {
     padding: 65px 15px;
   }
   .empty-state p {
-    font-size: 11px;
+    font-size: 13px;
   }
   .modal-body {
     padding: 19px;
@@ -426,11 +436,11 @@
     padding: 6px 9px;
   }
   .toast {
-    bottom: 15px;
-    font-size: 11px;
+    bottom: calc(68px + env(safe-area-inset-bottom));
+    font-size: 12px;
   }
   .notice {
-    font-size: 10px;
+    font-size: 12px;
   }
   .modal-header {
     padding: 15px 19px;
@@ -440,7 +450,8 @@
     gap: 10px;
   }
   .trash-row .btn {
-    font-size: 10px;
+    min-height: 44px;
+    font-size: 12px;
     padding: 6px 9px;
   }
   .trash-row b {

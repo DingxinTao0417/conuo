@@ -16,6 +16,30 @@
   color: #737373;
   font-weight: 400;
 }
+.reader-annotations-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.reader-annotations-heading h3 {
+  margin: 0;
+}
+@media (max-width: 1024px) {
+  .reader-annotations-heading .icon-btn {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+}
+@media (max-width: 620px) {
+  .reader-annotations-heading .icon-btn {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+}
 .reader-annotation-compose {
   flex-shrink: 0;
   padding: 14px 24px;

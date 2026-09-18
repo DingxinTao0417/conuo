@@ -18,6 +18,8 @@ describe("reader document controls and source actions", () => {
   let root: Root;
   let props: ReaderProps;
   let scrollDescriptor: PropertyDescriptor | undefined;
+  let compactLayout: boolean;
+  let compactLayoutListeners: Set<() => void>;
 
   beforeEach(async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -25,9 +27,21 @@ describe("reader document controls and source actions", () => {
       window.setTimeout(() => callback(0), 0),
     );
     vi.stubGlobal("cancelAnimationFrame", (id: number) => window.clearTimeout(id));
+    compactLayout = false;
+    compactLayoutListeners = new Set();
     vi.stubGlobal(
       "matchMedia",
-      vi.fn(() => ({ matches: false })),
+      vi.fn((query: string) => ({
+        get matches() {
+          return query === "(max-width: 1024px)" && compactLayout;
+        },
+        addEventListener: (_event: string, listener: () => void) => {
+          if (query === "(max-width: 1024px)") compactLayoutListeners.add(listener);
+        },
+        removeEventListener: (_event: string, listener: () => void) => {
+          if (query === "(max-width: 1024px)") compactLayoutListeners.delete(listener);
+        },
+      })),
     );
     scrollDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
     Object.defineProperty(Element.prototype, "scrollIntoView", {
@@ -155,6 +169,59 @@ describe("reader document controls and source actions", () => {
     expect(topbar?.querySelector('[aria-label^="打开资料目录"]')).toBeNull();
     expect(topbar?.querySelector("[data-reader-region-trigger]")).toBeNull();
     expect(topbar?.querySelector('[aria-label="PDF 阅读模式"]')).toBeNull();
+  });
+
+  it("connects the desktop Ask AI toggle to the panel and tracks opening and closing it", async () => {
+    const ai = host.querySelector<HTMLButtonElement>(".reader-topbar .reader-ai-toggle")!;
+    expect(ai.getAttribute("aria-controls")).toBe("reader-ai-panel");
+    expect(ai.getAttribute("aria-expanded")).toBe("true");
+    expect(host.querySelector("#reader-ai-panel")).toBeTruthy();
+
+    await click(ai);
+    expect(ai.getAttribute("aria-expanded")).toBe("false");
+    expect(host.querySelector("#reader-ai-panel")).toBeNull();
+
+    await click(ai);
+    expect(ai.getAttribute("aria-expanded")).toBe("true");
+    expect(host.querySelector("#reader-ai-panel")).toBeTruthy();
+    expect(props.onAsk).not.toHaveBeenCalled();
+  });
+
+  it("updates Ask AI visibility on compact layout changes while preserving the mounted panel", async () => {
+    const ai = host.querySelector<HTMLButtonElement>(".reader-topbar .reader-ai-toggle")!;
+    const panel = host.querySelector("#reader-ai-panel");
+    expect(panel).toBeTruthy();
+    expect(ai.getAttribute("aria-expanded")).toBe("true");
+
+    // The media-query change itself must update the toggle, without relying
+    // on a document edit or an unrelated Reader state change to rerender it.
+    await act(async () => {
+      compactLayout = true;
+      compactLayoutListeners.forEach((listener) => listener());
+    });
+    expect(ai.getAttribute("aria-controls")).toBe("reader-ai-panel");
+    expect(ai.getAttribute("aria-expanded")).toBe("false");
+    expect(host.querySelector("#reader-ai-panel")).toBe(panel);
+
+    await click(ai);
+    expect(ai.getAttribute("aria-expanded")).toBe("true");
+    expect(host.querySelector(".reader-workspace")?.classList.contains("reader-mobile-ai")).toBe(
+      true,
+    );
+    await click(ai);
+    expect(ai.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      host.querySelector(".reader-workspace")?.classList.contains("reader-mobile-reading"),
+    ).toBe(true);
+    expect(host.querySelector("#reader-ai-panel")).toBe(panel);
+
+    await act(async () => {
+      compactLayout = false;
+      compactLayoutListeners.forEach((listener) => listener());
+    });
+    expect(ai.getAttribute("aria-expanded")).toBe("true");
+    expect(host.querySelector("#reader-ai-panel")).toBe(panel);
+    expect(props.onAsk).not.toHaveBeenCalled();
   });
 
   it("keeps enough room for the reader when a narrow desktop resizes the AI panel", () => {

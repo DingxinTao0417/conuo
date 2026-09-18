@@ -227,6 +227,9 @@ describe("Reader PDF reading mode integration", () => {
       );
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+    });
   }
 
   function scrolledPhysicalPages() {

@@ -14,21 +14,19 @@
     display: none;
   }
   .reader-document-tools {
-    position: static;
+    position: sticky;
     width: 100%;
     margin-bottom: 12px;
-    box-shadow: none;
+    box-shadow: 0 3px 10px rgb(23 23 23 / 5%);
     flex-wrap: wrap;
   }
-  /* A phone keeps reading position and zoom in place and moves the
-     format-specific tools behind one control, which is what makes the strip
-     fit the 336px of content a 360px phone has. */
+  /* Page navigation stays visible; settings expand below it when needed. */
   .reader-toolstrip-toggle {
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
     gap: 4px;
-    min-height: 32px;
+    min-height: 44px;
     padding: 4px 9px;
     border: 1px solid #e5e5e5;
     border-radius: 8px;
@@ -48,12 +46,28 @@
   .reader-document-tools[data-tools-expanded="true"] .reader-toolstrip-tools {
     display: flex;
     flex-basis: 100%;
-    justify-content: flex-end;
-    gap: 4px;
+    justify-content: flex-start;
+    gap: 8px;
     margin-top: 6px;
     padding-top: 6px;
     border-top: 1px solid #f0f0f0;
-    overflow-x: visible;
+  }
+  .reader-toolstrip-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+    gap: 4px;
+  }
+  .reader-toolstrip-tools .reader-document-zoom-controls {
+    margin-left: auto;
+  }
+  .reader-document-tools .reader-tool-text,
+  .reader-document-tools .reader-zoom,
+  .reader-document-tools .reader-page-control input {
+    min-height: 44px;
+  }
+  .reader-document-tools .reader-zoom {
+    min-width: 44px;
   }
   .reader-ai-toggle {
     display: none;
@@ -71,7 +85,7 @@
   }
   .reader-breadcrumb strong {
     width: 100%;
-    line-height: 1.25;
+    line-height: 1.35;
   }
   .reader-mobile-reading-meta {
     display: block;

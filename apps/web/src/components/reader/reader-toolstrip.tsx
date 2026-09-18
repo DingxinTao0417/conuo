@@ -1,11 +1,12 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   Crop,
   FileText,
   Highlighter,
+  List,
   Minus,
   Plus,
   Settings2,
@@ -13,6 +14,7 @@ import {
 import type { Source } from "@/lib/types";
 import type { ReaderOutlineItem } from "../reader-outline";
 import type { ReaderPanel } from "./hooks/use-reader-panels";
+import ReaderPageInput from "./reader-page-input";
 
 export type ReaderToolstripProps = {
   source: Source;
@@ -45,10 +47,8 @@ const FORMAT_LABELS: Partial<Record<Source["kind"], string>> = { web: "网页快
  * position and framing only exist for PDFs, structure only appears for
  * documents that have any.
  *
- * Phones collapse the format-specific half behind one 工具 control so the
- * position and zoom the learner needs constantly keep their place at 360px;
- * narrower combinations (a tablet with the AI panel over it) scroll that half
- * horizontally rather than wrapping the strip into a second row.
+ * Phones keep page navigation visible and expand reading settings on demand.
+ * The strip remains in reach while scrolling, with explicit labels for tools.
  */
 export default function ReaderToolstrip({
   source,
@@ -70,6 +70,8 @@ export default function ReaderToolstrip({
   toggleAnnotations,
 }: ReaderToolstripProps) {
   const [toolsExpanded, setToolsExpanded] = useState(false);
+  const toolsToggle = useRef<HTMLButtonElement>(null);
+  const blockedHintId = useId();
   const pdf = source.kind === "pdf";
   const nativePdf = pdf && !showText;
   return (
@@ -96,14 +98,12 @@ export default function ReaderToolstrip({
               <ChevronLeft size={16} />
             </button>
             <label className="reader-page-control">
-              <input
-                aria-label="跳转页码"
-                type="number"
-                min={1}
-                max={pages}
-                value={page}
+              <ReaderPageInput
+                page={page}
+                pages={pages}
+                sourceKey={`${source.id}:${source.versionId}`}
                 disabled={showText}
-                onChange={(event) => changePage(Number(event.target.value))}
+                onCommit={changePage}
               />
               <span>/ {pages}</span>
             </label>
@@ -123,30 +123,9 @@ export default function ReaderToolstrip({
           </span>
         )}
       </div>
-      <span className="reader-tool-divider reader-document-zoom-divider" />
-      <div className="reader-tool-group reader-document-zoom-controls">
-        <button
-          className="icon-btn"
-          aria-label="缩小"
-          disabled={zoom <= 60}
-          onClick={() => setZoom(Math.max(60, zoom - 10))}
-        >
-          <Minus size={15} />
-        </button>
-        <button className="reader-zoom" title="恢复默认缩放" onClick={() => setZoom(100)}>
-          {zoom}%
-        </button>
-        <button
-          className="icon-btn"
-          aria-label="放大"
-          disabled={zoom >= 200}
-          onClick={() => setZoom(Math.min(200, zoom + 10))}
-        >
-          <Plus size={15} />
-        </button>
-      </div>
       <div className="reader-tool-spacer" />
       <button
+        ref={toolsToggle}
         type="button"
         className="reader-toolstrip-toggle"
         data-reader-toolstrip-toggle
@@ -154,59 +133,114 @@ export default function ReaderToolstrip({
         aria-expanded={toolsExpanded}
         aria-label={`${source.kind === "pdf" ? "PDF" : "资料"}阅读工具`}
         onClick={() => setToolsExpanded((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && toolsExpanded) {
+            event.preventDefault();
+            event.stopPropagation();
+            setToolsExpanded(false);
+          }
+        }}
       >
         <Settings2 size={15} aria-hidden="true" />
-        <span>工具</span>
+        <span>{toolsExpanded ? "收起工具" : "阅读工具"}</span>
       </button>
       <div
         id="reader-toolstrip-tools"
         className="reader-toolstrip-tools"
         data-reader-toolstrip-tools
+        onKeyDown={(event) => {
+          if (event.key !== "Escape" || !toolsExpanded || event.defaultPrevented) return;
+          event.preventDefault();
+          event.stopPropagation();
+          setToolsExpanded(false);
+          toolsToggle.current?.focus();
+        }}
       >
         {nativePdf && pdfReadingModeControls()}
-        {pdf && (
-          <button className="reader-tool-text" aria-pressed={showText} onClick={togglePdfText}>
-            {showText ? "原始 PDF" : "解析文本"}
-          </button>
-        )}
-        {nativePdf && (
+        <div className="reader-tool-group reader-document-zoom-controls" aria-label="缩放">
           <button
-            type="button"
-            className="reader-tool-text reader-region-trigger"
-            data-reader-region-trigger
-            aria-label={regionCaptureActive ? "取消区域框选" : "框选区域交给 AI"}
-            aria-pressed={regionCaptureActive}
-            title={regionStudyBlockedMessage || "区域视觉学习"}
-            disabled={Boolean(regionStudyBlockedMessage)}
-            onClick={toggleRegionCapture}
+            className="icon-btn"
+            aria-label="缩小"
+            disabled={zoom <= 60}
+            onClick={() => setZoom(Math.max(60, zoom - 10))}
           >
-            <Crop size={14} aria-hidden="true" />
-            <span>{regionCaptureActive ? "取消框选" : "区域学习"}</span>
+            <Minus size={15} />
           </button>
-        )}
-        {outlineItems.length > 0 && (
+          <button className="reader-zoom" title="恢复默认缩放" onClick={() => setZoom(100)}>
+            {zoom}%
+          </button>
           <button
-            type="button"
-            className="reader-tool-text reader-outline-trigger"
-            data-reader-outline-trigger
-            aria-label={`打开资料目录（${outlineItems.length} 项）`}
-            aria-controls="reader-outline-panel"
-            aria-expanded={activePanel === "outline"}
-            onClick={(event) => toggleOutline(event.currentTarget)}
+            className="icon-btn"
+            aria-label="放大"
+            disabled={zoom >= 200}
+            onClick={() => setZoom(Math.min(200, zoom + 10))}
           >
-            目录
+            <Plus size={15} />
           </button>
+        </div>
+        <div className="reader-toolstrip-actions">
+          {pdf && (
+            <button className="reader-tool-text" aria-pressed={showText} onClick={togglePdfText}>
+              <FileText size={15} aria-hidden="true" />
+              {showText ? "原始 PDF" : "解析文本"}
+            </button>
+          )}
+          {nativePdf && (
+            <button
+              type="button"
+              className="reader-tool-text reader-region-trigger"
+              data-reader-region-trigger
+              aria-label={regionCaptureActive ? "取消区域框选" : "框选区域交给 AI"}
+              aria-pressed={regionCaptureActive}
+              title={regionStudyBlockedMessage || "区域视觉学习"}
+              disabled={Boolean(regionStudyBlockedMessage)}
+              aria-describedby={regionStudyBlockedMessage ? blockedHintId : undefined}
+              onClick={toggleRegionCapture}
+            >
+              <Crop size={14} aria-hidden="true" />
+              <span>{regionCaptureActive ? "取消框选" : "区域学习"}</span>
+            </button>
+          )}
+          {outlineItems.length > 0 && (
+            <button
+              type="button"
+              className="reader-tool-text reader-outline-trigger"
+              data-reader-outline-trigger
+              aria-label={`打开资料目录（${outlineItems.length} 项）`}
+              aria-controls="reader-outline-panel"
+              aria-expanded={activePanel === "outline"}
+              onClick={(event) => {
+                toggleOutline(event.currentTarget);
+                setToolsExpanded(false);
+                if (toolsExpanded) toolsToggle.current?.focus();
+              }}
+            >
+              <List size={15} aria-hidden="true" />
+              目录
+            </button>
+          )}
+          <button
+            className="reader-tool-text reader-annotation-trigger"
+            data-reader-annotation-trigger
+            aria-label={`我的标注（${annotationCount}）`}
+            aria-controls="reader-annotations-panel"
+            aria-expanded={activePanel === "annotations"}
+            onClick={() => {
+              toggleAnnotations();
+              setToolsExpanded(false);
+              if (toolsExpanded) toolsToggle.current?.focus();
+            }}
+          >
+            <Highlighter size={15} aria-hidden="true" />
+            <span>标注</span>
+            {annotationCount > 0 && <span className="reader-tool-count">{annotationCount}</span>}
+          </button>
+        </div>
+        {nativePdf && regionStudyBlockedMessage && (
+          <p id={blockedHintId} className="reader-toolstrip-hint">
+            区域学习：{regionStudyBlockedMessage}
+          </p>
         )}
-        <button
-          className="icon-btn"
-          data-reader-annotation-trigger
-          aria-label={`我的标注（${annotationCount}）`}
-          aria-controls="reader-annotations-panel"
-          aria-expanded={activePanel === "annotations"}
-          onClick={toggleAnnotations}
-        >
-          <Highlighter size={16} />
-        </button>
       </div>
     </div>
   );

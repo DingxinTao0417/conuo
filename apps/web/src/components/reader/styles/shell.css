@@ -57,22 +57,35 @@
 }
 .reader-breadcrumb {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
   min-width: 0;
   flex: 1;
   font-size: 12px;
   color: #737373;
 }
 .reader-breadcrumb strong {
-  font-weight: 500;
-  color: #404040;
+  order: -1;
+  width: 100%;
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: #262626;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .reader-breadcrumb > span {
   white-space: nowrap;
+}
+.reader-library-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  line-height: 1.3;
 }
 .reader-mobile-reading-meta {
   display: none;
@@ -104,12 +117,30 @@
 .reader-save-cloud {
   color: #158b62;
 }
+.reader-save-cloud > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.reader-save-cloud {
+  justify-content: center;
+  min-width: 28px;
+}
 .reader-save-error,
 .reader-save-conflict {
   color: #b54708;
 }
 .reader-ai-toggle {
   white-space: nowrap;
+}
+.reader-ai-toggle[aria-expanded="true"] {
+  border-color: #ddd7ff;
+  background: #f5f3ff;
+  color: #4b3fe3;
 }
 .reader-find-action {
   flex: 0 0 auto;

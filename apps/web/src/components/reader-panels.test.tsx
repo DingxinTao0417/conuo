@@ -202,12 +202,12 @@ describe("reader panel slot", () => {
       "上一页",
       "跳转页码",
       "下一页",
-      "缩小",
-      "100%",
-      "放大",
       "PDF阅读工具",
       "单页",
       "连续滚动",
+      "缩小",
+      "100%",
+      "放大",
       "解析文本",
       "框选区域交给 AI",
       "我的标注（0）",
@@ -221,6 +221,14 @@ describe("reader panel slot", () => {
         .querySelector("[data-reader-toolstrip-tools]")
         ?.querySelector('[aria-label="PDF 阅读模式"]'),
     ).toBeTruthy();
+    const collapsedTools = toolstrip().querySelector("[data-reader-toolstrip-tools]")!;
+    for (const label of ["上一页", "跳转页码", "下一页"]) {
+      const pageControl = toolstrip().querySelector(`[aria-label="${label}"]`);
+      expect(pageControl, label).toBeTruthy();
+      expect(collapsedTools.contains(pageControl), `${label} stays outside collapsed tools`).toBe(
+        false,
+      );
+    }
 
     // Text formats have neither pages nor a physical page to frame, so the
     // strip must not leave their slots behind as empty controls.
@@ -236,10 +244,10 @@ describe("reader panel slot", () => {
       };
       await render({ source: text, sources: [text] });
       expect(toolstripControls(), kind).toEqual([
+        "资料阅读工具",
         "缩小",
         "100%",
         "放大",
-        "资料阅读工具",
         "我的标注（0）",
       ]);
       expect(toolstrip().querySelector(".reader-format")?.textContent, kind).toBe(
@@ -262,19 +270,23 @@ describe("reader panel slot", () => {
     expect(tools?.id).toBe("reader-toolstrip-tools");
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(toolstrip().dataset.toolsExpanded).toBe("false");
-    // Reading position and zoom stay outside the collapsed half at every width.
-    expect(tools?.querySelector('[aria-label="缩小"]')).toBeNull();
+    // Zoom joins the other reading settings, leaving room for PDF paging and
+    // the tool toggle in the compact phone row.
+    expect(tools?.querySelector('[aria-label="缩小"]')).toBeTruthy();
+    expect(tools?.querySelector('[title="恢复默认缩放"]')).toBeTruthy();
+    expect(tools?.querySelector('[aria-label="放大"]')).toBeTruthy();
     expect(tools?.querySelector("[data-reader-annotation-trigger]")).toBeTruthy();
 
     await click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(toolstrip().dataset.toolsExpanded).toBe("true");
 
-    // The row stays open while a tool is in use, so closing its panel can
-    // return focus to the control that opened it.
+    // Opening a document panel gives its content the space used by expanded
+    // settings; the visible toggle remains the focus fallback on phones.
     await click(trigger("[data-reader-outline-trigger]"));
     expect(host.querySelector("#reader-outline-panel")).toBeTruthy();
-    expect(toolstrip().dataset.toolsExpanded).toBe("true");
+    expect(toolstrip().dataset.toolsExpanded).toBe("false");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("gives the document one panel at a time", async () => {

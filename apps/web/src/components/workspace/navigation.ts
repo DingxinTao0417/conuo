@@ -38,7 +38,8 @@ export const sections = [
 ] as const;
 
 /**
- * Settings groups, in display order, following the product requirement's
+ * Settings groups, reached from the sidebar account or topbar avatar, in
+ * display order following the product requirement's
  * settings outline (account and devices, AI and source processing, cloud data
  * and storage, reading and sync). Each one is a `#settings/<pane>` route so a
  * reload or a shared link reopens the same group.
@@ -68,5 +69,5 @@ export const labels: Record<Section, string> = {
   questions: "我的问答",
   tasks: "任务中心",
   trash: "回收站",
-  settings: "设置",
+  settings: "账号与设置",
 };

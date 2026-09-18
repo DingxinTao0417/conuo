@@ -13,11 +13,14 @@
 }
 
 .library-workspace .topbar {
-  height: 64px;
-  border-bottom: 0;
+  height: var(--workspace-header-height);
+  border-bottom: 1px solid var(--border);
 }
 
 .library-workspace .collection-home-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -30,17 +33,13 @@
 }
 
 .library-workspace .content-scroll {
-  padding: 8px 24px 60px;
+  padding: 32px var(--workspace-gutter) 60px;
 }
 
 .library-workspace .content-scroll > * {
-  max-width: none;
-  margin-left: 0;
-  margin-right: 0;
-}
-
-.library-workspace .content-scroll > .collection-actions {
-  max-width: 940px;
+  max-width: var(--workspace-content-width);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .library-workspace .library-directory-heading,
@@ -56,11 +55,11 @@
 }
 
 .library-workspace .library-directory-heading {
-  margin-top: 44px;
+  margin-top: 0;
 }
 
 .library-workspace .document-library-heading {
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .library-workspace .library-directory-heading h2,
@@ -106,27 +105,6 @@
   margin-bottom: 22px;
 }
 
-.library-workspace .note-grid {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 290px));
-  gap: 18px;
-}
-
-.library-workspace .note-card {
-  min-width: 0;
-  min-height: 208px;
-  padding: 20px;
-  border-color: var(--border-neutral-l1);
-  border-radius: var(--radius-8);
-}
-
-.library-workspace .note-card:hover {
-  border-color: var(--border-brand);
-}
-
-.library-workspace .note-card h3 {
-  overflow-wrap: anywhere;
-}
-
 @media (min-width: 621px) {
   .library-workspace .source-list:not(.source-grid) .source-row {
     padding-top: 12px;
@@ -137,7 +115,7 @@
 /* The design's compact tablet rail keeps the current library in the top bar
    while preserving every navigation target as a 44px icon control. */
 @media (min-width: 621px) and (max-width: 1024px) {
-  .library-workspace .sidebar,
+  .app-shell .sidebar,
   .reader-shell .sidebar {
     width: 68px;
     flex-basis: 68px;
@@ -145,35 +123,37 @@
     padding: 12px 8px 8px;
   }
 
-  .library-workspace .brand,
+  .app-shell .brand,
   .reader-shell .brand {
     justify-content: center;
+    min-height: 44px;
+    margin-bottom: 12px;
     padding: 0;
   }
 
-  .library-workspace .brand > span,
+  .app-shell .brand > span,
   .reader-shell .brand > span,
-  .library-workspace .nav-item-label,
+  .app-shell .nav-item-label,
   .reader-shell .nav-item-label,
-  .library-workspace .nav-heading > span,
+  .app-shell .nav-heading > span,
   .reader-shell .nav-heading > span,
-  .library-workspace .local-hint > span,
+  .app-shell .local-hint > span,
   .reader-shell .local-hint > span,
-  .library-workspace .user-button > span:nth-child(2),
+  .app-shell .user-button > span:nth-child(2),
   .reader-shell .user-button > span:nth-child(2),
-  .library-workspace .user-button > svg,
+  .app-shell .user-button > svg,
   .reader-shell .user-button > svg {
     display: none;
   }
 
-  .library-workspace .pinned-source-section,
+  .app-shell .pinned-source-section,
   .reader-shell .pinned-source-section {
     display: none;
   }
 
-  .library-workspace .nav-item,
+  .app-shell .nav-item,
   .reader-shell .nav-item,
-  .library-workspace .user-button,
+  .app-shell .user-button,
   .reader-shell .user-button {
     justify-content: center;
     min-width: 44px;
@@ -181,17 +161,17 @@
     padding: 0;
   }
 
-  .library-workspace .nav-item,
+  .app-shell .nav-item,
   .reader-shell .nav-item {
     gap: 0;
   }
 
-  .library-workspace .nav-item.active::before,
+  .app-shell .nav-item.active::before,
   .reader-shell .nav-item.active::before {
     display: none;
   }
 
-  .library-workspace .nav-count,
+  .app-shell .nav-count,
   .reader-shell .nav-count {
     position: absolute;
     top: 3px;
@@ -204,44 +184,51 @@
     line-height: 14px;
   }
 
-  .library-workspace .nav-heading,
+  .app-shell .nav-heading,
   .reader-shell .nav-heading {
     justify-content: center;
     min-height: 44px;
     margin-top: 8px;
   }
 
-  .library-workspace .nav-heading .icon-btn,
+  .app-shell .nav-heading .icon-btn,
   .reader-shell .nav-heading .icon-btn {
     width: 44px;
     height: 44px;
   }
 
-  .library-workspace .space-list .nav-item,
+  .app-shell .space-list .nav-item,
   .reader-shell .space-list .nav-item {
-    min-height: 36px;
+    min-height: 44px;
   }
 
-  .library-workspace .space-list .space-dot,
+  .app-shell .space-list .space-dot,
   .reader-shell .space-list .space-dot {
-    width: 10px;
-    height: 10px;
+    width: 5px;
+    height: 5px;
     margin: 0;
   }
+  .app-shell .space-initial {
+    display: inline;
+    margin-left: 5px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+  }
 
-  .library-workspace .sidebar-bottom,
+  .app-shell .sidebar-bottom,
   .reader-shell .sidebar-bottom {
     padding-top: 8px;
   }
 
-  .library-workspace .local-hint,
+  .app-shell .local-hint,
   .reader-shell .local-hint {
     justify-content: center;
     min-height: 40px;
     padding: 0;
   }
 
-  .library-workspace .user-button,
+  .app-shell .user-button,
   .reader-shell .user-button {
     margin-top: 8px;
   }
@@ -256,13 +243,6 @@
   .library-workspace .view-switch .icon-btn {
     width: 44px;
     height: 44px;
-  }
-}
-
-@media (min-width: 1200px) {
-  .library-workspace .sidebar {
-    width: 224px;
-    flex-basis: 224px;
   }
 }
 
@@ -343,7 +323,7 @@
   }
 
   .comparison-shell .space-list .nav-item {
-    min-height: 36px;
+    min-height: 44px;
   }
 
   .comparison-shell .space-list .space-dot {
@@ -367,24 +347,17 @@
   }
 }
 
-@media (min-width: 1600px) {
-  .library-workspace .sidebar {
-    width: 300px;
-    flex-basis: 300px;
-  }
-}
-
 @media (max-width: 620px) {
   .library-workspace .topbar {
-    height: 58px;
+    height: var(--workspace-header-height);
   }
 
   .library-workspace .content-scroll {
-    padding: 14px 20px 45px;
+    padding: 24px 20px calc(76px + env(safe-area-inset-bottom));
   }
 
   .library-workspace .library-directory-heading {
-    margin-top: 32px;
+    margin-top: 0;
   }
 
   .library-workspace .document-library-heading {
@@ -401,9 +374,5 @@
 
   .library-workspace .content-scroll > .note-search {
     max-width: none;
-  }
-
-  .library-workspace .note-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
 }

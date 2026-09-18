@@ -3,23 +3,23 @@
   gap: 24px;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 28px;
 }
 .eyebrow {
-  font-size: 11px;
-  color: #999;
+  font-size: 12px;
+  color: var(--text-tertiary);
   margin-bottom: 7px;
   letter-spacing: 0.06em;
 }
 h1 {
-  font-size: 25px;
+  font-size: 26px;
   line-height: 1.45;
   letter-spacing: -0.5px;
   font-weight: 600;
 }
 .page-heading p:not(.eyebrow) {
-  color: #888;
-  font-size: 12px;
+  color: var(--text-tertiary);
+  font-size: 13px;
   margin-top: 7px;
 }
 .btn {
@@ -29,11 +29,11 @@ h1 {
   gap: 7px;
   flex-shrink: 0;
   min-height: 34px;
-  border: 1px solid #dedede;
-  border-radius: 7px;
+  border: 1px solid var(--border-neutral-l2);
+  border-radius: 6px;
   padding: 6px 12px;
   background: white;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 1.5;
   white-space: nowrap;
@@ -46,11 +46,11 @@ h1 {
   color: #fff;
   background: var(--brand);
   border-color: var(--brand);
-  box-shadow: 0 1px 2px #221d7720;
+  box-shadow: none;
 }
 .btn-primary:hover {
-  background: #3f31c6;
-  border-color: #3f31c6;
+  background: var(--bg-brand-hover);
+  border-color: var(--bg-brand-hover);
 }
 .btn-danger {
   color: #bf443b;
@@ -83,11 +83,11 @@ h1 {
   padding: 3px 0;
   border: 0;
   background: transparent;
-  color: var(--brand);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 .text-button:hover {
-  text-decoration: underline;
+  color: var(--text-brand);
 }
 .badge {
   display: inline-flex;
@@ -97,7 +97,7 @@ h1 {
   width: fit-content;
   border-radius: 5px;
   padding: 2px 7px;
-  font-size: 10px;
+  font-size: 11px;
   color: #737373;
   background: #f3f3f3;
   white-space: nowrap;
@@ -130,6 +130,6 @@ h1 {
   margin-bottom: 15px;
 }
 .section-heading h2 {
-  font-size: 14px;
-  font-weight: 550;
+  font-size: 15px;
+  font-weight: 600;
 }

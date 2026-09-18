@@ -14,7 +14,7 @@ import { createDemoWorkspace } from "@/lib/seed";
 import type { Conversation, Note, Source, Space, WorkspaceData } from "@/lib/types";
 import type { WorkspaceExportScope } from "@/lib/export-scope";
 import LearningContinuationCard from "../../learning-continuation-card";
-import { SourceIcon, date, plain } from "../shared";
+import { SourceIcon, date } from "../shared";
 import type { WorkspaceStore, WorkspaceUser } from "../types";
 import SpaceSettingsCard from "./space-settings-card";
 
@@ -66,10 +66,10 @@ export default function HomeSection({
   setModal,
 }: HomeSectionProps) {
   return (
-    <>
+    <div className="home-workspace">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">你的学习，从这里继续</p>
+          <p className="eyebrow">{activeSpace ? "空间概览" : "学习概览"}</p>
           <h1>{activeSpace?.name || "让知识，慢慢成为你的。"}</h1>
           <p>{activeSpace?.goal || "收集值得读的资料，把问题留给思考，把理解留在这里。"}</p>
         </div>
@@ -86,7 +86,9 @@ export default function HomeSection({
         </button>
       </div>
       {primaryContinuation ? (
-        <>
+        <div
+          className={`home-reading-grid${secondaryContinuedSources.length ? " has-recent" : ""}`}
+        >
           <LearningContinuationCard
             continuation={primaryContinuation}
             icon={<SourceIcon source={primaryContinuation.source} />}
@@ -101,9 +103,8 @@ export default function HomeSection({
               {secondaryContinuedSources.map((s) => (
                 <button key={s.id} className="continue-card" onClick={() => openSource(s.id)}>
                   <SourceIcon source={s} />
-                  <h3>{s.title}</h3>
-                  <p>{s.text ? plain(s.text).slice(0, 95) : "打开资料，开始阅读"}</p>
-                  <div>
+                  <div className="continue-card-copy">
+                    <h3>{s.title}</h3>
                     <span>
                       {s.pageCount
                         ? `第 ${s.readPage || 1} / ${s.pageCount} 页`
@@ -111,13 +112,13 @@ export default function HomeSection({
                           ? "上次读到正文"
                           : "已保存阅读位置"}
                     </span>
-                    <ArrowUpRight size={16} />
                   </div>
+                  <ArrowUpRight size={16} aria-hidden="true" />
                 </button>
               ))}
             </div>
           )}
-        </>
+        </div>
       ) : visibleSources.length ? (
         <div className="empty-small continue-empty">
           还没有阅读记录。打开一份资料后，这里会按你最后停留的位置继续。
@@ -161,71 +162,90 @@ export default function HomeSection({
           <small>支持 PDF、DOCX、Markdown、TXT 和网页链接</small>
         </div>
       )}
-      <div className="section-heading pending-question-heading">
-        <h2>待解决问题</h2>
-        <button className="text-button" onClick={() => navigate("questions")}>
-          全部问答
-          <ChevronRight size={14} />
-        </button>
-      </div>
-      {pendingQuestions.length ? (
-        <div className="pending-question-list">
-          {pendingQuestions.map((conversation) => {
-            const crossLibrary = isCrossLibraryConversation(conversation);
-            const source = conversation.sourceId
-              ? data.sources.find((item) => item.id === conversation.sourceId && !item.deletedAt)
-              : undefined;
-            return (
-              <button
-                className="pending-question-card"
-                key={conversation.id}
-                onClick={() => openConversation(conversation)}
-              >
-                <Sparkles size={17} />
-                <div>
-                  <b>{conversation.title}</b>
-                  <p>
-                    {crossLibrary
-                      ? `跨库 · ${conversation.sourceIds.length} 份固定资料`
-                      : source
-                        ? source.title
-                        : "原资料不可用或未绑定资料"}{" "}
-                    · {date(conversation.updatedAt)}
-                  </p>
-                </div>
-                <ChevronRight size={15} />
-              </button>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="empty-small continue-empty">
-          暂时没有待解决的问题。阅读时提出一个问题，它会保留在这里。
-        </div>
-      )}
-      <div className="section-heading">
-        <h2>最近的笔记</h2>
-        <button className="text-button" onClick={() => newNote("note")}>
-          <Plus size={14} />
-          写笔记
-        </button>
-      </div>
-      {scopedNotes.length ? (
-        <div className="recent-note-grid">
-          {scopedNotes.slice(0, 3).map((n) => (
-            <button className="space-card" key={n.id} onClick={() => openNote(n.id)}>
-              <StickyNote size={20} />
-              <div>
-                <b>{n.title}</b>
-                <p>{plain(n.content).slice(0, 55) || "写下你的第一个想法"}</p>
-              </div>
-              <ChevronRight size={15} />
+      <div className="home-columns">
+        <section
+          className="home-panel home-panel-questions"
+          aria-labelledby="home-questions-heading"
+        >
+          <div className="section-heading pending-question-heading">
+            <h2 id="home-questions-heading">
+              <Sparkles size={16} aria-hidden="true" />
+              待解决问题
+            </h2>
+            <button className="text-button" onClick={() => navigate("questions")}>
+              全部问答
+              <ChevronRight size={14} />
             </button>
-          ))}
-        </div>
-      ) : (
-        <div className="empty-small">读到有启发的地方，就把自己的理解写下来。</div>
-      )}
+          </div>
+          {pendingQuestions.length ? (
+            <div className="pending-question-list">
+              {pendingQuestions.map((conversation) => {
+                const crossLibrary = isCrossLibraryConversation(conversation);
+                const source = conversation.sourceId
+                  ? data.sources.find(
+                      (item) => item.id === conversation.sourceId && !item.deletedAt,
+                    )
+                  : undefined;
+                return (
+                  <button
+                    className="pending-question-card"
+                    key={conversation.id}
+                    onClick={() => openConversation(conversation)}
+                  >
+                    <Sparkles size={17} />
+                    <div>
+                      <b>{conversation.title}</b>
+                      <p>
+                        {crossLibrary
+                          ? `跨库 · ${conversation.sourceIds.length} 份固定资料`
+                          : source
+                            ? source.title
+                            : "原资料不可用或未绑定资料"}{" "}
+                        · {date(conversation.updatedAt)}
+                      </p>
+                    </div>
+                    <ChevronRight size={15} />
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="empty-small continue-empty">
+              暂时没有待解决的问题。阅读时提出一个问题，它会保留在这里。
+            </div>
+          )}
+        </section>
+        <section className="home-panel home-panel-notes" aria-labelledby="home-notes-heading">
+          <div className="section-heading">
+            <h2 id="home-notes-heading">
+              <StickyNote size={16} aria-hidden="true" />
+              最近的笔记
+            </h2>
+            <button className="text-button" onClick={() => newNote("note")}>
+              <Plus size={14} />
+              写笔记
+            </button>
+          </div>
+          {scopedNotes.length ? (
+            <div className="recent-note-grid">
+              {scopedNotes.slice(0, 3).map((n) => (
+                <button className="space-card" key={n.id} onClick={() => openNote(n.id)}>
+                  <StickyNote size={20} />
+                  <div>
+                    <b>{n.title}</b>
+                    <p>
+                      {n.kind === "knowledge" ? "知识页" : "笔记"} · {date(n.updatedAt)}更新
+                    </p>
+                  </div>
+                  <ChevronRight size={15} />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-small">读到有启发的地方，就把自己的理解写下来。</div>
+          )}
+        </section>
+      </div>
       {activeSpace && (
         <SpaceSettingsCard
           space={activeSpace}
@@ -238,6 +258,6 @@ export default function HomeSection({
           setModal={setModal}
         />
       )}
-    </>
+    </div>
   );
 }

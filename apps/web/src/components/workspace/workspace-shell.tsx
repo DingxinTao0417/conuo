@@ -26,6 +26,7 @@ import {
   unresolvedConversations,
 } from "@/lib/learning-continue";
 import { pinnedLibrarySources } from "@/lib/library-navigation";
+import { parseNoteRoute, parseSourceRoute } from "@/lib/document-route";
 import {
   formatLibraryRoute,
   normalizeLibraryTags,
@@ -165,7 +166,6 @@ import { useLibraryRoute } from "./hooks/use-library-route";
 import NotePage from "./note-page/note-page";
 import {
   isSettingsPane,
-  labels,
   spaceTabs,
   type Section,
   type SettingsPane,
@@ -201,11 +201,6 @@ function currentLibraryReturnRoute(hash: string): LibraryRoute {
 
 function replaceWithLibraryRoute(route: LibraryRoute): void {
   window.history.replaceState(null, "", formatLibraryRoute(route));
-}
-
-/** `#note/<id>/<view>` restores which AI review was open beside the page. */
-function notePanelFromRouteView(view: string | undefined): NotePanel {
-  return view === "relations" || view === "update" || view === "ask" ? view : null;
 }
 
 const comparisonUnavailableCopy: Record<ComparisonSourcesUnavailableReason, string> = {
@@ -392,6 +387,8 @@ export default function Workspace({
   const [editorKey, setEditorKey] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const latestSources = useRef(data.sources);
+  // Membership changes invalidate deep links; ordinary edits must not reopen routes.
+  const spaceRouteIds = JSON.stringify(data.spaces.map((space) => space.id).sort());
   const latestLibraryViewRoute = useRef(currentLibraryViewRoute);
   const handledInvalidSourceRoute = useRef<string | null>(null);
   const pendingSearchFocus = useRef(false);
@@ -586,7 +583,11 @@ export default function Workspace({
   );
   const knowledgePageCount = scopedNotes.filter((note) => note.kind === "knowledge").length;
   const sourceSpace: Space =
-    data.spaces.find((space) => space.id === spaceId) ||
+    data.spaces.find(
+      (space) =>
+        !space.archived && space.id === spaceId && currentSource?.spaceIds.includes(space.id),
+    ) ||
+    data.spaces.find((space) => !space.archived && currentSource?.spaceIds.includes(space.id)) ||
     data.spaces.find((space) => currentSource?.spaceIds.includes(space.id)) ||
     inboxSpace;
   const comparisonPickerSpace =
@@ -728,6 +729,23 @@ export default function Workspace({
     [applyLibraryRouteState, setDetailId, setModal, setPendingNoteCitation, setToast],
   );
 
+  const recoverWorkspaceRoute = useCallback(
+    (next: "home" | "notes" | "library", message?: string) => {
+      readerReturnTargetRef.current = null;
+      setReaderReturnTarget(null);
+      setNotePanel(null);
+      setPendingNoteCitation(undefined);
+      setDetailId(null);
+      setModal(null);
+      setKnowledgeFilter("all");
+      applyLibraryRouteState(currentLibraryReturnRoute("#library"));
+      setSection(next);
+      window.history.replaceState(null, "", `#${next}`);
+      if (message) setToast(message);
+    },
+    [applyLibraryRouteState, setDetailId, setModal, setPendingNoteCitation, setToast],
+  );
+
   function setActiveCrossLibraryConversation(
     conversationId?: string,
     searchDraft: CrossLibrarySearchDraft | null = null,
@@ -864,12 +882,21 @@ export default function Workspace({
       return;
     }
 
-    const [path] = location.hash.slice(1).split("?");
-    const [type, routeSourceId] = path.split("/");
-    if (type !== "source" || routeSourceId !== sourceId) return;
+    if (parseSourceRoute(location.hash)?.sourceId !== sourceId) return;
     if (handledInvalidSourceRoute.current === location.hash) return;
     recoverUnavailableSourceRoute(location.hash);
   }, [currentSource, ready, recoverUnavailableSourceRoute, sourceId]);
+  useEffect(() => {
+    if (!ready || !noteId || currentNote) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (!active || parseNoteRoute(location.hash)?.noteId !== noteId) return;
+      recoverWorkspaceRoute("notes", "这篇笔记已删除、不存在或当前账号无权访问，已返回我的笔记。");
+    });
+    return () => {
+      active = false;
+    };
+  }, [currentNote, noteId, ready, recoverWorkspaceRoute]);
   useEffect(() => {
     latestReadingProgressSyncPlan.current = store.readingProgressSyncPlan;
   }, [store.readingProgressSyncPlan]);
@@ -952,11 +979,44 @@ export default function Workspace({
   useEffect(() => {
     const route = () => {
       const [path] = location.hash.slice(1).split("?");
-      const [type, id, view, version] = path.split("/");
-      const libraryRoute = parseLibraryRoute(location.hash);
-      const workspaceSectionRoute = parseWorkspaceSectionRoute(location.hash);
+      const segments = path.split("/");
+      const [type, id] = segments;
+      let libraryRoute = parseLibraryRoute(location.hash);
+      let workspaceSectionRoute = parseWorkspaceSectionRoute(location.hash);
+      const sourceRoute = parseSourceRoute(location.hash);
+      const noteRoute = parseNoteRoute(location.hash);
       const nextComparisonRoute = parseComparisonRoute(location.hash);
       const nextConversationRoute = parseConversationRoute(location.hash);
+      const knownSpaces = new Set<string>(JSON.parse(spaceRouteIds));
+      const missingSpace = (id: string) =>
+        ready && id !== "all" && id !== "inbox" && !knownSpaces.has(id);
+      if (libraryRoute && missingSpace(libraryRoute.spaceId)) {
+        libraryRoute = { ...libraryRoute, spaceId: "all" };
+        replaceWithLibraryRoute(libraryRoute);
+        setToast("这个知识库已不存在或当前账号无权访问，已显示全部资料。");
+      } else if (workspaceSectionRoute && missingSpace(workspaceSectionRoute.spaceId)) {
+        workspaceSectionRoute = { ...workspaceSectionRoute, spaceId: "all" };
+        window.history.replaceState(
+          null,
+          "",
+          workspaceSectionRoute.section === "questions"
+            ? formatQuestionHistoryRoute("all", parseQuestionHistoryFilter(location.hash))
+            : formatWorkspaceSectionRoute(
+                workspaceSectionRoute.section,
+                "all",
+                workspaceSectionRoute,
+              ),
+        );
+        setToast("这个知识库已不存在或当前账号无权访问，已显示全部内容。");
+      }
+      // Back can emit both popstate and hashchange. Preserve a details panel
+      // restored to this exact library view by the first event.
+      if (
+        !libraryRoute ||
+        formatLibraryRoute(libraryRoute) !== formatLibraryRoute(latestLibraryViewRoute.current)
+      )
+        setModal((current) => (current === "details" ? null : current));
+      setSidebar(false);
       if (type !== "source") {
         const returnTarget = readerReturnTargetRef.current;
         if (returnTarget?.kind === "recognized-content" && libraryRoute)
@@ -967,7 +1027,7 @@ export default function Workspace({
       setCrossLibraryAsk(null);
       setCrossLibrarySearchDraft(null);
       setPendingNoteCitation(undefined);
-      setNotePanel(type === "note" ? notePanelFromRouteView(view) : null);
+      setNotePanel(noteRoute?.panel ?? null);
       if (nextConversationRoute) {
         setQuestionHistoryFilter("all");
         setConversationRouteId(nextConversationRoute.conversationId);
@@ -980,6 +1040,8 @@ export default function Workspace({
         setSourceVersionId(null);
         setNoteId(null);
         setSection("questions");
+        setSpaceId("all");
+        setSearch("");
         setSidebar(false);
       } else if (type === "conversation") {
         setQuestionHistoryFilter("all");
@@ -990,6 +1052,8 @@ export default function Workspace({
         setSourceVersionId(null);
         setNoteId(null);
         setSection("questions");
+        setSpaceId("all");
+        setSearch("");
         setSidebar(false);
         setConversationRouteIssue("这条问答记录不可用或不属于当前账号。");
       } else if (nextComparisonRoute) {
@@ -1001,28 +1065,41 @@ export default function Workspace({
         setSection("library");
         setSpaceId(nextComparisonRoute.spaceId);
         setSidebar(false);
-      } else if (type === "source" && id) {
+      } else if (sourceRoute) {
         clearConversationRouteState();
         // A source route replaces the library behind the panel, so the panel
         // closes unless the reader-return handler has just reopened it.
         setModal((current) => (current === "details" ? null : current));
         setComparisonRoute(null);
-        setSourceId(id);
-        setSourceVersionId(view === "version" ? (version ?? "") : null);
+        setSourceId(sourceRoute.sourceId);
+        setSourceVersionId(sourceRoute.versionId ?? null);
         setNoteId(null);
       } else if (type === "source") {
         recoverUnavailableSourceRoute(location.hash);
-      } else if (type === "note" && id) {
+      } else if (noteRoute) {
         clearConversationRouteState();
         setComparisonRoute(null);
-        setNoteId(id);
+        setNoteId(noteRoute.noteId);
         setSourceId(null);
-      } else if (Object.hasOwn(labels, type)) {
+        setSourceVersionId(null);
+      } else if (type === "note") {
+        recoverWorkspaceRoute("notes", "这个笔记链接无效，已返回我的笔记。");
+      } else if (
+        libraryRoute ||
+        workspaceSectionRoute ||
+        path === "trash" ||
+        (type === "settings" && segments.length <= 2)
+      ) {
         clearConversationRouteState();
         setComparisonRoute(null);
         setSection(type as Section);
         setSourceId(null);
+        setSourceVersionId(null);
         setNoteId(null);
+        setSearch("");
+        setCollectionSearch("");
+        setKnowledgeFilter("all");
+        setSelected([]);
         // `#settings/<pane>` reopens one settings group; a bare or unknown
         // pane falls back to the first group instead of an empty screen.
         if (type === "settings") setSettingsPane(isSettingsPane(id) ? id : "account");
@@ -1081,15 +1158,13 @@ export default function Workspace({
             setSearch("");
             setKnowledgeFilter("all");
           }
+        } else {
+          setSpaceId("all");
         }
-      } else if (type === "compare") {
-        clearConversationRouteState();
-        setComparisonRoute(null);
-        setSourceId(null);
-        setSourceVersionId(null);
-        setNoteId(null);
-        setSection("library");
-        setToast("这个对照链接无效，已回到资料库。");
+      } else if (type === "library" || type === "compare") {
+        recoverWorkspaceRoute("library", "这个资料库或对照链接无效，已回到资料库。");
+      } else {
+        recoverWorkspaceRoute("home", path ? "这个页面链接无效，已返回学习概览。" : undefined);
       }
     };
     route();
@@ -1103,6 +1178,7 @@ export default function Workspace({
     clearConversationRouteState,
     ready,
     recoverUnavailableSourceRoute,
+    recoverWorkspaceRoute,
     restoreRecognizedContentTarget,
     setCollectionSearch,
     setCrossLibraryAsk,
@@ -1115,6 +1191,10 @@ export default function Workspace({
     setSort,
     setSpaceId,
     setTimeFilter,
+    setModal,
+    setSelected,
+    setToast,
+    spaceRouteIds,
   ]);
   function navigate(
     next: Section,
@@ -1126,12 +1206,15 @@ export default function Workspace({
     const currentLibraryTime = timeFilter;
     const currentLibrarySort = sort;
     setNotePanel(null);
+    readerReturnTargetRef.current = null;
     setReaderReturnTarget(null);
+    setModal((current) => (current === "details" ? null : current));
     setComparisonRoute(null);
     setComparisonTargetId("");
     clearConversationRouteState();
     setSection(next);
     setSourceId(null);
+    setSourceVersionId(null);
     setNoteId(null);
     setNoteLibraryReturn(null);
     setSelected([]);
@@ -1191,9 +1274,15 @@ export default function Workspace({
           window.history.pushState(null, "", formatWorkspaceSectionRoute(next, nextSpaceId));
         }
       } else {
+        setSpaceId("all");
         window.history.pushState(null, "", `#${next}`);
       }
     }
+  }
+  // Sidebar, brand and phone navigation always address the whole workspace.
+  // Only explicit in-space actions may preserve the current learning space.
+  function navigateGlobal(next: Section) {
+    navigate(next, next === "library" ? { spaceId: "all", files: false } : undefined, "all");
   }
   function changeQuestionHistoryFilter(next: QuestionHistoryFilter) {
     const route = formatQuestionHistoryRoute(spaceId, next);
@@ -1341,7 +1430,13 @@ export default function Workspace({
       window.history.pushState(null, "", formatLibraryRoute(route));
       return;
     }
-    if (note.kind === "knowledge" && section === "knowledge") {
+    const returnSpaceId =
+      spaceId === "all" || spaceId === note.spaceId
+        ? spaceId
+        : note.spaceId === "inbox" || data.spaces.some((space) => space.id === note.spaceId)
+          ? note.spaceId
+          : "all";
+    if (note.kind === "knowledge" && section === "knowledge" && returnSpaceId === spaceId) {
       setNotePanel(null);
       setNoteId(null);
       setNoteSearchTarget(undefined);
@@ -1355,7 +1450,7 @@ export default function Workspace({
       );
       return;
     }
-    navigate(note.kind === "knowledge" ? "knowledge" : "notes");
+    navigate(note.kind === "knowledge" ? "knowledge" : "notes", undefined, returnSpaceId);
   }
 
   const showConversation = useCallback(
@@ -1381,6 +1476,11 @@ export default function Workspace({
       setCrossLibraryAsk(null);
 
       if (resolution.kind === "cross-library") {
+        const route: LibraryRoute = {
+          ...currentLibraryReturnRoute("#library/all"),
+          crossLibraryAsk: { conversationId: conversation.id },
+        };
+        applyLibraryRoute(route);
         setComparisonRoute(null);
         setComparisonTargetId("");
         setConversationToInspectId(null);
@@ -1398,20 +1498,7 @@ export default function Workspace({
           // deep link. Keeping its route id would let a later data update apply
           // the old direct-link effect over the active cross-library panel.
           setConversationRouteId(null);
-          window.history.pushState(
-            null,
-            "",
-            formatLibraryRoute({
-              spaceId: "all",
-              files: true,
-              filter: "all",
-              time: "all",
-              sort: defaultLibrarySort,
-              layout: "list",
-              query: "",
-              crossLibraryAsk: { conversationId: conversation.id },
-            }),
-          );
+          window.history.pushState(null, "", formatLibraryRoute(route));
         }
         return;
       }
@@ -1472,11 +1559,14 @@ export default function Workspace({
       setSourceId(null);
       setSourceVersionId(null);
       setSection("questions");
+      setSpaceId("all");
+      setSearch("");
       setModal(null);
       setConversationRouteIssue("这条问答记录不可用或不属于当前账号。");
       write();
     },
     [
+      applyLibraryRoute,
       data,
       setComparisonTargetId,
       setConversationToInspectId,
@@ -1485,6 +1575,7 @@ export default function Workspace({
       setModal,
       setPendingNoteCitation,
       setSpaceId,
+      setSearch,
     ],
   );
 
@@ -1502,9 +1593,11 @@ export default function Workspace({
     setSourceVersionId(null);
     setNoteId(null);
     setSection("questions");
+    setSpaceId("all");
+    setSearch("");
     setModal(null);
     setConversationRouteIssue("这条问答记录不可用或不属于当前账号。");
-  }, [setConversationToInspectId, setCrossLibraryAsk, setModal]);
+  }, [setConversationToInspectId, setCrossLibraryAsk, setModal, setSpaceId, setSearch]);
 
   useEffect(() => {
     if (!conversationRouteId) {
@@ -1696,7 +1789,7 @@ export default function Workspace({
     const now = new Date().toISOString();
     const note: Note = {
       id: crypto.randomUUID(),
-      spaceId: activeSpace?.id || sourceSpace.id,
+      spaceId: currentSource ? sourceSpace.id : activeSpace?.id || inboxSpace.id,
       title: kind === "knowledge" ? "未命名知识页" : "未命名笔记",
       content: content ? markdownToEditorHtml(content) : "",
       kind,
@@ -1995,6 +2088,18 @@ export default function Workspace({
     setSettingsPane(pane);
     window.history.pushState(null, "", `#settings/${pane}`);
   }
+  function openAccountSettings() {
+    // A blocked account must still reach its recovery controls; workspace
+    // settings remain unavailable until account access has been restored.
+    if (accountDeletionState) {
+      setSidebar(false);
+      setModal("account");
+      return;
+    }
+    navigateGlobal("settings");
+    // Keep one history entry, with the default pane explicit for reloads.
+    window.history.replaceState(null, "", "#settings/account");
+  }
   function openSpaceCreation(intent: "browse" | "import" = "browse") {
     setSpaceCreationIntent(intent);
     setModal("space");
@@ -2190,7 +2295,6 @@ export default function Workspace({
       <WorkspaceSidebar
         data={data}
         user={user}
-        status={status}
         cloudConfigured={cloudConfigured}
         sidebar={sidebar}
         setSidebar={setSidebar}
@@ -2200,12 +2304,12 @@ export default function Workspace({
         currentSource={currentSource}
         currentNote={currentNote}
         pinnedSources={pinnedSources}
-        navigate={navigate}
+        navigate={navigateGlobal}
         openCollectionHome={openCollectionHome}
         chooseSpace={chooseSpace}
         openSource={openSource}
         openSpaceCreation={openSpaceCreation}
-        setModal={setModal}
+        openAccountSettings={openAccountSettings}
       />
       <main className="app-main">
         {!isReadingWorkspace && (
@@ -2227,7 +2331,7 @@ export default function Workspace({
             openCollectionHome={openCollectionHome}
             openAllSourcesSearch={openAllSourcesSearch}
             navigate={navigate}
-            setModal={setModal}
+            openAccountSettings={openAccountSettings}
           />
         )}
         {storageMode !== "cloud" && (
@@ -2810,7 +2914,11 @@ export default function Workspace({
                 pendingQuestions={pendingQuestions}
                 update={update}
                 setToast={setToast}
-                navigate={navigate}
+                navigate={(next) =>
+                  next === "library"
+                    ? navigate("library", { spaceId, files: true })
+                    : navigate(next)
+                }
                 openImport={openImport}
                 openSpaceCreation={openSpaceCreation}
                 openSource={openSource}
@@ -2893,10 +3001,7 @@ export default function Workspace({
                 status={store.organizationStatus}
                 durableProcessorState={durableProcessorState}
                 onRefreshStatus={store.refreshOrganizationStatus}
-                onSpaceChange={(id) => {
-                  setSpaceId(id);
-                  setSelected([]);
-                }}
+                onSpaceChange={(id) => navigate("organize", undefined, id)}
                 onGenerate={store.organize}
                 onStop={store.stopOrganization}
                 onRetry={store.retryOrganization}
@@ -3098,7 +3203,8 @@ export default function Workspace({
       {!isReadingWorkspace && !currentNote && (
         <WorkspaceMobileNav
           section={section}
-          navigate={navigate}
+          spaceId={spaceId}
+          navigate={navigateGlobal}
           openCollectionHome={openCollectionHome}
         />
       )}

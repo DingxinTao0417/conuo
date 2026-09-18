@@ -2,6 +2,31 @@ import { describe, expect, it } from "vitest";
 import { formatLibraryRoute, normalizeLibraryTags, parseLibraryRoute } from "./library-route";
 
 describe("library route", () => {
+  it.each([
+    "library/space-a",
+    "#library/",
+    "#library/space-a/extra",
+    "#library/space-a/",
+    "#library//space-a",
+    "#library/%E0%A4%A",
+    "#library/%00",
+  ])("does not silently redirect an invalid library path: %s", (hash) => {
+    expect(parseLibraryRoute(hash)).toBeUndefined();
+  });
+
+  it("retains encoded library identities that the existing formatter supports", () => {
+    const route = {
+      spaceId: "机器学习 / 课程",
+      files: true,
+      filter: "all" as const,
+      time: "all" as const,
+      sort: "updated" as const,
+      layout: "list" as const,
+      query: "",
+    };
+    expect(parseLibraryRoute(formatLibraryRoute(route))).toEqual(route);
+  });
+
   it.each(["note", "knowledge"] as const)(
     "preserves %s type and time when filtering before typing",
     (filter) => {

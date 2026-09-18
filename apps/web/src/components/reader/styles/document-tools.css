@@ -45,21 +45,33 @@
   align-items: center;
   gap: 2px;
 }
-/* The format-specific half of the strip. It is the part that runs out of room
-   first, so it scrolls sideways instead of wrapping the position and zoom
-   controls out of reach: the narrowest desktop case (a 1025px viewport whose
-   AI panel has taken its minimum 320px) leaves this strip 452px. */
+/* Wrapping keeps every labelled action discoverable in a narrow reader pane. */
 .reader-toolstrip-tools {
   display: flex;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.reader-toolstrip-actions {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+  margin-left: auto;
 }
-.reader-toolstrip-tools::-webkit-scrollbar {
-  display: none;
+.reader-toolstrip-tools .reader-document-zoom-controls {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.reader-toolstrip-hint {
+  flex: 1 0 100%;
+  margin: 0;
+  padding: 2px 4px;
+  color: #737373;
+  font-size: 11px;
+  line-height: 1.5;
 }
 .reader-toolstrip-toggle {
   display: none;
@@ -81,6 +93,33 @@
   padding: 6px;
   font-size: 11px !important;
   white-space: nowrap;
+}
+.reader-tool-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 6px 9px;
+  border-radius: 6px;
+}
+.reader-tool-text:hover:not(:disabled),
+.reader-zoom:hover:not(:disabled) {
+  background: #f5f4fa;
+  color: #4b3fe3;
+}
+.reader-tool-text[aria-expanded="true"] {
+  background: #f0eeff;
+  color: #4b3fe3;
+}
+.reader-tool-count {
+  min-width: 16px;
+  border-radius: 4px;
+  padding: 0 3px;
+  background: #efedf5;
+  font-size: 10px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
 }
 .reader-region-trigger {
   display: inline-flex;

@@ -5,9 +5,9 @@
   gap: 8px;
 }
 @theme inline {
-  --color-brand: #4b3fe3;
+  --color-brand: #5850cf;
   --font-sans:
-    "SF Pro Text", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI",
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui,
     sans-serif;
 }
 :root {
@@ -15,21 +15,37 @@
      names in the app lets production code follow the supplied design tokens
      without importing the ignored local design-artifact directory at runtime. */
   --bg-base-default: #fff;
-  --bg-base-secondary: #f5f5f5;
+  --bg-base-secondary: #f7f7f8;
   --bg-base-tertiary: #e5e5e5;
   --bg-overlay-l1: color-mix(in srgb, #171717 8%, transparent);
-  --bg-brand: #4b3fe3;
-  --bg-brand-hover: #6a6fff;
-  --bg-brand-active: #3f31c6;
-  --bg-brand-popup: #f0eeff;
-  --text-default: #171717;
-  --text-secondary: #404040;
-  --text-tertiary: #737373;
+  --bg-brand: #5850cf;
+  --bg-brand-hover: #4c44bb;
+  --bg-brand-active: #4039a8;
+  --bg-brand-popup: #eeedf9;
+  --text-default: #26272b;
+  --text-secondary: #55575f;
+  --text-tertiary: #6e7079;
   --text-disabled: #a1a1a1;
-  --text-brand: #4b3fe3;
-  --border-neutral-l1: #e8e8e8;
+  --text-brand: #5850cf;
+  --border-neutral-l1: #e8e8ec;
   --border-neutral-l2: #d1d1d1;
-  --border-brand: #4b3fe3;
+  --border-brand: #5850cf;
+  /* Content accents are separate from success, warning and error states. */
+  --accent-violet: #6353c7;
+  --accent-violet-soft: #eee9fc;
+  --accent-violet-border: #dcd3f5;
+  --accent-blue: #396bb8;
+  --accent-blue-soft: #eaf2ff;
+  --accent-blue-border: #d2e2fa;
+  --accent-teal: #287b69;
+  --accent-teal-soft: #e9f6ef;
+  --accent-teal-border: #cfe8db;
+  --accent-amber: #996127;
+  --accent-amber-soft: #fff4e3;
+  --accent-amber-border: #f0dfc5;
+  --accent-rose: #b04f63;
+  --accent-rose-soft: #fdeff2;
+  --accent-rose-border: #f3d8df;
   --status-primary: #2f74ff;
   --status-success: #15a877;
   --status-warning: #e27900;
@@ -47,16 +63,21 @@
   --heading-md: 20px;
   --body-sm: 12px;
   --body-base: 14px;
-  --brand: #4b3fe3;
-  --brand-soft: #f0eeff;
+  --brand: var(--bg-brand);
+  --brand-soft: var(--bg-brand-popup);
   --bg: #fff;
-  --bg-secondary: #f5f5f5;
-  --text: #171717;
-  --muted: #737373;
-  --border: #e8e8e8;
+  --bg-secondary: var(--bg-base-secondary);
+  --text: var(--text-default);
+  --muted: var(--text-tertiary);
+  --border: var(--border-neutral-l1);
   --success: #15a877;
   --danger: #e8463a;
   --radius: 8px;
+  --workspace-sidebar-width: 232px;
+  --workspace-header-height: 56px;
+  --workspace-content-width: 1120px;
+  --workspace-gutter: 40px;
+  --shadow-popover: 0 6px 24px #24242b12, 0 1px 4px #24242b08;
   color-scheme: light;
 }
 * {

@@ -6,11 +6,11 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  flex: 0 0 224px;
-  width: 224px;
+  flex: 0 0 var(--workspace-sidebar-width);
+  width: var(--workspace-sidebar-width);
   background: var(--bg-secondary);
   border-right: 1px solid var(--border);
-  padding: 16px 12px 8px;
+  padding: 20px 12px 12px;
 }
 .brand {
   display: flex;
@@ -44,6 +44,9 @@
   background: var(--brand);
   border-radius: 50%;
 }
+.space-initial {
+  display: none;
+}
 .sidebar nav {
   display: flex;
   flex-direction: column;
@@ -55,26 +58,27 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 37px;
+  min-height: 36px;
   padding: 7px 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   text-align: left;
-  color: #525252;
+  color: var(--text-secondary);
   font-size: 13px;
   overflow: hidden;
 }
 .nav-item:hover {
-  background: #ebebeb;
+  background: #ededf0;
 }
-.nav-item.active {
-  background: #eaeaea;
-  color: #171717;
+.nav-item.active,
+.space-list .space-active {
+  background: var(--brand-soft);
+  color: var(--text-brand);
   font-weight: 500;
 }
 .nav-item.active::before {
-  content: "";
+  content: none;
   position: absolute;
   left: 0;
   top: 10px;
@@ -91,13 +95,19 @@
   color: #888;
   font-size: 11px;
 }
+.nav-item-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .nav-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 21px 7px 5px;
-  font-size: 11px;
-  color: #8b8b8b;
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 .pinned-source-list {
   display: flex;
@@ -126,8 +136,8 @@
   overflow: auto;
 }
 .space-list .nav-item {
-  font-size: 12px;
-  min-height: 34px;
+  font-size: 13px;
+  min-height: 36px;
 }
 .space-list .space-dot {
   margin-left: 4px;
@@ -149,8 +159,8 @@
 }
 .local-hint small {
   display: block;
-  color: #999;
-  font-size: 10px;
+  color: var(--text-tertiary);
+  font-size: 11px;
 }
 .user-button {
   display: flex;
@@ -163,6 +173,22 @@
   padding: 14px 4px 6px;
   margin-top: 12px;
   text-align: left;
+}
+.user-button:hover {
+  background: var(--bg-brand-popup);
+}
+.user-button.active {
+  background: var(--bg-brand-popup);
+  color: var(--text-brand);
+  border-radius: var(--radius-6);
+}
+.user-button.active small {
+  color: var(--text-brand);
+}
+.topbar-account[aria-current="page"] .topbar-avatar {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 3px var(--border-brand);
 }
 .avatar {
   display: flex;
@@ -184,7 +210,7 @@
 }
 .user-button b {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -192,8 +218,8 @@
 }
 .user-button small {
   display: block;
-  color: #999;
-  font-size: 10px;
+  color: var(--text-tertiary);
+  font-size: 11px;
   margin-top: 1px;
 }
 .app-main {
@@ -208,8 +234,8 @@
   flex-shrink: 0;
   align-items: center;
   gap: 10px;
-  height: 53px;
-  padding: 0 24px;
+  height: var(--workspace-header-height);
+  padding: 0 var(--workspace-gutter);
   border-bottom: 1px solid var(--border);
   background: white;
 }
@@ -219,7 +245,7 @@
   gap: 10px;
   min-width: 0;
   color: #a0a0a0;
-  font-size: 11px;
+  font-size: 12px;
 }
 .breadcrumbs b {
   font-weight: 500;
@@ -248,7 +274,7 @@
   border-radius: 7px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
   white-space: nowrap;
 }
@@ -271,7 +297,9 @@
 }
 .topbar-search-trigger {
   gap: 7px;
-  padding: 0 8px;
+  padding: 0 10px;
+  border-color: var(--border);
+  background: var(--bg-base-secondary);
 }
 .topbar-search-trigger:hover,
 .topbar-tasks:hover,
@@ -319,6 +347,7 @@
   font-weight: 600;
 }
 .topbar-account-label {
+  display: none;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -326,11 +355,11 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
-  color: #888;
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 .save-cloud {
-  color: var(--success);
+  color: var(--text-tertiary);
 }
 .model-status-compact {
   margin: 10px 0 12px;
@@ -421,10 +450,10 @@
 .content-scroll {
   overflow-y: auto;
   flex: 1;
-  padding: 36px 40px 60px;
+  padding: 32px var(--workspace-gutter) 60px;
 }
 .content-scroll > * {
-  max-width: 1180px;
+  max-width: var(--workspace-content-width);
   margin-left: auto;
   margin-right: auto;
 }

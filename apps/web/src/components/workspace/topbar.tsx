@@ -33,7 +33,7 @@ export type WorkspaceTopbarProps = {
   openCollectionHome: () => void;
   openAllSourcesSearch: () => void;
   navigate: (section: "tasks") => void;
-  setModal: (modal: "account") => void;
+  openAccountSettings: () => void;
 };
 
 export default function WorkspaceTopbar({
@@ -54,7 +54,7 @@ export default function WorkspaceTopbar({
   openCollectionHome,
   openAllSourcesSearch,
   navigate,
-  setModal,
+  openAccountSettings,
 }: WorkspaceTopbarProps) {
   return (
     <header className="topbar">
@@ -126,22 +126,12 @@ export default function WorkspaceTopbar({
         </button>
         <button
           className="topbar-account"
-          onClick={() => setModal("account")}
-          disabled={status === "saving"}
-          aria-label={
-            user && cloudConfigured
-              ? `账号与云端保存：${user.email}`
-              : cloudConfigured
-                ? "登录以连接云端"
-                : "本机工作区"
+          onClick={openAccountSettings}
+          aria-current={
+            section === "settings" && !currentSource && !currentNote ? "page" : undefined
           }
-          title={
-            user && cloudConfigured
-              ? "账号与云端保存"
-              : cloudConfigured
-                ? "登录以连接云端"
-                : "本机工作区"
-          }
+          aria-label={user && cloudConfigured ? `账号与设置：${user.email}` : "账号与设置"}
+          title="账号与设置"
         >
           <span className="topbar-avatar">{user?.email.slice(0, 1).toUpperCase() || "C"}</span>
           <span className="topbar-account-label">

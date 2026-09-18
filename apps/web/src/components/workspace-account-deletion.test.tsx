@@ -273,6 +273,22 @@ describe("Workspace account deletion access barrier", () => {
     expect(auth.signOut).not.toHaveBeenCalled();
   });
 
+  it.each([".sidebar-bottom .user-button", ".topbar-account"])(
+    "keeps recovery available through %s when account access is blocked",
+    async (selector) => {
+      await render({ ready: false, accountDeletionState: "blocked" });
+      const previousHash = window.location.hash;
+      const trigger = host.querySelector<HTMLButtonElement>(selector);
+      expect(trigger).toBeInstanceOf(HTMLButtonElement);
+      await act(async () => trigger!.click());
+      expect(window.location.hash).toBe(previousHash);
+      expect(host.querySelector(".account-access-stopped")).not.toBeNull();
+      expect(host.querySelector("dialog[open] [data-testid='account-panel']")).not.toBeNull();
+      expect(accountProps?.onAccountDeletion).toBe(workspaceStore.discardAccount);
+      expect(accountProps?.signOutControl).toBeUndefined();
+    },
+  );
+
   it("closes an ongoing backup review when account access stops and does not revive it afterward", async () => {
     window.history.replaceState(null, "", "#settings/storage");
     await render();

@@ -11,6 +11,7 @@ const items = [
 
 export type WorkspaceMobileNavProps = {
   section: Section;
+  spaceId?: string;
   navigate: (section: Section) => void;
   openCollectionHome: () => void;
 };
@@ -25,6 +26,7 @@ export type WorkspaceMobileNavProps = {
  */
 export default function WorkspaceMobileNav({
   section,
+  spaceId = "all",
   navigate,
   openCollectionHome,
 }: WorkspaceMobileNavProps) {
@@ -32,7 +34,8 @@ export default function WorkspaceMobileNav({
     <nav className="workspace-mobile-nav" aria-label="主要内容导航">
       {items.map(([key, label, Icon]) => {
         const active =
-          key === "knowledge" ? section === "knowledge" || section === "notes" : section === key;
+          spaceId === "all" &&
+          (key === "knowledge" ? section === "knowledge" || section === "notes" : section === key);
         return (
           <button
             key={key}

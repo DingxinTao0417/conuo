@@ -1,15 +1,15 @@
 .learning-continuation-card {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: 38px minmax(0, 1fr);
   gap: 12px 16px;
   align-items: start;
-  min-height: 190px;
+  min-height: 216px;
   padding: 22px;
-  border: 1px solid #ded9f1;
-  border-radius: 12px;
-  margin-bottom: 14px;
-  background: linear-gradient(135deg, #fff 0%, #fbfaff 72%, #f2efff 100%);
-  box-shadow: 0 8px 24px #342d680a;
+  border: 1px solid var(--accent-violet-border);
+  border-radius: 8px;
+  margin-bottom: 0;
+  background: linear-gradient(120deg, #e7dffb, #f2edfe 65%, #e8efff);
+  box-shadow: none;
 }
 .learning-continuation-icon {
   grid-row: 1 / span 3;
@@ -20,12 +20,13 @@
 .learning-continuation-heading > span {
   display: block;
   margin-bottom: 3px;
-  color: var(--brand);
-  font-size: 10px;
+  color: var(--accent-violet);
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
 }
 .learning-continuation-heading h3 {
+  color: #403166;
   overflow: hidden;
   font-size: 17px;
   font-weight: 600;
@@ -38,15 +39,15 @@
   align-items: center;
   gap: 5px;
   margin-top: 5px;
-  color: #797381;
-  font-size: 11px;
+  color: #6c6080;
+  font-size: 12px;
 }
 .learning-continuation-summary {
   grid-column: 2;
   display: -webkit-box;
   overflow: hidden;
-  color: #77717c;
-  font-size: 12px;
+  color: #5e5372;
+  font-size: 13px;
   line-height: 1.75;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -68,8 +69,8 @@
 }
 .learning-continuation-question span {
   display: block;
-  color: #8d8793;
-  font-size: 9px;
+  color: #6c6080;
+  font-size: 11px;
 }
 .learning-continuation-question b {
   display: block;
@@ -81,10 +82,19 @@
   white-space: nowrap;
 }
 .learning-continuation-action {
-  grid-column: 3;
-  grid-row: 1 / span 3;
-  align-self: center;
+  grid-column: 2;
+  grid-row: auto;
+  align-self: end;
+  justify-self: start;
+  background: var(--bg-brand);
+  color: #fff;
+  border-color: var(--bg-brand);
   min-width: 112px;
+}
+
+.learning-continuation-action:hover {
+  background: var(--bg-brand-hover);
+  border-color: var(--bg-brand-hover);
 }
 
 @media (min-width: 621px) and (max-width: 1024px) {

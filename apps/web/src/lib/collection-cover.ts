@@ -9,39 +9,39 @@ type PaletteEntry = Pick<
   "--collection-cover" | "--collection-cover-text" | "--collection-cover-muted"
 >;
 
-// These quiet book-cover treatments are intentionally separate from the
+// These book-cover treatments are intentionally separate from the
 // navigation selection color. A collection should keep its visual identity
 // when its position in the shelf changes.
 const COVER_PALETTE: readonly PaletteEntry[] = [
   {
-    "--collection-cover": "#7865cf",
+    "--collection-cover": "#705bc2",
     "--collection-cover-text": "#ffffff",
-    "--collection-cover-muted": "#eee9ff",
+    "--collection-cover-muted": "#f0ebff",
   },
   {
-    "--collection-cover": "#d5e0ed",
-    "--collection-cover-text": "#354253",
-    "--collection-cover-muted": "#617081",
+    "--collection-cover": "#cbdffd",
+    "--collection-cover-text": "#204f89",
+    "--collection-cover-muted": "#4b607d",
   },
   {
-    "--collection-cover": "#dce7e1",
-    "--collection-cover-text": "#354253",
-    "--collection-cover-muted": "#617081",
+    "--collection-cover": "#c7e8dc",
+    "--collection-cover-text": "#205f51",
+    "--collection-cover-muted": "#486b60",
   },
   {
-    "--collection-cover": "#e3e3e8",
-    "--collection-cover-text": "#354253",
-    "--collection-cover-muted": "#617081",
+    "--collection-cover": "#f7d9c9",
+    "--collection-cover-text": "#7d4530",
+    "--collection-cover-muted": "#775444",
   },
   {
-    "--collection-cover": "#e9e1d6",
-    "--collection-cover-text": "#354253",
-    "--collection-cover-muted": "#617081",
+    "--collection-cover": "#f4e4b5",
+    "--collection-cover-text": "#755522",
+    "--collection-cover-muted": "#706039",
   },
   {
-    "--collection-cover": "#dcdfee",
-    "--collection-cover-text": "#354253",
-    "--collection-cover-muted": "#617081",
+    "--collection-cover": "#e2d6f8",
+    "--collection-cover-text": "#594187",
+    "--collection-cover-muted": "#655184",
   },
 ];
 
@@ -64,15 +64,15 @@ export function collectionCoverStyle(spaceId: string, color: string): Collection
   if (isCustomColor(color)) {
     return {
       "--collection-cover": `color-mix(in srgb, ${color} 20%, var(--bg-base-secondary))`,
-      "--collection-cover-text": "var(--text-secondary)",
-      "--collection-cover-muted": "var(--text-tertiary)",
+      "--collection-cover-text": "#333844",
+      "--collection-cover-muted": "#4b505c",
     };
   }
   return { ...COVER_PALETTE[stablePaletteIndex(spaceId)] };
 }
 
 export const inboxCoverStyle: CollectionCoverStyle = {
-  "--collection-cover": "var(--bg-base-tertiary)",
-  "--collection-cover-text": "var(--text-secondary)",
-  "--collection-cover-muted": "var(--text-tertiary)",
+  "--collection-cover": "#e1edf7",
+  "--collection-cover-text": "#365c7b",
+  "--collection-cover-muted": "#536b80",
 };

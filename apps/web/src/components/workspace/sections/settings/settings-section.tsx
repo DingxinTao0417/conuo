@@ -63,8 +63,8 @@ export default function SettingsSection({
       <div className="page-heading">
         <div>
           <p className="eyebrow">按你的方式学习</p>
-          <h1>设置</h1>
-          <p>控制资料的保存位置与检索权限。</p>
+          <h1>账号与设置</h1>
+          <p>管理账号、AI、云端资料和学习偏好。</p>
         </div>
       </div>
       <nav className="settings-panes" aria-label="设置分组">

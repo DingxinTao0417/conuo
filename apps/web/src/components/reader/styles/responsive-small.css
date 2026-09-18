@@ -65,9 +65,9 @@
     margin: 0 2px;
   }
   .reader-document-tools .icon-btn {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
     padding: 5px;
   }
   .reader-zoom {
@@ -75,8 +75,8 @@
     min-width: 36px;
   }
   .reader-tool-text {
-    padding: 4px;
-    font-size: 10px !important;
+    padding: 6px 9px;
+    font-size: 12px !important;
   }
   .reader-ai-header {
     padding: 15px 16px;
@@ -205,7 +205,7 @@
     padding-bottom: 7px;
   }
   .reader-page-control input {
-    width: 26px;
+    width: 40px;
   }
   .reader-page-control {
     font-size: 10px;

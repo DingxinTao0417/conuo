@@ -1,11 +1,14 @@
 @media (min-width: 1600px) {
   .content-scroll {
-    padding-top: 45px;
+    padding-top: 32px;
   }
 }
 @media (max-width: 1100px) {
+  :root {
+    --workspace-gutter: 24px;
+  }
   .content-scroll {
-    padding: 28px 24px 50px;
+    padding: 32px var(--workspace-gutter) 60px;
   }
   .sidebar {
     width: 200px;

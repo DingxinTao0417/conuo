@@ -1,4 +1,5 @@
 "use client";
+import { X } from "lucide-react";
 import type { Annotation, Source } from "@/lib/types";
 import { markdownQuoteText } from "../../markdown-selection";
 import type { ReaderProps } from "../reader-types";
@@ -23,6 +24,7 @@ export type AnnotationsPanelProps = {
   clearCitation: () => void;
   setAiOpen: (open: boolean) => void;
   setMobileTab: (tab: "reading" | "ai" | "citation") => void;
+  onClose: () => void;
 };
 
 export default function AnnotationsPanel({
@@ -45,12 +47,28 @@ export default function AnnotationsPanel({
   clearCitation,
   setAiOpen,
   setMobileTab,
+  onClose,
 }: AnnotationsPanelProps) {
   return (
-    <aside id="reader-annotations-panel" className="reader-annotations" aria-label="我的标注">
-      <h3>
-        我的标注 <span>{sourceAnnotations.length}</span>
-      </h3>
+    <aside
+      id="reader-annotations-panel"
+      className="reader-annotations"
+      aria-label="我的标注"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || editingAnnotationId || event.defaultPrevented) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }}
+    >
+      <div className="reader-annotations-heading">
+        <h3>
+          我的标注 <span>{sourceAnnotations.length}</span>
+        </h3>
+        <button type="button" className="icon-btn" aria-label="关闭标注" onClick={onClose}>
+          <X size={16} aria-hidden="true" />
+        </button>
+      </div>
       {!sourceAnnotations.length && (
         <p className="muted">
           {historical

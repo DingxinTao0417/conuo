@@ -12,11 +12,11 @@ describe("collection shelf covers", () => {
     );
   });
 
-  it("uses an explicit custom space color without changing text contrast tokens", () => {
+  it("uses an explicit custom space color with readable dark text", () => {
     expect(collectionCoverStyle("personal", "#2F74FF")).toEqual({
       "--collection-cover": "color-mix(in srgb, #2F74FF 20%, var(--bg-base-secondary))",
-      "--collection-cover-text": "var(--text-secondary)",
-      "--collection-cover-muted": "var(--text-tertiary)",
+      "--collection-cover-text": "#333844",
+      "--collection-cover-muted": "#4b505c",
     });
   });
 });

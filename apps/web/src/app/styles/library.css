@@ -14,14 +14,14 @@
   height: 35px;
   max-width: 420px;
   flex: 1;
-  color: #aaa;
+  color: var(--text-tertiary);
 }
 .search-field input {
   min-width: 0;
   width: 100%;
   border: 0;
   background: none;
-  font-size: 12px;
+  font-size: 13px;
   outline: none;
 }
 .search-field:focus-within {
@@ -71,7 +71,7 @@
   border-radius: 8px;
   background: var(--brand);
   color: #fff;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 16px;
   text-align: center;
 }
@@ -82,10 +82,10 @@
   right: 0;
   width: min(292px, calc(100vw - 36px));
   padding: 13px;
-  border: 1px solid #e0ddec;
+  border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
-  box-shadow: 0 12px 30px #342d6824;
+  box-shadow: var(--shadow-popover);
 }
 .library-menu-field {
   display: grid;
@@ -152,7 +152,7 @@
 .tag-filter-empty {
   margin: 3px 0 0;
   color: #737c8c;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.55;
 }
 .tag-filter-options {
@@ -200,15 +200,15 @@
 }
 .source-list {
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 8px;
   overflow: hidden;
 }
 .source-list-heading {
   display: grid;
   grid-template-columns: 1fr 110px 96px 76px;
   background: #fafafa;
-  font-size: 10px;
-  color: #999;
+  font-size: 12px;
+  color: var(--text-tertiary);
   padding: 11px 16px 11px 43px;
   border-bottom: 1px solid var(--border);
 }
@@ -225,7 +225,7 @@
   border: 0;
 }
 .source-row:hover {
-  background: #fcfcfc;
+  background: var(--bg-base-secondary);
 }
 .source-check {
   width: 13px;
@@ -250,7 +250,7 @@
 }
 .source-open b {
   display: block;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -261,14 +261,14 @@
   gap: 6px;
   align-items: center;
   margin-top: 5px;
-  color: #aaa;
-  font-size: 9px;
+  color: var(--text-tertiary);
+  font-size: 12px;
   flex-wrap: wrap;
 }
 .tag {
   background: #f3f3f5;
-  color: #888;
-  font-size: 9px;
+  color: var(--text-secondary);
+  font-size: 12px;
   padding: 1px 5px;
   border-radius: 3px;
 }
@@ -279,8 +279,8 @@
 }
 .source-date {
   width: 72px;
-  font-size: 10px;
-  color: #999;
+  font-size: 12px;
+  color: var(--text-tertiary);
   text-align: center;
   flex-shrink: 0;
 }
@@ -300,7 +300,7 @@
 .source-grid .source-row {
   flex-wrap: wrap;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 8px;
   padding: 18px;
   gap: 8px;
 }
@@ -340,11 +340,11 @@
   border: 1px solid #ddd8f3;
   background: #f8f7ff;
   border-radius: 7px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .bulk-bar .btn {
   min-height: 27px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .empty-state {
   display: flex;
@@ -367,7 +367,7 @@
 }
 .empty-state p {
   font-size: 12px;
-  color: #999;
+  color: var(--text-tertiary);
   max-width: 400px;
   line-height: 1.8;
 }

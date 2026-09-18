@@ -60,7 +60,8 @@ export function isLibraryFilter(value: string): value is LibraryFilter {
 function decodePathSegment(value: string | undefined): string | undefined {
   if (!value) return undefined;
   try {
-    return decodeURIComponent(value);
+    const decoded = decodeURIComponent(value);
+    return decoded && !controlCharacter.test(decoded) ? decoded : undefined;
   } catch {
     return undefined;
   }
@@ -96,13 +97,15 @@ export function normalizeLibraryTags(values: readonly string[] | undefined): str
  * without server state.
  */
 export function parseLibraryRoute(hash: string): LibraryRoute | undefined {
-  const fragment = hash.replace(/^#/, "");
+  if (typeof hash !== "string" || !hash.startsWith("#")) return undefined;
+  const fragment = hash.slice(1);
   const queryStart = fragment.indexOf("?");
   const path = (queryStart === -1 ? fragment : fragment.slice(0, queryStart)).split("/");
-  if (path[0] !== "library") return undefined;
+  if (path[0] !== "library" || path.length > 2) return undefined;
 
   const params = new URLSearchParams(queryStart === -1 ? "" : fragment.slice(queryStart + 1));
   const spaceId = decodePathSegment(path[1]);
+  if (path.length === 2 && !spaceId) return undefined;
   const files = Boolean(spaceId);
   const filterValue = params.get("filter");
   const timeValue = params.get("time");

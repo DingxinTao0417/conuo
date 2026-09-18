@@ -8,19 +8,20 @@
   border-bottom: 1px solid var(--border);
 }
 .settings-panes button {
-  padding: 6px 11px;
+  min-height: 36px;
+  padding: 7px 12px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 13px;
 }
 .settings-panes button:hover {
-  background: var(--bg-base-tertiary);
+  background: var(--bg-base-secondary);
   color: var(--text-default);
 }
 .settings-panes button.active {
-  background: var(--bg-base-tertiary);
+  background: var(--bg-base-secondary);
   border-color: var(--border);
   color: var(--text-default);
   font-weight: 500;
@@ -30,11 +31,13 @@
   outline-offset: 2px;
 }
 .space-settings-card {
-  margin-top: 30px;
+  margin-top: 24px;
 }
 .space-settings-note {
   margin-top: 12px;
-  font-size: 11px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.7;
 }
 .settings-advanced {
   margin-top: 6px;
@@ -54,39 +57,45 @@
   max-width: 820px;
   padding: 24px;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  margin: 0 0 22px;
+  border-radius: 8px;
+  margin: 0 0 20px;
+  background: var(--bg-base-default);
 }
 .settings-card h2 {
   font-size: 14px;
-  font-weight: 550;
-  margin-bottom: 5px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-default);
+  line-height: 1.6;
 }
 .setting-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  padding: 21px 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
 }
 .setting-row:last-child {
   border: 0;
   padding-bottom: 4px;
 }
 .setting-row b {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
+  color: var(--text-default);
+  overflow-wrap: anywhere;
 }
 .setting-row p {
-  color: #999;
-  font-size: 11px;
-  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-top: 5px;
   max-width: 530px;
-  line-height: 1.8;
+  line-height: 1.7;
 }
 .setting-row > div {
   flex: 1;
+  min-width: 0;
 }
 .setting-row > .setting-actions {
   display: flex;
@@ -111,15 +120,15 @@
 }
 .organization-history-impact {
   padding: 13px 14px;
-  border: 1px solid #ece9f4;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fbfaff;
-  color: #5f5877;
+  background: var(--bg-base-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 .organization-history-impact > p:first-child {
   margin: 0 0 9px;
-  color: #342d4a;
+  color: var(--text-default);
 }
 .organization-history-impact dl {
   display: grid;
@@ -140,14 +149,14 @@
   margin: 0;
 }
 .organization-history-impact dd {
-  color: #41395b;
+  color: var(--text-default);
   font-weight: 550;
   white-space: nowrap;
 }
 .organization-history-impact .organization-history-kinds {
   margin: 10px 0 0;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.7;
 }
 .switch {
@@ -177,4 +186,14 @@
 }
 .switch:checked::after {
   left: 16px;
+}
+
+@media (max-width: 620px) {
+  .settings-panes button {
+    min-height: 44px;
+  }
+
+  .organization-history-impact dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

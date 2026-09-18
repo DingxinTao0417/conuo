@@ -85,6 +85,10 @@
   .reader-document-tools .reader-document-zoom-controls {
     display: none;
   }
+  .reader-document-tools > .reader-tool-spacer,
+  .reader-topbar .reader-status-ready {
+    display: none;
+  }
   .reader-desktop-bottom-controls {
     display: flex;
     align-items: center;
@@ -151,6 +155,16 @@
   }
 }
 @media (min-width: 621px) and (max-width: 1024px) {
+  .reader-document-tools {
+    flex-wrap: wrap;
+  }
+  .reader-document-tools button,
+  .reader-document-tools input {
+    min-height: 40px;
+  }
+  .reader-document-tools .icon-btn {
+    min-width: 40px;
+  }
   .reader-mobile-tabs {
     display: none;
   }

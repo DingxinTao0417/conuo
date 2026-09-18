@@ -1,14 +1,13 @@
 "use client";
 import Image from "next/image";
-import { ChevronRight, FileText, Inbox, Plus, Settings2, ShieldCheck, Trash2 } from "lucide-react";
+import { ChevronRight, FileText, Inbox, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import type { Note, Source, WorkspaceData } from "@/lib/types";
 import { sections, type Section } from "./navigation";
-import type { WorkspaceStore, WorkspaceUser } from "./types";
+import type { WorkspaceUser } from "./types";
 
 export type WorkspaceSidebarProps = {
   data: WorkspaceData;
   user: WorkspaceUser;
-  status: WorkspaceStore["status"];
   cloudConfigured: boolean;
   sidebar: boolean;
   setSidebar: (open: boolean) => void;
@@ -23,13 +22,12 @@ export type WorkspaceSidebarProps = {
   chooseSpace: (id: string) => void;
   openSource: (id: string) => void;
   openSpaceCreation: () => void;
-  setModal: (modal: "account") => void;
+  openAccountSettings: () => void;
 };
 
 export default function WorkspaceSidebar({
   data,
   user,
-  status,
   cloudConfigured,
   sidebar,
   setSidebar,
@@ -44,7 +42,7 @@ export default function WorkspaceSidebar({
   chooseSpace,
   openSource,
   openSpaceCreation,
-  setModal,
+  openAccountSettings,
 }: WorkspaceSidebarProps) {
   return (
     <>
@@ -62,7 +60,12 @@ export default function WorkspaceSidebar({
           {sections.map(([key, label, Icon]) => (
             <button
               key={key}
-              className={`nav-item ${section === key && !currentSource && !currentNote ? "active" : ""}`}
+              className={`nav-item ${spaceId === "all" && section === key && !currentSource && !currentNote ? "active" : ""}`}
+              aria-current={
+                spaceId === "all" && section === key && !currentSource && !currentNote
+                  ? "page"
+                  : undefined
+              }
               aria-label={label}
               title={label}
               onClick={() => {
@@ -81,11 +84,11 @@ export default function WorkspaceSidebar({
             </button>
           ))}
         </nav>
-        <section className="pinned-source-section" aria-labelledby="pinned-source-title">
-          <div className="nav-heading">
-            <span id="pinned-source-title">置顶资料</span>
-          </div>
-          {pinnedSources.length > 0 && (
+        {pinnedSources.length > 0 && (
+          <section className="pinned-source-section" aria-labelledby="pinned-source-title">
+            <div className="nav-heading">
+              <span id="pinned-source-title">置顶资料</span>
+            </div>
             <div className="pinned-source-list">
               {pinnedSources.map((source) => (
                 <button
@@ -100,8 +103,8 @@ export default function WorkspaceSidebar({
                 </button>
               ))}
             </div>
-          )}
-        </section>
+          </section>
+        )}
         <div className="nav-heading">
           <span>我的知识库</span>
           <button className="icon-btn" aria-label="新建知识库" onClick={() => openSpaceCreation()}>
@@ -120,11 +123,14 @@ export default function WorkspaceSidebar({
                 onClick={() => chooseSpace(s.id)}
               >
                 <span className="space-dot" style={{ background: s.color }} />
+                <span className="space-initial" aria-hidden="true">
+                  {Array.from(s.name.trim())[0] || "库"}
+                </span>
                 <span className="nav-item-label">{s.name}</span>
               </button>
             ))}
           <button
-            className="nav-item"
+            className={`nav-item ${spaceId === "inbox" ? "space-active" : ""}`}
             onClick={() => chooseSpace("inbox")}
             aria-label="收件箱"
             title="收件箱"
@@ -160,32 +166,13 @@ export default function WorkspaceSidebar({
             <span className="nav-item-label">回收站</span>
           </button>
           <button
-            className={`nav-item ${section === "settings" ? "active" : ""}`}
-            onClick={() => navigate("settings")}
-            aria-label="设置"
-            title="设置"
-          >
-            <Settings2 size={16} />
-            <span className="nav-item-label">设置</span>
-          </button>
-          <button
-            className="user-button"
-            onClick={() => setModal("account")}
-            disabled={status === "saving"}
-            aria-label={
-              user && cloudConfigured
-                ? `账号与云端保存：${user.email}`
-                : cloudConfigured
-                  ? "登录以连接云端"
-                  : "本机工作区"
+            className={`user-button${section === "settings" && !currentSource && !currentNote ? " active" : ""}`}
+            onClick={openAccountSettings}
+            aria-current={
+              section === "settings" && !currentSource && !currentNote ? "page" : undefined
             }
-            title={
-              user && cloudConfigured
-                ? "账号与云端保存"
-                : cloudConfigured
-                  ? "登录以连接云端"
-                  : "本机工作区"
-            }
+            aria-label={user && cloudConfigured ? `账号与设置：${user.email}` : "账号与设置"}
+            title="账号与设置"
           >
             <span className="avatar">{user?.email.slice(0, 1).toUpperCase() || "C"}</span>
             <span>
@@ -196,13 +183,7 @@ export default function WorkspaceSidebar({
                     ? "开始你的学习之旅"
                     : "本机工作区"}
               </b>
-              <small>
-                {user && cloudConfigured
-                  ? "账号与云端保存"
-                  : cloudConfigured
-                    ? "登录以连接云端"
-                    : "云端同步暂不可用"}
-              </small>
+              <small>账号与设置</small>
             </span>
             <ChevronRight size={15} />
           </button>

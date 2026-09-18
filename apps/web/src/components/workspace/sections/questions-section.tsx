@@ -36,7 +36,6 @@ export default function QuestionsSection({
           <p>每次讨论都保留资料范围与原文依据。</p>
         </div>
       </div>
-      <div className="notice">基于所选资料提问并核对引用；本机或未配置模型时使用原文检索。</div>
       {conversationRouteIssue && (
         <div className="notice notice-warning" role="status">
           <span>{conversationRouteIssue}</span>

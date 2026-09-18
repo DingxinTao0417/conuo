@@ -113,6 +113,7 @@ import MobileCitationPage from "./panels/mobile-citation-page";
 import OutlinePanel from "./panels/outline-panel";
 import ReaderToolstrip from "./reader-toolstrip";
 import ReaderTopbar from "./reader-topbar";
+import ReaderPageInput from "./reader-page-input";
 import {
   clearReaderSearchHighlights,
   getAndroidUserAgent,
@@ -850,10 +851,11 @@ export default function Reader(props: ReaderProps) {
   ]);
 
   function changePage(value: number, preserveCitation = false) {
+    if (!Number.isSafeInteger(value) || value < 1) return;
     setFocusedAnnotationId(null);
     if (!preserveCitation) clearCitation();
     locatedReaderTarget.current = null;
-    const next = Math.max(1, Math.min(value || 1, pages));
+    const next = Math.max(1, Math.min(value, pages));
     clearSearchResults();
     pageRef.current = next;
     setPage(next);
@@ -1087,7 +1089,11 @@ export default function Reader(props: ReaderProps) {
   }
 
   function isCompactReaderLayout() {
-    return typeof window !== "undefined" && window.matchMedia("(max-width: 1024px)").matches;
+    return (
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 1024px)").matches
+    );
   }
 
   function isWideReaderLayout() {
@@ -2353,6 +2359,10 @@ export default function Reader(props: ReaderProps) {
               clearCitation={clearCitation}
               setAiOpen={setAiOpen}
               setMobileTab={setMobileTab}
+              onClose={() => {
+                closePanel();
+                visibleReaderTool("[data-reader-annotation-trigger]", null)?.focus();
+              }}
             />
           )}
           {source.originalMissing && (
@@ -2589,14 +2599,12 @@ export default function Reader(props: ReaderProps) {
                 <span className="reader-tool-divider" aria-hidden="true" />
                 <label className="reader-bottom-page-jump">
                   <span>跳至</span>
-                  <input
-                    aria-label="跳转页码"
-                    type="number"
-                    min={1}
-                    max={pages}
-                    value={page}
+                  <ReaderPageInput
+                    sourceKey={`${source.id}:${source.versionId}`}
+                    page={page}
+                    pages={pages}
                     disabled={showText}
-                    onChange={(event) => changePage(Number(event.target.value))}
+                    onCommit={changePage}
                   />
                 </label>
                 <span className="reader-tool-divider" aria-hidden="true" />

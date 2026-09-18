@@ -1,14 +1,15 @@
 .conversation-list,
 .trash-list {
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 8px;
+  background: var(--bg-base-default);
   overflow: hidden;
 }
 .conversation-row {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 18px;
+  padding: 16px 18px;
   border-bottom: 1px solid var(--border);
 }
 .conversation-row:last-child {
@@ -16,7 +17,7 @@
 }
 .conversation-row > button:first-child {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: center;
   flex: 1;
   text-align: left;
@@ -25,32 +26,38 @@
   min-width: 0;
 }
 .conversation-row svg {
-  color: #999;
+  color: var(--text-tertiary);
 }
 .conversation-row h3 {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
+  color: var(--text-default);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 .conversation-row p,
 .trash-row p {
-  font-size: 10px;
-  color: #999;
-  margin-top: 5px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+  line-height: 1.6;
 }
 .resolved {
   color: #59916a;
 }
 .trash-row {
   display: flex;
-  gap: 15px;
+  gap: 16px;
   align-items: center;
-  padding: 18px;
+  padding: 16px 18px;
   border-bottom: 1px solid var(--border);
 }
 .trash-row:last-child {
   border: 0;
 }
 .trash-row b {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
+  color: var(--text-default);
+  line-height: 1.6;
 }

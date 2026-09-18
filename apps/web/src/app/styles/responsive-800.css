@@ -48,7 +48,7 @@
     gap: 8px;
   }
   .topbar {
-    padding: 0 16px;
+    padding: 0 var(--workspace-gutter);
   }
   .space-context-bar {
     padding-right: 16px;

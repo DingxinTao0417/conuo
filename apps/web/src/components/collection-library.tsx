@@ -201,8 +201,20 @@ export default function CollectionLibrary({
                   className={`collection-cover${book.archived ? " collection-cover-archived" : ""}`}
                   style={book.style}
                 >
-                  <span className="collection-cover-index" aria-hidden="true">
-                    {book.inbox ? "收" : book.name.trim().slice(0, 1)}
+                  <span className="collection-cover-header">
+                    <span className="collection-cover-index" aria-hidden="true">
+                      {book.inbox ? "收" : book.name.trim().slice(0, 1)}
+                    </span>
+                    {(book.archived || book.pendingReviewCount > 0) && (
+                      <span className="collection-cover-statuses">
+                        {book.archived && <span className="collection-cover-state">已归档</span>}
+                        {book.pendingReviewCount > 0 && (
+                          <span className="collection-cover-review">
+                            待审核 {book.pendingReviewCount}
+                          </span>
+                        )}
+                      </span>
+                    )}
                   </span>
                   <span className="collection-cover-copy">
                     <strong className="collection-cover-title" title={book.name}>
@@ -214,16 +226,6 @@ export default function CollectionLibrary({
                       </span>
                     )}
                   </span>
-                  {(book.archived || book.pendingReviewCount > 0) && (
-                    <span className="collection-cover-statuses">
-                      {book.archived && <span className="collection-cover-state">已归档</span>}
-                      {book.pendingReviewCount > 0 && (
-                        <span className="collection-cover-review">
-                          待审核 {book.pendingReviewCount}
-                        </span>
-                      )}
-                    </span>
-                  )}
                   <span className="collection-cover-meta">
                     <span>{book.count} 份资料</span>
                     {book.updatedAt && (

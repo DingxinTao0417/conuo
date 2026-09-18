@@ -180,14 +180,21 @@ describe("Workspace first material path", () => {
     expectFirstImportNaming();
   });
 
-  it("labels the account entry as a browser-only workspace when cloud sync is unavailable", async () => {
-    const entry = host.querySelector<HTMLButtonElement>('[aria-label="本机工作区"]');
+  it("keeps browser-only status visible through account settings when cloud sync is unavailable", async () => {
+    const entry = host.querySelector<HTMLButtonElement>(
+      '.sidebar-bottom [aria-label="账号与设置"]',
+    );
     expect(entry).toBeInstanceOf(HTMLButtonElement);
-    expect(entry?.textContent).toContain("云端同步暂不可用");
+    expect(entry?.textContent).toContain("本机工作区");
+    expect(entry?.textContent).toContain("账号与设置");
+    expect(host.textContent).toContain("云端同步暂不可用");
     expect(host.textContent).not.toContain("登录以连接云端");
 
     await act(async () => entry!.click());
-    expect(host.textContent).toContain("云端同步暂不可用");
+    expect(window.location.hash).toBe("#settings/account");
+    expect(host.querySelector(".settings-card")?.textContent).toContain(
+      "云端同步暂不可用。资料仅保存在此浏览器",
+    );
     expect(host.textContent).not.toContain("Supabase");
     expect(host.querySelector('input[type="email"]')).toBeNull();
   });

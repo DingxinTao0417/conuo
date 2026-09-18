@@ -1,9 +1,8 @@
 "use client";
-import type { RefObject } from "react";
+import { useSyncExternalStore, type RefObject } from "react";
 import {
   ArrowLeft,
   Check,
-  ChevronRight,
   Cloud,
   Columns2,
   Download,
@@ -21,6 +20,15 @@ import { sourcePresentationStatus } from "@/lib/source-coverage";
 import { sourceStatusLabel } from "./reader-constants";
 import type { ReaderPanels } from "./hooks/use-reader-panels";
 import type { ReaderProps } from "./reader-types";
+
+function subscribeToReaderLayout(onChange: () => void) {
+  if (typeof window.matchMedia !== "function") return () => {};
+  const query = window.matchMedia("(max-width: 1024px)");
+  query.addEventListener?.("change", onChange);
+  return () => query.removeEventListener?.("change", onChange);
+}
+
+const serverCompactLayout = () => false;
 
 export type ReaderTopbarProps = {
   source: Source;
@@ -80,6 +88,12 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
     space,
     toggleDocumentSearch,
   } = props;
+  const compact = useSyncExternalStore(
+    subscribeToReaderLayout,
+    isCompactReaderLayout,
+    serverCompactLayout,
+  );
+  const aiVisible = compact ? mobileTab === "ai" : aiOpen;
   return (
     <header className="reader-topbar">
       <button
@@ -94,8 +108,9 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
         {contextualBackLabel && <span>{contextualBackLabel}</span>}
       </button>
       <div className="reader-breadcrumb">
-        <span>{space.name}</span>
-        <ChevronRight size={13} />
+        <span className="reader-library-name" title={space.name}>
+          {space.name}
+        </span>
         <strong title={source.title}>{source.title}</strong>
         <span
           className="reader-mobile-reading-meta"
@@ -110,7 +125,12 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
         {historical ? "历史版本 · 只读" : sourceStatusLabel(source)}
       </span>
       {props.saveState && props.saveLabel && (
-        <span className={`reader-save-status reader-save-${props.saveState}`} role="status">
+        <span
+          className={`reader-save-status reader-save-${props.saveState}`}
+          role="status"
+          title={props.saveLabel}
+          aria-label={props.saveLabel}
+        >
           {props.saveState === "saving" || props.saveState === "loading" ? (
             <LoaderCircle size={14} className="spin" />
           ) : props.saveState === "cloud" ? (
@@ -236,6 +256,10 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
       </div>
       <button
         className="btn reader-ai-toggle"
+        type="button"
+        aria-controls="reader-ai-panel"
+        aria-expanded={aiVisible}
+        title={aiVisible ? "收起问答面板" : "打开问答面板"}
         onClick={() => {
           if (isCompactReaderLayout()) {
             if (mobileTab === "ai") closeAiPanel();
