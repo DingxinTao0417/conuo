@@ -7,7 +7,7 @@ export class PurgeLocalPersistenceError extends Error {}
 
 export function conflictRecordId(prefix: string): string {
   const uuid = globalThis.crypto?.randomUUID?.();
-  return `${prefix}:${uuid || `${Date.now()}:${Math.random().toString(36).slice(2)}`}`;
+  return `${prefix}_${uuid || `${Date.now()}_${Math.random().toString(36).slice(2)}`}`;
 }
 
 export function errorText(cause: unknown): string {

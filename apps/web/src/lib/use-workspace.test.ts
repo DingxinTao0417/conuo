@@ -2776,6 +2776,11 @@ describe("note-level cloud conflict resolution", () => {
       "local explanation",
       "remote explanation",
     ]);
+    expect(saved.data?.notes[0].versions.map((version) => version.id)).toEqual([
+      expect.stringMatching(/^[a-zA-Z0-9_-]{1,100}$/),
+      expect.stringMatching(/^[a-zA-Z0-9_-]{1,100}$/),
+    ]);
+    expect(workspaceSchema.safeParse(saved.data).success).toBe(true);
     expect(coordinator.getSnapshot().recovery).toBeNull();
   });
 
