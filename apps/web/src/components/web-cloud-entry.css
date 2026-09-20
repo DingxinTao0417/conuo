@@ -20,12 +20,6 @@
   font-weight: 600;
   text-decoration: none;
 }
-.web-cloud-brand-name {
-  margin-left: 10px;
-  color: var(--text-tertiary);
-  font-size: 15px;
-  font-weight: 400;
-}
 .web-cloud-entry-card {
   padding: 28px;
   border: 1px solid var(--border-neutral-l1);

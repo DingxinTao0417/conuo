@@ -6,6 +6,13 @@
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
 
+## 品牌名收敛为 Conuo（2026-09-20）
+
+- 按用户反馈，界面不再显示中文名“可诺”：侧栏品牌、登录页品牌与无障碍标签、浏览器标题、PWA 应用名统一为 `Conuo`。同时删除已无引用的 `.brand small` 与 `.web-cloud-brand-name` 样式规则。
+- 产品命名文档（PRD、技术方案、README、设计提示词）仍保留“Conuo（可诺）”记录，因为中文名属于命名决策历史；界面呈现与文档命名不冲突。
+- 6 个品牌相关测试文件／68 项通过，独立 TypeScript、Prettier、ESLint 与差异检查通过；ESLint 保留既有 `_result` 警告。真实浏览器确认侧栏只显示 `Conuo`、标签页标题为 `Conuo`。
+- 本地完成并已提交推送，未部署、未修改云端资源。
+
 ## 提交前统一校验（2026-09-18）
 
 - 本次收拢 P34–P38 的阅读器体验、导航修复、工作台样式与色彩、账号设置入口及相关文档。下方各阶段的“未提交／未推送”描述当时交付状态，最终版本以 Git 历史为准。

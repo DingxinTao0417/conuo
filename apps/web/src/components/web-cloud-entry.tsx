@@ -58,11 +58,9 @@ export default function WebCloudEntry() {
   return (
     <main className="web-cloud-entry">
       <div className="web-cloud-entry-shell">
-        <div className="web-cloud-brand" aria-label="Conuo 可诺">
+        <div className="web-cloud-brand" aria-label="Conuo">
           <Image src="/conuo-icon-192.png" alt="" width={40} height={40} priority />
-          <span>
-            Conuo<span className="web-cloud-brand-name">可诺</span>
-          </span>
+          <span>Conuo</span>
         </div>
         <section className="web-cloud-entry-card" aria-labelledby="web-cloud-entry-title">
           <div className="web-cloud-entry-intro">

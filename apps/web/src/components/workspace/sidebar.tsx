@@ -52,9 +52,7 @@ export default function WorkspaceSidebar({
       <aside className={`sidebar ${sidebar ? "sidebar-open" : ""}`}>
         <button className="brand" onClick={() => navigate("home")} aria-label="Conuo 学习概览">
           <Image src="/conuo-logo.png" alt="" width={34} height={34} priority />
-          <span>
-            Conuo <small>可诺</small>
-          </span>
+          <span>Conuo</span>
         </button>
         <nav aria-label="主导航">
           {sections.map(([key, label, Icon]) => (

@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Conuo · 可诺",
+  title: "Conuo",
   description: "陪你把知识学会。收集资料、阅读原文，保存自己的理解。",
   applicationName: "Conuo",
   manifest: "/manifest.webmanifest",

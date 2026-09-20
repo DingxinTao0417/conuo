@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "Conuo · 可诺",
+    name: "Conuo",
     short_name: "Conuo",
     description: "陪你把知识学会。",
     lang: "zh-CN",
