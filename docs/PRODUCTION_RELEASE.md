@@ -111,7 +111,7 @@ Preview Branch 默认不复制数据，即使选择包含生产数据也属于�
 - [x] 受控邮箱的真实注册确认邮件及同浏览器 PKCE 回调已通过。
 - [x] Chrome 与 Edge 的独立持久会话在等待超过一小时并重启浏览器后，均自动轮换 Cookie、推进到期时间并保持工作区 200；专用账号与 Profile 已删除。
 - [x] signup token 在真实等待超过配置有效期后进入 `/auth/error`，没有建立会话；专用账号已删除。
-- [ ] 真实找回密码邮件与跨浏览器邮件点击通过；staging Auth 已接受真实找回请求并更新 `recovery_sent_at`，但实际收件和链接回调仍无证据。跨浏览器 token-hash 模板还受未配置自定义 SMTP 限制。
+- [ ] 真实找回密码邮件与跨浏览器邮件点击通过；staging Auth 已接受无浏览器找回请求并更新 `recovery_sent_at`，但该请求没有正式客户端 PKCE verifier，只能观察投递，不能证明应用回调或密码更新。跨浏览器 token-hash 模板还受未配置自定义 SMTP 限制。
 - [ ] 三条 Vercel Cron 至少各观察一次自然触发，并完成清理器崩溃、租约到期和可重试 Storage 故障。
 - [ ] staging 备份在新隔离项目恢复成功，并从零跑完 27 份迁移。
 - [ ] 其余 staging 闸门关闭后，重新冻结最终候选 Git SHA、Vercel Deployment ID、不可变部署地址和数据库迁移上界。

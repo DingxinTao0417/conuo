@@ -16,7 +16,7 @@ Auth token 验收使用 Supabase Admin 为专用可丢弃账号生成一次性 s
 
 另使用受控真实邮箱完成注册确认：Auth 日志在 `2026-09-20T14:05:39Z` 记录 `/signup` 200 与 `user_confirmation_requested`，在 `14:06:05Z` 记录邮件链接 `/verify` 303 与 `user_signedup`，随后 `/token` 以 `grant_type=pkce` 返回 200，同一浏览器建立有效会话。该证据不包含邮箱、用户 ID、IP、token 或请求 ID；它仍不覆盖真实找回邮件或跨浏览器点击。staging 未启用自定义 SMTP，默认模板使用 `{{ .ConfirmationURL }}`，跨浏览器所需的 token-hash 模板当前不能在控制台编辑。
 
-`2026-09-20T17:08:51Z` 又通过 staging 的正式公开 Auth 接口向受控账号发起真实找回密码请求，接口返回 200；Admin 只读回查显示 `recovery_sent_at` 于 `17:08:52Z` 更新。该结果证明请求被 Auth 接受并进入邮件生成流程，不证明邮箱实际收到、链接可点击、跨浏览器 PKCE 成功或密码已更新；这些步骤继续保持未验收。
+`2026-09-20T17:08:51Z` 又通过 staging 的正式公开 Auth 接口向受控账号发起真实找回密码请求，接口返回 200；Admin 只读回查显示 `recovery_sent_at` 于 `17:08:52Z` 更新。该请求由无浏览器脚本发起，没有正式 `createBrowserClient` 写入的 PKCE verifier，因此只证明请求被 Auth 接受并进入邮件生成流程，可用于观察真实邮箱投递；它不能验证链接点击、应用回调或密码更新。正式同浏览器验收须从 Conuo 登录界面发起，跨浏览器验收则须先配置 token-hash 邮件模板。
 
 另在 Chrome 与 Edge 分别播种独立真实会话并关闭浏览器，等待超过一小时后重启。两份持久 Cookie 均与播种指纹一致，页面随后自动轮换 Cookie、推进到期时间，并以刷新后的身份读取工作区返回 200；专用账号和两个 Profile 在通过后删除。该结果验证当前 staging 的持久登录自动刷新，不替代真双设备、跨浏览器邮件点击或账号删除后的跨设备失效。
 
