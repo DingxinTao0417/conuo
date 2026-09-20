@@ -2,7 +2,7 @@
 
 更新日期：2026-09-20。范围：Web 开发增量及独立 staging 部署。
 
-本项目已有可运行的 Web 工作台，支持导入、阅读与版本历史、笔记与知识审核、普通搜索、原始资料问答、PDF 区域截图学习及个人 ZIP 备份恢复。当前已使用自编 QA 资料完成真实 DeepSeek 问答、回答另存笔记、截图解读／提问／出题、资料分析、跨资料主题生成与人工接受，并确认相关笔记和知识正文的云端保存及刷新恢复；知识页也已基于固定原始依据收到流式问答成功终态，知识页正文本身不充当证据。2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级资料整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、六条主要业务冲突接口，以及孤立上传、带数据历史版本、资料、Storage 和账号 Auth 删除主链路均已通过；一次性 signup/recovery token 的确认与密码更新也已通过真实路由。真双设备、自然 Cron、真实邮件投递、PKCE 邮件点击、过期 token 和刷新登录状态仍待验收。原生产数据库未升级，生产网页代码与 schema 仍可能不一致。本轮已提交并推送 `staging`，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。 **完整 M0 仍未验收。**
+本项目已有可运行的 Web 工作台，支持导入、阅读与版本历史、笔记与知识审核、普通搜索、原始资料问答、PDF 区域截图学习及个人 ZIP 备份恢复。当前已使用自编 QA 资料完成真实 DeepSeek 问答、回答另存笔记、截图解读／提问／出题、资料分析、跨资料主题生成与人工接受，并确认相关笔记和知识正文的云端保存及刷新恢复；知识页也已基于固定原始依据收到流式问答成功终态，知识页正文本身不充当证据。2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级资料整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、六条主要业务冲突接口，以及孤立上传、带数据历史版本、资料、Storage 和账号 Auth 删除主链路均已通过；一次性 signup/recovery token 的确认与密码更新也已通过真实路由。真双设备、自然 Cron、真实邮件投递、PKCE 邮件点击、过期 token 和刷新登录状态仍待验收。原生产数据库未升级，生产网页代码与 schema 仍可能不一致。本轮已提交并推送 `staging`；可变域名的当前版本由 `/api/health` 返回 Vercel 环境、Git 分支和完整 SHA，首次探针验证为 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。 **完整 M0 仍未验收。**
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
 
@@ -10,6 +10,7 @@
 
 - Supabase `conuo-staging` 从空项目执行原 24 份迁移，再追加 Storage 预检、工作区冲突及全部业务冲突响应三份修复，历史表实测 27 条。第 27 份迁移把 49 个显式业务 `40001` 改为 `PT409`，迁移后旧码为 0；原生产项目没有迁移或改动。
 - 独立 Vercel `conuo-staging` 已 Ready，环境变量、Auth 回调、分钟级 processor 和三条 daily cleanup 均已配置；配置文件由仓库根迁到 `apps/web/vercel.json`。项目已连接 GitHub `DingxinTao0417/conuo`，`staging` push 可触发部署。
+- 无缓存的 `/api/health` 从实际 Vercel 运行实例返回环境、Git 分支和完整提交 SHA；首次真实请求确认 `production`、`staging` 与 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`，后续发布应以该端点核对可变域名而不是沿用文档中的历史 SHA。
 - 真网页 TXT 上传、解析、刷新恢复与哈希核验通过；A/B 数据隔离通过；两个独立会话并发保存得到 200／409；分钟调度实际调用模型并发布带引用的摘要、标签、主题。
 - 修复前工作区旧 revision 请求挂起；修复后工作区及整理取消、资料／历史版本清理、解析完成／取消／重试均快速返回 409，陈旧请求没有写入。`40001` 的平台内部原因仍未证实。
 - 专用可丢弃账号通过正式解析租约完成带数据删除生命周期：历史版本和资料清理均完成且 Storage 原件物理消失；资料删除按预览清理所选笔记版本、对话和消息，旧快照不能复活；账号注销后访问被封锁，Storage 与 Auth 删除均完成。该账号已删除，只保留 A/B QA 账号。

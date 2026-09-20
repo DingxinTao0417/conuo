@@ -11,6 +11,7 @@
 | Vercel Project ID | `prj_XVdAZjFtRZ6gAqc818JZcIU6hn8M`                                                                        |
 | 最近完整验收部署  | `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq`，Ready，Git 自动部署                                                   |
 | 对应不可变地址    | https://conuo-staging-npo01mm1s-dingxintao0417s-projects.vercel.app                                       |
+| 当前域名版本      | 以 https://conuo-staging.vercel.app/api/health 返回的分支和完整提交 SHA 为准                              |
 | Supabase 项目     | `conuo-staging` / `yyleaedclbhsiowsaunt`                                                                  |
 | Supabase 资源     | 独立 Free 项目，us-east-1，Nano；由 Vercel Marketplace 管理                                               |
 | Web 运行时        | Next.js，Node 24.x；Root Directory 为 `apps/web`，允许读取工作区根文件                                    |
@@ -18,7 +19,7 @@
 | 发布来源          | GitHub `DingxinTao0417/conuo` 的 `staging`；Vercel 已连接仓库，push 自动创建 Production 部署              |
 | 原生产环境        | `conuo` Vercel 项目及 `czcurayfzshrqievceww` Supabase 未修改；原站已有 Ready 部署，不能再表述为从未部署过 |
 
-这里使用独立 Vercel 项目的 Production target，使该项目的 Cron 可以执行；它仍是测试环境，不是原生产站上线。首次部署来自 Git 忽略的隔离快照，随后同一内容已固化到 Git。2026-09-20 已创建并推送 `staging` 分支，staging 的 Production Branch 已切换为 `staging`，并以提交 `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` 触发 Git 自动部署；部署状态为 Ready。原生产项目仍跟随 `main`，但已关闭 Preview 自动部署，避免 staging 分支在生产项目生成带生产变量的预览。生产数据库最后一次记录为 19 份迁移，本轮没有重新核验或更改它。相对当前仓库的 27 份，预期需要补八份，但生产执行前必须再次实时核对。
+这里使用独立 Vercel 项目的 Production target，使该项目的 Cron 可以执行；它仍是测试环境，不是原生产站上线。首次部署来自 Git 忽略的隔离快照，随后同一内容已固化到 Git。2026-09-20 已创建并推送 `staging` 分支，staging 的 Production Branch 已切换为 `staging`，并以提交 `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` 触发 Git 自动部署；部署状态为 Ready。该提交和上表 Deployment ID 是完整验收基线，不代表可变域名永远停留在该版本。提交 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5` 增加无缓存的 `/api/health` 发布探针，首次真实请求返回 `environment=production`、`branch=staging` 和同一完整 SHA；后续以该端点实时返回值确认当前域名版本。原生产项目仍跟随 `main`，但已关闭 Preview 自动部署，避免 staging 分支在生产项目生成带生产变量的预览。生产数据库最后一次记录为 19 份迁移，本轮没有重新核验或更改它。相对当前仓库的 27 份，预期需要补八份，但生产执行前必须再次实时核对。
 
 本轮只读核对确认，`conuo` 生产项目仍连接 `main`，`conuo-staging` 已连接同一仓库的 `staging`。原生产项目的 Preview 自动部署已关闭；生产网页仍可能与 19 份数据库迁移不一致，发布处置见[生产发布手册](PRODUCTION_RELEASE.md)。
 
@@ -64,6 +65,7 @@ Vercel 以 `CRON_SECRET` 发送 Bearer；本环境 `CONUO_CLEANUP_SECRET` 与其
 | Auth token 流程    | Admin 生成的一次性 signup token 在真实 `/auth/confirm` 建立会话，空工作区读取 200；recovery token 打开重置页并成功更新密码，旧密码被拒、新密码可登录；重复使用 signup/recovery token 及无效 token 均进入 `/auth/error`。测试账号已删除；这不证明真实邮件投递、PKCE 邮件点击或自然过期 |
 | 本地回归与构建     | 全量 243 个测试文件／4,172 项通过；包含从零重放全部 27 份迁移的 PGlite 测试。TypeScript、格式检查、本地及 Vercel 构建通过；ESLint 0 错误，保留已有 `_result` 警告                                                                                                                     |
 | Git 发布复现       | 推送 `staging` 后自动创建部署 `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq`，状态 Ready；部署元数据中的 ref 为 `staging`、SHA 为 `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a`                                                                                                                      |
+| 发布版本探针       | 当前域名的 `/api/health` 无缓存返回 Vercel 运行时环境、Git 分支和完整 SHA；首次上线验证返回 `production`、`staging`、`d64ee3f76bdb24cdfcfed76cbd958a615183feb5`                                                                                                                       |
 | 其余业务冲突       | 在上述部署重新实测解析完成／取消／重试陈旧请求，分别返回 409，耗时 303／297／274ms；最终资料为 `saved`、任务为 `cancelled`，没有迟到写入                                                                                                                                              |
 
 本机证据文件：`work/staging-release/final-smoke-results.json`、`concurrency-results.json`、`endpoint-results.json`、`conflict-smoke.mjs`、`deletion-lifecycle-results.json`、`orphan-upload-lifecycle-results.json`。它们位于 Git 忽略目录，是本轮现场记录，不是可替代后续验收的永久保证。专用冲突／生命周期和孤立上传账号均已完成验证并删除；当前只保留 A/B 两个 QA 账号。没有导入用户真实旧资料，临时错误探针函数已移除。

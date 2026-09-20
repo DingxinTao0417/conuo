@@ -8,16 +8,17 @@
 
 2026-09-20 的只读核对结果：
 
-| 项目              | staging                                    | 原生产                                                 |
-| ----------------- | ------------------------------------------ | ------------------------------------------------------ |
-| Vercel 项目       | `conuo-staging`                            | `conuo`                                                |
-| Git 来源          | `DingxinTao0417/conuo` / `staging`         | `DingxinTao0417/conuo` / `main`                        |
-| 最近 staging 部署 | `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq`         | —                                                      |
-| 对应 Git 提交     | `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` | `0c2474e1e36cfe4b3715629dd9fd5e62daeb66f2`             |
-| 数据库迁移        | 27 份，已核验                              | 最后一次只读核验为 19 份；发布前须重新实时核对         |
-| Vercel 变量       | 16 个，仅 Production                       | 19 个，Production 与 Preview（Preview 自动部署已关闭） |
-| 清理 Cron         | 三条已注册，手动触发 200                   | 三条也已随同一 `vercel.json` 注册                      |
-| 发布结论          | 测试环境                                   | 代码已自动部署，但数据库未确认升级，不构成正式发布     |
+| 项目             | staging                                    | 原生产                                                 |
+| ---------------- | ------------------------------------------ | ------------------------------------------------------ |
+| Vercel 项目      | `conuo-staging`                            | `conuo`                                                |
+| Git 来源         | `DingxinTao0417/conuo` / `staging`         | `DingxinTao0417/conuo` / `main`                        |
+| 完整验收基线部署 | `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq`         | —                                                      |
+| 基线 Git 提交    | `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` | `0c2474e1e36cfe4b3715629dd9fd5e62daeb66f2`             |
+| 当前域名版本     | `/api/health` 实时返回分支与完整 SHA       | 尚未建立同等发布探针记录                               |
+| 数据库迁移       | 27 份，已核验                              | 最后一次只读核验为 19 份；发布前须重新实时核对         |
+| Vercel 变量      | 16 个，仅 Production                       | 19 个，Production 与 Preview（Preview 自动部署已关闭） |
+| 清理 Cron        | 三条已注册，手动触发 200                   | 三条也已随同一 `vercel.json` 注册                      |
+| 发布结论         | 测试环境                                   | 代码已自动部署，但数据库未确认升级，不构成正式发布     |
 
 staging 已改为跟随 `staging` 分支，原生产项目继续跟随 `main`；原生产项目的 Preview 自动部署已关闭。因此后续推送 `staging` 只会触发 staging Production 部署，不会再向原生产项目创建 Preview。当前生产网页代码已经前进到 27 份迁移对应版本，不能继续用“生产代码未部署”描述；尚未升级的是生产数据库和配套运行配置。
 
@@ -25,7 +26,7 @@ staging 已改为跟随 `staging` 分支，原生产项目继续跟随 `main`；
 
 发布职责已经分开，当前配置为：
 
-- `conuo-staging` 从 `staging` 自动部署，已用提交 `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` 验证 Git 自动部署。
+- `conuo-staging` 从 `staging` 自动部署，已用提交 `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` 验证 Git 自动部署；提交 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5` 又验证 `/api/health` 能从实际运行实例返回 `production`、`staging` 和完整 SHA。
 - `conuo` 改用受保护的 `production` 分支，或断开自动 Git 部署后只接受经过验收的明确晋升。
 - `conuo` 继续从 `main` 接收生产部署；生产发布记录固定 Git SHA、数据库迁移上界和 Vercel Deployment ID，不能用可变的“最新 main”代替发布版本。
 - staging 验收通过后，由同一不可变提交进入生产；生产数据库升级和生产代码晋升属于同一维护窗口。
@@ -99,12 +100,13 @@ staging Supabase 当前为 Free 方案，不包含计划数据库备份；控制
 以下项目全部满足后，才进入生产维护窗口：
 
 - [x] 生产 Vercel 不再跟随 staging 的 `main` 自动漂移；staging 使用 `staging`，原生产使用 `main`，生产 Preview 自动部署已关闭。
-- [x] 已选定不可变 staging 发布提交，并确认部署 `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq` 对应 SHA `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a`。
+- [x] Git 自动部署和精确 SHA 探针已通过；完整验收基线部署 `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq` 对应 SHA `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a`，`/api/health` 首次上线验证对应 SHA `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。
 - [ ] 真实双设备完成同时编辑、断网、响应丢失、旧页面恢复联网、删除防复活、阅读位置和笔记冲突。
 - [x] Admin 生成的一次性 signup/recovery token 已通过真实确认、重置、密码更新、重复使用和无效 token 路由；测试账号已删除。
 - [ ] 真实注册／找回邮件投递、PKCE 邮件点击、真正过期 token 及刷新登录状态通过。
 - [ ] 三条 Vercel Cron 至少各观察一次自然触发，并完成清理器崩溃、租约到期和可重试 Storage 故障。
 - [ ] staging 备份在新隔离项目恢复成功，并从零跑完 27 份迁移。
+- [ ] 其余 staging 闸门关闭后，重新冻结最终候选 Git SHA、Vercel Deployment ID、不可变部署地址和数据库迁移上界。
 - [ ] 实时核对生产迁移历史、Supabase 方案、备份状态、Security Advisor、Auth URL 和 Redirect URLs。
 - [ ] 生产变量差异逐项审核；Preview 不复用生产服务端密钥。
 - [ ] 明确维护窗口、停写方式、负责人、回退判断和用户通知方式。
