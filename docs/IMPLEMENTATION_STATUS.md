@@ -1,10 +1,19 @@
 # Conuo Web 开发状态
 
-更新日期：2026-09-18。范围：当前仓库的 Web 开发增量。
+更新日期：2026-09-20。范围：Web 开发增量及独立 staging 部署。
 
-本项目已有可运行的 Web 工作台，支持导入、阅读与版本历史、笔记与知识审核、普通搜索、原始资料问答、PDF 区域截图学习及个人 ZIP 备份恢复。当前已使用自编 QA 资料完成真实 DeepSeek 问答、回答另存笔记、截图解读／提问／出题、资料分析、跨资料主题生成与人工接受，并确认相关笔记和知识正文的云端保存及刷新恢复；知识页也已基于固定原始依据收到流式问答成功终态，知识页正文本身不充当证据。Supabase PRODUCTION 保持 **19 份迁移已应用、5 份待迁移**，Vercel 和持久整理调度尚未部署。**完整 M0 仍未验收。** 双账号 Auth/Storage、双设备断网与并发 CAS、额度耗尽、缓存过期、持久 worker 及完整数据生命周期仍需验收。
+本项目已有可运行的 Web 工作台，支持导入、阅读与版本历史、笔记与知识审核、普通搜索、原始资料问答、PDF 区域截图学习及个人 ZIP 备份恢复。当前已使用自编 QA 资料完成真实 DeepSeek 问答、回答另存笔记、截图解读／提问／出题、资料分析、跨资料主题生成与人工接受，并确认相关笔记和知识正文的云端保存及刷新恢复；知识页也已基于固定原始依据收到流式问答成功终态，知识页正文本身不充当证据。2026-09-20 已创建独立 staging：26 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS 和真实模型后台整理已通过；真双设备、完整异常／删除链路仍待验收。原生产环境未升级。本轮修复已提交并推送 `main`，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)。 **完整 M0 仍未验收。**
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
+
+## 首次独立 staging 部署（2026-09-20）
+
+- Supabase `conuo-staging` 从空项目执行原 24 份迁移，再追加真实 Storage 预检与工作区冲突响应两份修复，历史表实测 26 条。原生产项目没有迁移或改动。
+- 独立 Vercel `conuo-staging` 已 Ready，环境变量、Auth 回调、分钟级 processor 和三条 daily cleanup 均已配置；配置文件由仓库根迁到 `apps/web/vercel.json`。没有连接 Git 自动部署。
+- 真网页 TXT 上传、解析、刷新恢复与哈希核验通过；A/B 数据隔离通过；两个独立会话并发保存得到 200／409；分钟调度实际调用模型并发布带引用的摘要、标签、主题。
+- 修复前工作区旧 revision 请求挂起；修复后 270ms 返回 409。`40001` 的平台内部原因仍未证实，其他 RPC 的同类异常路径列为生产前验收门槛。
+- 全量 242 个测试文件／4,161 项、TypeScript、格式、本地及 Vercel 构建通过；ESLint 0 错误、1 条既有警告。
+- 本地开发配置已备份并切至 staging，3000 无运行服务；测试账号、资料及调度保留。**已部署 staging／已提交推送／未升级生产。** 环境、发布 ID、证据与剩余矩阵见 [部署记录](STAGING_DEPLOYMENT.md)。下方各阶段“未部署”等表述保留为当时的历史记录。
 
 ## 品牌名收敛为 Conuo（2026-09-20）
 

@@ -209,6 +209,7 @@ beforeAll(async () => {
       "20260914000700_fix_project_workspace_space_alias_scope.sql",
       "20260914000800_fast_workspace_saves.sql",
       "20260914120601_upload_intents.sql",
+      "20260920000100_storage_upload_preflight.sql",
     ]) {
       await db.exec(await migration(name));
     }
@@ -229,6 +230,39 @@ afterAll(async () => {
 });
 
 describe("original upload intents", () => {
+  it("accepts Storage's contentLength preflight only for the exact live owner reservation", async () => {
+    const source = uploadSource();
+    const reservation = await reserve(source);
+    const allowed = (metadata: unknown, owner = ownerA) =>
+      asRole("authenticated", owner, async () => {
+        await db.exec("BEGIN");
+        try {
+          await db.query(
+            "insert into storage.objects(bucket_id,name,metadata) values ('originals',$1,$2::jsonb)",
+            [reservation.storagePath, JSON.stringify(metadata)],
+          );
+          return true;
+        } catch (error) {
+          if ((error as { code?: string }).code === "42501") return false;
+          throw error;
+        } finally {
+          await db.exec("ROLLBACK");
+        }
+      });
+    expect(await allowed({ mimetype: source.mime, contentLength: source.size })).toBe(true);
+    expect(await allowed({ contentLength: source.size + 1 })).toBe(false);
+    expect(await allowed({ contentLength: source.size }, ownerB)).toBe(false);
+    expect(await allowed({})).toBe(false);
+    expect(await allowed(null)).toBe(false);
+    expect(await allowed({ size: "invalid", contentLength: source.size })).toBe(false);
+    expect(await allowed({ size: source.size + 1, contentLength: source.size })).toBe(false);
+    await db.query(
+      "update conuo_private.original_upload_intents set reservation_until=clock_timestamp()-interval '1 second' where intent_id=$1::uuid",
+      [reservation.intentId],
+    );
+    expect(await allowed({ contentLength: source.size })).toBe(false);
+  });
+
   it("rejects direct originals writes that have no unexpired matching reservation", async () => {
     const source = uploadSource();
 

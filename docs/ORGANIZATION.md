@@ -68,7 +68,7 @@ NEXT_PUBLIC_CONUO_LOCAL_ORGANIZATION_RUNNER_ENABLED=true
 3. 配置受信任的调度器定期调用 `/api/internal/organization-processor`；该入口每次只处理有界批次，不会自行常驻或无限循环。
 4. 在确认前三项均已部署后，于构建环境设置 `NEXT_PUBLIC_CONUO_ORGANIZATION_PROCESSOR_ENABLED=true` 并重新构建 Web。这是浏览器可见的发布声明，不能填入任何密钥，也不替代处理器健康检查。
 
-当前 Supabase PRODUCTION 保持 19 份迁移已应用、5 份待迁移，队列迁移为待应用的第 22 份。现有 Supabase 服务端 secret 已配置于 Git 忽略的开发环境文件，手动模型链路可用；队列迁移、生产 processor 调度及 Vercel 部署仍未完成。Cron 也不提供精确一次保证；重复、超时或漏调由数据库任务状态、租约、暂存结果和后续领取处理。
+2026-09-20 已创建独立 staging：26 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS 和真实模型后台整理已通过；真双设备、完整异常／删除链路仍待验收。原生产环境未升级。本轮本地修复未提交／推送，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)。 staging 上述四项条件均已满足，真实任务由调度领取并发布成功。Cron 也不提供精确一次保证；重复、超时或漏调由数据库任务状态、租约、暂存结果和后续领取处理。
 
 ## 审核与人工修改保护
 

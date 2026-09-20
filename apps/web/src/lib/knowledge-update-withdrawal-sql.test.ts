@@ -238,8 +238,8 @@ afterAll(async () => {
 });
 
 describe("withdrawal receipts through ordinary PostgreSQL workspace saves", () => {
-  it("executes all 24 migrations and round-trips an applied review before withdrawal", async () => {
-    expect(migrationNames).toHaveLength(24);
+  it("executes every migration and round-trips an applied review before withdrawal", async () => {
+    expect(migrationNames).toHaveLength(26);
     const { applied } = fixture();
     const revision = await save(applied);
     const saved = await reload();

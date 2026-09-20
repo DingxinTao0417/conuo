@@ -58,7 +58,7 @@ export async function PUT(request: Request) {
       p_data: parsed.data.data,
       p_expected_revision: parsed.data.expectedRevision,
     });
-    if (error?.code === "40001")
+    if (error?.code === "40001" || error?.code === "PT409")
       throw new ApiError(
         409,
         "REVISION_CONFLICT",

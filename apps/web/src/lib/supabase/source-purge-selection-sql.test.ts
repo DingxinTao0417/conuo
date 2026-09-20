@@ -433,7 +433,7 @@ describe("optional saved-content source purge SQL", () => {
     ).toEqual([]);
     const restored = structuredClone(result.data);
     restored.notes.push(note("note-a", "knowledge", { citations: [], versions: [] }));
-    await expect(save(restored, result.revision)).rejects.toMatchObject({ code: "40001" });
+    await expect(save(restored, result.revision)).rejects.toMatchObject({ code: "PT409" });
     const restoredConversation = structuredClone(result.data);
     restoredConversation.conversations.push(
       conversation("conversation-a", {
@@ -443,9 +443,18 @@ describe("optional saved-content source purge SQL", () => {
       }),
     );
     await expect(save(restoredConversation, result.revision)).rejects.toMatchObject({
-      code: "40001",
+      code: "PT409",
     });
     expect((await saved()).revision).toBe(result.revision);
+  });
+
+  it("returns a bounded HTTP conflict code for stale saves without changing stored data", async () => {
+    const data = workspace();
+    await save(data);
+    await expect(save(data, 0)).rejects.toMatchObject({ code: "PT409" });
+    await expect(save(data, 9)).rejects.toMatchObject({ code: "PT409" });
+    expect((await saved()).revision).toBe(1);
+    expect(await save(data, 1)).toBe(2);
   });
 
   it("retains all saved content by default through both legacy RPCs", async () => {
@@ -978,7 +987,7 @@ describe("optional saved-content source purge SQL", () => {
     resurrected.conversations.push(
       conversation("shared", { sourceId: "source-b", sourceIds: ["source-b"], messages: [] }),
     );
-    await expect(save(resurrected, result.revision + 1)).rejects.toMatchObject({ code: "40001" });
+    await expect(save(resurrected, result.revision + 1)).rejects.toMatchObject({ code: "PT409" });
   });
 
   it("captures noteEvidence-only conversation candidates while keeping their historical body by default", async () => {

@@ -266,7 +266,7 @@ describe("projected annotation UTF-16 source-text anchors", () => {
     const data = workspace(source(), annotation(sourceText, quote, false));
     await save(data);
     data.annotations[0]!.textAnchor = annotation().textAnchor;
-    await expect(save(data, 1)).rejects.toMatchObject({ code: "40001" });
+    await expect(save(data, 1)).rejects.toMatchObject({ code: "PT409" });
     expect((await projected())[0]!.text_anchor).toBeNull();
     expect((await saved())!.revision).toBe(1);
   });
@@ -281,7 +281,7 @@ describe("projected annotation UTF-16 source-text anchors", () => {
         const start = sourceText.indexOf(quote);
         data.annotations[0]!.textAnchor = { start, end: start + quote.length };
       }
-      await expect(save(data, 1)).rejects.toMatchObject({ code: "40001" });
+      await expect(save(data, 1)).rejects.toMatchObject({ code: "PT409" });
       expect((await projected())[0]!.text_anchor).toEqual(annotation().textAnchor);
       expect((await saved())!.revision).toBe(1);
     },

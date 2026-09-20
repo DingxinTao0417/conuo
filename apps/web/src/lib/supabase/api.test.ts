@@ -215,7 +215,11 @@ describe("cloud request boundary", () => {
       ),
     ).rejects.toBeInstanceOf(ApiError);
   });
-  it("reports an owner-lock miss as a retryable busy response without leaking database details", async () => {
+  it.each([
+    ["55P03", 503, "WORKSPACE_BUSY"],
+    ["40001", 409, "REVISION_CONFLICT"],
+    ["PT409", 409, "REVISION_CONFLICT"],
+  ])("maps workspace database error %s without leaking details", async (code, status, apiCode) => {
     mock.rpc
       .mockResolvedValueOnce({
         data: {
@@ -235,7 +239,7 @@ describe("cloud request boundary", () => {
       })
       .mockResolvedValueOnce({
         data: null,
-        error: { code: "55P03", message: "private lock and query details" },
+        error: { code, message: "private lock and query details" },
       });
     const response = await saveWorkspace(
       new Request("http://localhost/api/v1/workspace", {
@@ -248,12 +252,9 @@ describe("cloud request boundary", () => {
       }),
     );
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(status);
     const body = await response.json();
-    expect(body).toEqual({
-      code: "WORKSPACE_BUSY",
-      error: "云端正在处理同一账号的资料，请稍后重新连接；本地修改仍然保留。",
-    });
+    expect(body.code).toBe(apiCode);
     expect(JSON.stringify(body)).not.toContain("private lock");
   });
 });

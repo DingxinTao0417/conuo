@@ -98,7 +98,7 @@ describe("original upload intent cloud adapter", () => {
       p_expected_sha256: source.hash,
       p_content_type: "text/plain",
     });
-    expect(mock.upload).toHaveBeenCalledExactlyOnceWith(canonicalPath, blob, {
+    expect(mock.upload).toHaveBeenCalledExactlyOnceWith(canonicalPath, await blob.arrayBuffer(), {
       contentType: "text/plain",
       upsert: false,
     });
@@ -153,7 +153,7 @@ describe("original upload intent cloud adapter", () => {
 
     await expect(uploadSourceBlob(source, blob, ownerId)).resolves.toBe(canonicalPath);
 
-    expect(mock.upload).toHaveBeenCalledExactlyOnceWith(canonicalPath, blob, {
+    expect(mock.upload).toHaveBeenCalledExactlyOnceWith(canonicalPath, await blob.arrayBuffer(), {
       contentType: "text/plain",
       upsert: false,
     });

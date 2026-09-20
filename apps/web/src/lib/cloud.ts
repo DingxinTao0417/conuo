@@ -1093,7 +1093,13 @@ async function uploadOriginalToStorage(
 ): Promise<void> {
   const { error } = await client.storage
     .from("originals")
-    .upload(path, blob, { contentType: blob.type || "application/octet-stream", upsert: false });
+    // A Blob makes storage-js send multipart/form-data. Send raw bytes so the
+    // Storage RLS preflight sees the exact original Content-Length, not a
+    // multipart envelope or unknown file length. Completion still checks size.
+    .upload(path, await blob.arrayBuffer(), {
+      contentType: blob.type || "application/octet-stream",
+      upsert: false,
+    });
   if (!error) return;
   // Immutable paths make retries safe. An existing path is accepted only after
   // comparing the actual stored bytes, never simply because the filename matches.

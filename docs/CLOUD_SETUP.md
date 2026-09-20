@@ -2,6 +2,10 @@
 
 当前 Web 采用 Supabase Auth、PostgreSQL 和私有 Storage，云端是唯一正式存储。必须配置项目并登录才能打开工作台；未配置或未登录时不创建匿名工作区。浏览器内存只暂存编辑与待上传原件，刷新后重新读取云端。本地与云端共存留给未来桌面版，当前边界见 [Web 存储政策](WEB_CLOUD_STORAGE.md)。本文不包含项目凭据，也不以迁移源文件作为环境已部署完成的证据。
 
+## 当前环境（2026-09-20）
+
+2026-09-20 已创建独立 staging：26 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS 和真实模型后台整理已通过；真双设备、完整异常／删除链路仍待验收。原生产环境未升级。本轮修复已提交并推送 `main`，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)。 本机开发配置现已指向 staging，原生产配置备份在被 Git 忽略的 `work/staging-release/.env.production-before-staging.local`。
+
 ## 本地配置
 
 1. 在你用于开发的 Supabase 项目中，确认启用 Email/Password 登录；建议保留邮箱确认。
@@ -25,13 +29,15 @@
    17. `20260914000500_source_version_purge.sql`：历史资料版本的服务端影响预览、CAS 清理事务和版本级 Storage outbox；复用既有资料清理 worker，**已在连接的开发 Supabase 项目执行；`source_purges` 的两个新字段、两个 RPC 及仅 `authenticated` 可执行的权限边界已核验。**
    18. `20260914000600_fix_project_workspace_space_alias.sql`：修复资料库投影读取 JSON 数组元素时的值列访问。
    19. `20260914000700_fix_project_workspace_space_alias_scope.sql`：为两个资料库 JSON 数组结果集显式声明 `sp(value)`，修复历史云端定义遗漏聚合子查询别名的问题；**已在连接项目执行，并以真实账号的笔记保存复测。**
-   20. `20260914000800_fast_workspace_saves.sql`：缩短忙写路径并跳过未变化的读投影；**仅在本地准备，尚未应用到连接项目或 PRODUCTION。**
-   21. `20260914120601_upload_intents.sql`：原件上传预留、服务端精确配额、Storage INSERT 收紧、工作区 CAS 内提交和过期原件清理租约；**仅在本地准备，尚未应用到连接项目或 PRODUCTION。**
-   22. `20260914120700_organization_jobs.sql`：资料／知识整理的持久任务、租约与结果提交；**仅在本地准备，尚未应用到连接项目或 PRODUCTION。**
-   23. `20260915045450_annotation_utf16_text_anchors.sql`：批注只读位置投影、精确 UTF-16 原文切片、不可变身份与新锚点恢复草稿核验；**仅在本地准备，尚未应用到连接项目或 PRODUCTION。**
-   24. `20260915060323_source_purge_saved_content_selection.sql`：资料彻底删除时按权威预览逐篇选择关联笔记／知识页（含当前及全部历史正文）、逐个选择整段对话；另存内容墓碑、生成依赖清理和相关模型缓存收窄保留额度账行；**仅在本地准备，尚未应用到连接项目或 PRODUCTION。**
+   20. `20260914000800_fast_workspace_saves.sql`：缩短忙写路径并跳过未变化的读投影；**已应用独立 staging；原生产未应用。**
+   21. `20260914120601_upload_intents.sql`：原件上传预留、服务端精确配额、Storage INSERT 收紧、工作区 CAS 内提交和过期原件清理租约；**已应用独立 staging；原生产未应用。**
+   22. `20260914120700_organization_jobs.sql`：资料／知识整理的持久任务、租约与结果提交；**已应用独立 staging；原生产未应用。**
+   23. `20260915045450_annotation_utf16_text_anchors.sql`：批注只读位置投影、精确 UTF-16 原文切片、不可变身份与新锚点恢复草稿核验；**已应用独立 staging；原生产未应用。**
+   24. `20260915060323_source_purge_saved_content_selection.sql`：资料彻底删除时按权威预览逐篇选择关联笔记／知识页（含当前及全部历史正文）、逐个选择整段对话；另存内容墓碑、生成依赖清理和相关模型缓存收窄保留额度账行；**已应用独立 staging；原生产未应用。**
+   25. `20260920000100_storage_upload_preflight.sql`：兼容 Storage 上传预检 `contentLength`，保留实际大小与活预留校验；**已应用 staging。**
+   26. `20260920000200_workspace_conflict_response.sql`：工作区保存冲突转换为 PostgREST `PT409`，保留事务回滚和 CAS；**已应用 staging。**
 
-   003 使用 `extensions` schema 下的 `vector` 扩展。托管 Supabase 的 `storage.objects` 由平台角色 `supabase_storage_admin` 拥有，且平台已启用该表的 RLS；006 只维护其 Storage policy，不能对这个平台表执行 `ALTER TABLE` 或改变其所有者。其 restrictive policy 仍会在账号注销处理中与其他 Storage policy 共同生效，不会放宽既有的对象访问隔离。旧数据不符合身份或原件路径约束时，迁移会回滚本次改动，保留此前迁移，不静默跳过。不要重写已应用的迁移；成功升级后的回退须另行评审备份恢复或前向修复。详见 [搜索与索引](SEARCH_INDEXING.md)。连接项目已完成并核验前 19 份迁移，包含预期表和函数、私有 `originals` 桶、4 条 Storage policy，以及所有面向用户的 `public` 表 RLS。第 20—24 份共五份迁移仍只在本地工作树中；在任一环境验证其 schema、Storage policy、RPC、trigger 和 Cron 前，不能将它们视为已部署。第 11 份迁移已额外核验：`public.notes` 与 `public.note_versions` 均启用 RLS、两条仅限当前账号读取的 policy、一个 `project_workspace_notes` trigger 均存在；当时 Supabase Security Advisor 为 0 个 error。第 12 份迁移已实际执行，已核验私有 `conuo_private.import_parse_leases` 表启用 RLS、`claim_import_parse` 与 `finish_import_parse` RPC 存在，且 `save_workspace` 带有解析租约保护。第 13—16 份已创建五张只读投影表并登记迁移历史；五张表的 RLS、认证角色只读权限、owner 与账号删除闸门 policy 和四个工作区触发器均已核验。第 17 份迁移已在线核验两个 `source_purges` 字段、两个历史版本清理 RPC 与仅认证用户可执行的权限边界；没有运行任何实际资料版本清理。第 18—19 份修复了资料库 JSON 数组投影的值列与聚合别名；远端函数、迁移记录和真实账号的空资料库笔记保存及刷新重载已核验。迁移源文件仍是开发与恢复依据；其他项目仍须通过自身迁移历史或 schema 核验实际状态。
+   003 使用 `extensions` schema 下的 `vector` 扩展。托管 Supabase 的 `storage.objects` 由平台角色 `supabase_storage_admin` 拥有，且平台已启用该表的 RLS；006 只维护其 Storage policy，不能对这个平台表执行 `ALTER TABLE` 或改变其所有者。其 restrictive policy 仍会在账号注销处理中与其他 Storage policy 共同生效，不会放宽既有的对象访问隔离。旧数据不符合身份或原件路径约束时，迁移会回滚本次改动，保留此前迁移，不静默跳过。不要重写已应用的迁移；成功升级后的回退须另行评审备份恢复或前向修复。详见 [搜索与索引](SEARCH_INDEXING.md)。原生产项目历史记录已完成并核验前 19 份迁移，包含预期表和函数、私有 `originals` 桶、4 条 Storage policy，以及所有面向用户的 `public` 表 RLS。独立 staging 已应用全部 26 份；原生产的增量仍须在备份和验收后另行升级。第 11 份迁移已额外核验：`public.notes` 与 `public.note_versions` 均启用 RLS、两条仅限当前账号读取的 policy、一个 `project_workspace_notes` trigger 均存在；当时 Supabase Security Advisor 为 0 个 error。第 12 份迁移已实际执行，已核验私有 `conuo_private.import_parse_leases` 表启用 RLS、`claim_import_parse` 与 `finish_import_parse` RPC 存在，且 `save_workspace` 带有解析租约保护。第 13—16 份已创建五张只读投影表并登记迁移历史；五张表的 RLS、认证角色只读权限、owner 与账号删除闸门 policy 和四个工作区触发器均已核验。第 17 份迁移已在线核验两个 `source_purges` 字段、两个历史版本清理 RPC 与仅认证用户可执行的权限边界；没有运行任何实际资料版本清理。第 18—19 份修复了资料库 JSON 数组投影的值列与聚合别名；远端函数、迁移记录和真实账号的空资料库笔记保存及刷新重载已核验。迁移源文件仍是开发与恢复依据；其他项目仍须通过自身迁移历史或 schema 核验实际状态。
 
 3. 将 `apps/web/.env.example` 复制为 `apps/web/.env.local`，填入项目 URL 和 publishable key。旧项目的 anon key 也可用于相同公开客户端位置。**`NEXT_PUBLIC_*` 变量中不能填 secret key 或 service_role key。** `.env.local` 已由仓库忽略；不要把密钥发到聊天或提交到 Git。
 4. 重启 Web 开发服务器，再通过界面中的账号入口注册或登录。
@@ -41,7 +47,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
-以上变量会进入浏览器构建，属于公开项目连接配置；数据隔离依赖 Auth 与 RLS。部署 Vercel 前需要在目标环境分别配置并重新构建，目前未执行部署。
+以上变量会进入浏览器构建，属于公开项目连接配置；数据隔离依赖 Auth 与 RLS。部署 Vercel 前需要在目标环境分别配置并重新构建，当前已完成独立 staging 部署，原生产未升级。
 
 ### 跨设备导入解析租约（第 12 份迁移已应用）
 
@@ -51,15 +57,15 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 
 这些受控转换只能改变解析派生状态，例如正文、内容块、页码解析结果、错误、解析状态和时间；同一资料版本的原件与来源身份（文件哈希、名称、类型、大小、原件键、Storage 路径、网址和网页快照等）必须保持不变。
 
-这些规则已作为第 12 份迁移在连接的开发 Supabase 执行。已核验私有表 RLS、认领与完成 RPC、`save_workspace` 的租约保护；远端迁移历史当前为 19 条。真实两台设备的认领、心跳、完成、取消、重试、断网与迟到结果拒绝仍待联调，因此不能据此宣称完整跨设备场景已验收。
+这些规则已作为第 12 份迁移在连接的开发 Supabase 执行。已核验私有表 RLS、认领与完成 RPC、`save_workspace` 的租约保护；当时原生产迁移历史为 19 条；staging 当前为 26 条。真实两台设备的认领、心跳、完成、取消、重试、断网与迟到结果拒绝仍待联调，因此不能据此宣称完整跨设备场景已验收。
 
-### 原件上传预留、配额与清理（第 21 份迁移，仅本地）
+### 原件上传预留、配额与清理（第 21、25 份迁移，staging 已应用）
 
 `20260914120601_upload_intents.sql` 把一份新原件的云端流程固定为“预留 → 浏览器直传私有 Storage → 服务端确认 → 工作区 revision CAS”。预留记录只关联账号和不可变的资料/版本身份，因此首次创建工作区前也可安全上传。工作区写入的 `BEFORE` trigger 会在同一个事务中确认对应原件；CAS 冲突或任何后续投影失败时，原件保持 `uploaded` 状态，后续同一身份的重试可继续提交，而不会把路径静默写入快照。
 
 该迁移会把 `originals` 的 INSERT policy 收紧为仅允许匹配未过期预留、精确路径和 Storage 元数据大小的请求。账号容量在同一账号锁内按物理 Storage 对象与未完成预留去重计算；本地实现当前沿用每份 30 MiB、每账号 512 MiB 的保守值，但这不是对外存储套餐承诺。已有原件路径会回填为已提交记录，不会因为普通资料元数据保存而被拒绝。
 
-未完成的预留不会由浏览器直接释放：超过租约后，service-role RPC 让 `GET /api/internal/original-upload-cleanup` 领取有限对象批次，删除后才标记为释放；`404` 仍是幂等成功。根目录 [vercel.json](../vercel.json) 已在本地定义每天 `03:20 UTC` 的受保护 Cron。该入口复用 `SUPABASE_SECRET_KEY`（或旧版 `SUPABASE_SERVICE_ROLE_KEY`）和至少 32 个可见 ASCII 字符的 `CONUO_CLEANUP_SECRET`（或 Vercel `CRON_SECRET`）。迁移、环境变量和 Cron 均未应用或部署到连接项目；必须先完成迁移并核验 Storage policy/RPC，再在真实双账号和中断上传场景中验收。
+未完成的预留不会由浏览器直接释放：超过租约后，service-role RPC 让 `GET /api/internal/original-upload-cleanup` 领取有限对象批次，删除后才标记为释放；`404` 仍是幂等成功。应用目录 [vercel.json](../apps/web/vercel.json) 已在 staging 注册每天 `03:20 UTC` 的受保护 Cron。该入口复用 `SUPABASE_SECRET_KEY`（或旧版 `SUPABASE_SERVICE_ROLE_KEY`）和至少 32 个可见 ASCII 字符的 `CONUO_CLEANUP_SECRET`（或 Vercel `CRON_SECRET`）。staging 的迁移、变量及 Cron 已部署；真实上传和跨账号隔离通过，中断上传、有数据清理及自然定时触发仍待验收。
 
 ### 显式导入旧匿名资料
 
@@ -93,13 +99,13 @@ Next.js 与受信 Python 处理器配置相同的 `CONUO_PROCESSOR_SECRET`，供
 
 ### 可选彻底删除清理执行器
 
-迁移 024 在本地扩展资料删除为明确的另存内容选择，默认全部保留笔记、知识页和对话。选择、候选身份、完整内容指纹与预期 revision 由同账号服务端重新核对；同事务删除选中内容并写入防复活墓碑，人工批注或手工关系须先明确处理。旧环境仍可沿原协议默认保留另存内容，不能代替用户提交选择。具体粒度、模型缓存和在途边界见[彻底删除](PERMANENT_DELETION.md)。
+迁移 024 已在 staging 扩展资料删除为明确的另存内容选择，默认全部保留笔记、知识页和对话。选择、候选身份、完整内容指纹与预期 revision 由同账号服务端重新核对；同事务删除选中内容并写入防复活墓碑，人工批注或手工关系须先明确处理。旧环境仍可沿原协议默认保留另存内容，不能代替用户提交选择。具体粒度、模型缓存和在途边界见[彻底删除](PERMANENT_DELETION.md)。
 
 迁移 004 只在资料元数据已安全删除后写入原件 cleanup outbox；迁移 005 为每个 canonical `originals` 路径加入有限租约、最多 5 次尝试和指数退避。迁移 017 的单历史版本清理复用同一个 outbox，只会写入不再被其他保留版本引用的路径。Next.js 的 `GET /api/internal/source-purge-cleanup` 不接收账号、资料或路径参数，只由 service-role RPC 认领对象，再删除 `originals` 桶中经 SQL 验证的路径并确认结果。`404` 被视为原件已不存在的幂等成功；其他失败只记录受控错误码，不返回 Storage 原始错误或路径。
 
-该入口需要服务端 `SUPABASE_SECRET_KEY`（或旧版 `SUPABASE_SERVICE_ROLE_KEY`）以及至少 32 个可见 ASCII 字符的 `CONUO_CLEANUP_SECRET`。仓库根目录的 [vercel.json](../vercel.json) 已准备每日 `03:17 UTC` 的 Vercel Cron 调用；部署时可改用 Vercel 的 `CRON_SECRET`，因为 Vercel 会将其以 Bearer Authorization 发送给 Cron Route，或把 `CONUO_CLEANUP_SECRET` 设为同一值。调度定义与验证方法见 [Vercel Cron 文档](https://vercel.com/docs/cron-jobs/manage-cron-jobs)。
+该入口需要服务端 `SUPABASE_SECRET_KEY`（或旧版 `SUPABASE_SERVICE_ROLE_KEY`）以及至少 32 个可见 ASCII 字符的 `CONUO_CLEANUP_SECRET`。应用目录的 [vercel.json](../apps/web/vercel.json) 已准备每日 `03:17 UTC` 的 Vercel Cron 调用；部署时可改用 Vercel 的 `CRON_SECRET`，因为 Vercel 会将其以 Bearer Authorization 发送给 Cron Route，或把 `CONUO_CLEANUP_SECRET` 设为同一值。调度定义与验证方法见 [Vercel Cron 文档](https://vercel.com/docs/cron-jobs/manage-cron-jobs)。
 
-全部 19 份迁移已在连接项目执行，且已完成 schema、私有桶、Storage policy 与 `public` 表 RLS 核验；第 11 份的两张笔记读投影表、两条读取 policy、一个工作区投影 trigger 与当时 0 个 Security Advisor error 均已实际核对。第 12 份 `20260913233000_import_parse_leases.sql` 已额外核验私有表 RLS、认领与完成 RPC、以及 `save_workspace` 租约保护；第 13—16 份的五张只读投影表与四个工作区触发器也已在线核对。第 17 份已核对两个 `source_purges` 字段、两个 RPC 与仅认证用户执行的权限边界。第 18—19 份已用真实账号验证资料库投影、首次笔记保存和刷新后的云端重载。这不代表 Vercel 环境变量已配置或实际执行过 Storage 删除，也不代表真实跨设备解析已经通过；后两者仍必须以目标环境设置、outbox 记录和两设备联调核验。资料 UI 中的 `pending` 表示元数据已安全删除且等待清理；只有 outbox 的所有对象确认完成后，父级 purge 才会显示 `completed`。
+历史上前 19 份迁移已在原连接项目执行，且已完成 schema、私有桶、Storage policy 与 `public` 表 RLS 核验；第 11 份的两张笔记读投影表、两条读取 policy、一个工作区投影 trigger 与当时 0 个 Security Advisor error 均已实际核对。第 12 份 `20260913233000_import_parse_leases.sql` 已额外核验私有表 RLS、认领与完成 RPC、以及 `save_workspace` 租约保护；第 13—16 份的五张只读投影表与四个工作区触发器也已在线核对。第 17 份已核对两个 `source_purges` 字段、两个 RPC 与仅认证用户执行的权限边界。第 18—19 份已用真实账号验证资料库投影、首次笔记保存和刷新后的云端重载。这不代表 Vercel 环境变量已配置或实际执行过 Storage 删除，也不代表真实跨设备解析已经通过；后两者仍必须以目标环境设置、outbox 记录和两设备联调核验。资料 UI 中的 `pending` 表示元数据已安全删除且等待清理；只有 outbox 的所有对象确认完成后，父级 purge 才会显示 `completed`。
 
 ### 可选账号注销执行器
 
@@ -109,7 +115,7 @@ Next.js 与受信 Python 处理器配置相同的 `CONUO_PROCESSOR_SECRET`，供
 
 浏览器在确认请求成功后会停止该账号的问答、整理和导入，清理会话内存快照、暂存原件和独立审核状态，保留当前页面的身份封锁。已由 Web 会话管理的账号不会因为注销通知自动读取或修改旧 IndexedDB；迟到结果只封锁和清理发起账号，不能清理当前另一个账号。刷新后由 Auth 和服务端注销闸门重新核验。旧副本与用户下载的 ZIP 不由本轮 Web 策略自动清除。
 
-该入口与资料清理入口共用 `CONUO_CLEANUP_SECRET`（或 Vercel `CRON_SECRET`）及服务端 Supabase admin key。根目录 [vercel.json](../vercel.json) 已准备每天 `03:22 UTC` 的受保护 Cron 调用。账号注销迁移属于上方的部署链；在任一项目启用清理器前，必须确认对应迁移已成功完成，并分别核验 Vercel 环境、Storage 删除和 Auth Admin 删除。
+该入口与资料清理入口共用 `CONUO_CLEANUP_SECRET`（或 Vercel `CRON_SECRET`）及服务端 Supabase admin key。应用目录 [vercel.json](../apps/web/vercel.json) 已准备每天 `03:22 UTC` 的受保护 Cron 调用。账号注销迁移属于上方的部署链；在任一项目启用清理器前，必须确认对应迁移已成功完成，并分别核验 Vercel 环境、Storage 删除和 Auth Admin 删除。
 
 ## 邮件与回调
 
