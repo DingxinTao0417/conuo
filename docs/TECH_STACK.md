@@ -1,6 +1,6 @@
 # Conuo（可诺）技术选型与架构说明
 
-> 当前部署状态：2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、主要业务冲突接口、孤立上传清理、带数据删除／注销主链路、真实注册确认邮件、同浏览器 PKCE 与 Chrome／Edge 持久会话自动刷新已通过；真双设备、断网、自然 Cron、真实找回密码邮件、跨浏览器邮件与过期 token 仍待验收。staging 从 GitHub `staging` 分支自动部署，原生产 Vercel 保持 `main` 且已关闭 Preview 自动部署；原生产数据库未升级，生产代码与 schema 可能不一致。完整验收基线 SHA `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` 已验证；可变域名当前运行版本始终以无缓存 `/api/health` 返回的分支与完整 SHA 为准。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。
+> 当前部署状态：2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、主要业务冲突接口、孤立上传清理、带数据删除／注销主链路、真实注册确认邮件、同浏览器 PKCE、真实等待后的过期 signup token 与 Chrome／Edge 持久会话自动刷新已通过；真双设备、断网、自然 Cron、真实找回密码邮件与跨浏览器邮件仍待验收。staging 从 GitHub `staging` 分支自动部署，原生产 Vercel 保持 `main` 且已关闭 Preview 自动部署；原生产数据库未升级，生产代码与 schema 可能不一致。完整验收基线 SHA `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` 已验证；可变域名当前运行版本始终以无缓存 `/api/health` 返回的分支与完整 SHA 为准。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。
 
 > 陪你把知识学会。
 
