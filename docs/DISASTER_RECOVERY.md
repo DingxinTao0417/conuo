@@ -4,11 +4,27 @@
 
 ## 当前状态
 
-完整演练尚未执行。当前机器可通过 `npx` 运行 Supabase CLI 2.117.0，但没有 Docker／Podman、`psql`、源数据库密码或目标恢复项目。staging 是 Free 项目，不包含计划备份；在补齐这些条件前，不能宣称已有可恢复数据库备份。
+完整演练尚未执行。用户已明确不在本机下载 PostgreSQL，因此不再把安装 `psql`／`pg_dump` 或本机 Docker 作为当前恢复路径。此前下载到 Git 忽略演练目录的 PostgreSQL 安装包及清单已删除，没有安装程序、PostgreSQL 进程、服务或系统配置残留。
+
+2026-09-20 在 Supabase 控制台只读复核：staging 所在组织和项目仍为 Free；Scheduled backups 明确显示 Free 不包含项目备份，“Restore to new project”明确要求 Pro 及已启用的物理备份。Preview Branch 可以建立隔离环境，默认不复制数据，也可在 Dashboard 选择包含生产数据；它会产生独立 Compute、磁盘、网络和 Storage 用量，且分支克隆不等于从备份恢复，不能用来关闭灾备恢复闸门。当前选择的数据库路径只有：单独授权升级 staging 到 Pro，等待并确认一份物理备份后，通过 “Restore to new project” 恢复到新的隔离项目。
 
 2026-09-20T15:44Z 已用仓库脚本真实读取 staging 私有 Storage，备份 1 个桶、6 个对象、834 字节；本机独立复核全部对象长度和 SHA-256 与 manifest 一致。产物保存在 Git 忽略的 `work/staging-release/disaster-recovery/20260920T154438Z/storage/`，manifest SHA-256 为 `5f78cc89f1096703136411ee2ab2f4e5ff136ae9793eb3fb95c0ebf2d297c8c1`。这只证明源对象字节可以导出，不证明数据库、Auth、Vault 或目标 Storage 可以恢复。
 
-数据库流程采用 Supabase 官方的 [Backup and Restore using the CLI](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)：分别导出角色、Schema、数据和迁移历史，再用 `psql` 在单事务与 `ON_ERROR_STOP=1` 下恢复。CLI 的数据导出包含 Auth 与 Storage 元数据，但不包含 Storage 对象字节；对象字节由仓库脚本单独下载、恢复并逐个核对 SHA-256。
+下文 CLI 逻辑导出流程保留为未采用的备选记录，不再执行或安装本机依赖。当前云端路径由 Supabase 生成并恢复物理备份；Storage 对象字节仍需使用仓库脚本单独恢复并逐个核对 SHA-256，因为数据库备份中的 Storage 元数据不能证明对象字节已经恢复。
+
+## 云端恢复路径
+
+该路径会升级付费方案并创建新的云资源，只有获得单独授权后才能执行：
+
+1. 记录升级前的组织、staging 项目、Git SHA、迁移上界、数据库区域和 Storage 对象清单，不记录密钥或完整对象路径。
+2. 将 staging 所在组织升级到 Pro；不同时修改原生产项目、Vercel 项目或应用环境变量。
+3. 在 Supabase Backups 页面确认物理备份已生成且可选择；没有实际备份时不能进入恢复。
+4. 使用 “Restore to new project” 创建隔离恢复项目，不覆盖 staging 或原生产项目。
+5. 在新项目检查 Auth、业务 Schema、`conuo_private`、扩展、函数、触发器、RLS、迁移历史和 Storage 元数据。
+6. 使用现有 Storage 备份脚本向新项目恢复对象字节并逐对象核对长度与 SHA-256。
+7. 完成下方恢复验收，记录新项目的保留或删除终态；删除项目、降级方案和其他费用变更分别记录。
+
+Supabase Preview Branch 只用于额外的迁移或隔离行为测试。即使选择 “Include data”，也不能替代上述物理备份恢复证据；分支用量不受 Spend Cap 覆盖，创建前同样需要费用授权。
 
 ## 隔离与凭据
 
@@ -18,7 +34,7 @@
 - 所有导出放在 `work/staging-release/disaster-recovery/<UTC 时间>/`；`work/` 已被 Git 忽略。完成后记录保留或清理终态。
 - 若项目使用 Vault／pgsodium，恢复前还必须按官方文档复制旧项目 root encryption key。本项目的 processor secret 当前保存在 staging Vault，因此演练必须覆盖这一项，不能只恢复可见业务表。
 
-## 1. 前置条件
+## 1. CLI 备选路径前置条件（当前不执行）
 
 1. 安装并启动 Docker Desktop 或 Podman，供 Supabase CLI 执行 `pg_dump`。
 2. 安装与托管数据库主版本兼容的 PostgreSQL `psql`。

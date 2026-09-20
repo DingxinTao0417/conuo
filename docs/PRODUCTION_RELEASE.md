@@ -77,14 +77,16 @@ staging 已改为跟随 `staging` 分支，原生产项目继续跟随 `main`；
 
 ## 备份与恢复闸门
 
-staging Supabase 当前为 Free 方案，不包含计划数据库备份；控制台的 “Restore to a new project” 需要 Pro 和可用物理备份。本机当前也没有 `pg_dump`、`pg_restore`、`psql`、Supabase CLI 登录 token 或数据库密码。因此“已备份”与“已恢复验证”目前都不成立。
+staging Supabase 当前为 Free 方案，不包含计划数据库备份；控制台的 “Restore to a new project” 需要 Pro 和可用物理备份。用户已明确不在本机下载 PostgreSQL，因此当前只采用 Supabase 托管的物理备份恢复路径；升级方案、生成物理备份和创建隔离恢复项目属于尚未授权的付费外部变更。因此“已备份”与“已恢复验证”目前都不成立。
 
 仓库已增加不落密钥的数据库与 Storage 演练脚本，并按官方 CLI 流程固定角色、Schema、数据、迁移历史、对象字节及 SHA-256 校验步骤。staging 私有 Storage 的 1 个桶、6 个对象、834 字节已真实导出并通过本机逐对象长度与 SHA-256 复核；数据库备份和隔离项目恢复仍未执行，因此发布闸门保持未通过。完整命令、隔离要求与验收矩阵见 [Staging 灾备恢复演练](DISASTER_RECOVERY.md)。
 
-生产发布只能选择以下一种经过实测的方案：
+生产发布只能采用以下当前已选方案并经过实测：
 
-1. 升级到支持物理备份的方案，在新项目恢复，并核对 Auth、业务表、私有 schema、Storage 元数据、对象字节和权限。
-2. 使用官方 PostgreSQL 工具和受控数据库连接完成逻辑导出；在全新隔离 Supabase 项目恢复，随后单独复制并校验私有 Storage 对象。
+1. 单独授权后将 staging 升级到支持物理备份的方案，确认实际备份可用，再通过 “Restore to new project” 创建隔离恢复项目。
+2. 在恢复项目核对 Auth、业务表、私有 schema、扩展、函数、触发器、RLS、Storage 元数据、对象字节和权限。
+
+Preview Branch 默认不复制数据，即使选择包含生产数据也属于分支克隆，不是从备份恢复；同时会产生不受 Spend Cap 覆盖的独立用量，不能代替灾备恢复闸门。CLI 逻辑导出仅保留在灾备手册中作为未采用备选，不安装本机 PostgreSQL。
 
 应用内个人 ZIP 只能恢复用户业务副本，不能替代数据库灾难恢复。仅导出 `public` 表或调用 REST 逐表下载也不完整，因为它不会证明 Auth、`conuo_private`、函数、触发器、策略、扩展和 Storage 对象可恢复。
 
