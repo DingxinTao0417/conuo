@@ -103,8 +103,8 @@ staging Supabase 当前为 Free 方案，不包含计划数据库备份；控制
 
 - [x] 生产 Vercel 不再跟随 staging 的 `main` 自动漂移；staging 使用 `staging`，原生产使用 `main`，生产 Preview 自动部署已关闭。
 - [x] Git 自动部署和精确 SHA 探针已通过；完整验收基线部署 `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq` 对应 SHA `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a`，`/api/health` 首次上线验证对应 SHA `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。
-- [x] 同一主机的独立 Chrome／Edge 已完成同时编辑、断网重连、提交后响应丢失、旧页面删除防复活和笔记冲突手工合并。
-- [ ] 两台物理设备复核上述同步矩阵，并补阅读位置冲突、解析租约、迟到解析结果和真实设备网络切换。
+- [x] 同一主机的独立 Chrome／Edge 已完成同时编辑、断网重连、提交后响应丢失、旧页面删除防复活、笔记冲突手工合并和阅读位置选择／回切。
+- [ ] 两台物理设备复核上述同步矩阵，并补解析租约、迟到解析结果和真实设备网络切换。
 - [x] Admin 生成的一次性 signup/recovery token 已通过真实确认、重置、密码更新、重复使用和无效 token 路由；测试账号已删除。
 - [x] 受控邮箱的真实注册确认邮件及同浏览器 PKCE 回调已通过。
 - [x] Chrome 与 Edge 的独立持久会话在等待超过一小时并重启浏览器后，均自动轮换 Cookie、推进到期时间并保持工作区 200；专用账号与 Profile 已删除。
