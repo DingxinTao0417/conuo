@@ -9,7 +9,7 @@
 ## 首次独立 staging 部署（2026-09-20）
 
 - Supabase `conuo-staging` 从空项目执行原 24 份迁移，再追加真实 Storage 预检与工作区冲突响应两份修复，历史表实测 26 条。原生产项目没有迁移或改动。
-- 独立 Vercel `conuo-staging` 已 Ready，环境变量、Auth 回调、分钟级 processor 和三条 daily cleanup 均已配置；配置文件由仓库根迁到 `apps/web/vercel.json`。没有连接 Git 自动部署。
+- 独立 Vercel `conuo-staging` 已 Ready，环境变量、Auth 回调、分钟级 processor 和三条 daily cleanup 均已配置；配置文件由仓库根迁到 `apps/web/vercel.json`。项目已连接 GitHub `DingxinTao0417/conuo`，`main` push 可触发部署。
 - 真网页 TXT 上传、解析、刷新恢复与哈希核验通过；A/B 数据隔离通过；两个独立会话并发保存得到 200／409；分钟调度实际调用模型并发布带引用的摘要、标签、主题。
 - 修复前工作区旧 revision 请求挂起；修复后 270ms 返回 409。`40001` 的平台内部原因仍未证实，其他 RPC 的同类异常路径列为生产前验收门槛。
 - 全量 242 个测试文件／4,161 项、TypeScript、格式、本地及 Vercel 构建通过；ESLint 0 错误、1 条既有警告。

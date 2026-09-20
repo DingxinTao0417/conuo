@@ -9,16 +9,16 @@
 | 测试站            | https://conuo-staging.vercel.app                                                                          |
 | Vercel 项目       | `dingxintao0417s-projects/conuo-staging`                                                                  |
 | Vercel Project ID | `prj_XVdAZjFtRZ6gAqc818JZcIU6hn8M`                                                                        |
-| 最新部署          | `dpl_AUbasQbmRfT8asSrtMvWkzrZWdhZ`，Ready                                                                 |
-| 不可变部署地址    | https://conuo-staging-an2hc9cmn-dingxintao0417s-projects.vercel.app                                       |
+| 最近完整验收部署  | `dpl_AUbasQbmRfT8asSrtMvWkzrZWdhZ`，Ready                                                                 |
+| 对应不可变地址    | https://conuo-staging-an2hc9cmn-dingxintao0417s-projects.vercel.app                                       |
 | Supabase 项目     | `conuo-staging` / `yyleaedclbhsiowsaunt`                                                                  |
 | Supabase 资源     | 独立 Free 项目，us-east-1，Nano；由 Vercel Marketplace 管理                                               |
 | Web 运行时        | Next.js，Node 24.x；Root Directory 为 `apps/web`，允许读取工作区根文件                                    |
 | 数据库迁移        | 原 24 份从空项目顺序执行，随后追加 25、26 两份修复；历史表实际为 26 条                                    |
-| 发布来源          | 首次部署为 `7d0e7b7` 加本轮本地修复的隔离快照；同一内容已固化并推送 `main`                                |
+| 发布来源          | GitHub `DingxinTao0417/conuo` 的 `main`；Vercel 已连接仓库，后续 push 自动创建部署                        |
 | 原生产环境        | `conuo` Vercel 项目及 `czcurayfzshrqievceww` Supabase 未修改；原站已有 Ready 部署，不能再表述为从未部署过 |
 
-这里使用独立 Vercel 项目的 Production target，使该项目的 Cron 可以执行；它仍是测试环境，不是原生产站上线。生产数据库最后一次记录为 19 份迁移，本轮没有重新核验或更改它。相对当前仓库的 26 份，预期需要补七份，但生产执行前必须再次实时核对。
+这里使用独立 Vercel 项目的 Production target，使该项目的 Cron 可以执行；它仍是测试环境，不是原生产站上线。首次部署来自 Git 忽略的隔离快照，随后同一内容已固化到 Git，Vercel 项目已连接 GitHub 仓库。生产数据库最后一次记录为 19 份迁移，本轮没有重新核验或更改它。相对当前仓库的 26 份，预期需要补七份，但生产执行前必须再次实时核对。
 
 ## 配置与隔离
 
