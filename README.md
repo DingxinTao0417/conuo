@@ -23,7 +23,7 @@ Conuo 希望把文件、网页和笔记组织为可检索、可追溯的个人�
 
 **Web 版采用云端唯一正式存储，登录后使用。** 工作区、笔记、阅读进度和已接受的知识更新保存到 Supabase PostgreSQL，原件保存在私有 Storage。页面只用内存暂存编辑和上传字节，刷新后重新读取云端；本地与云端共存留给未来桌面版。详见 [Web 存储政策](docs/WEB_CLOUD_STORAGE.md)。
 
-> **当前状态：首版 Web 开发中，独立 staging 已部署。** staging Supabase 已从空项目顺序应用全部 27 份迁移，Vercel 已连接 GitHub `main` 自动部署；分钟级资料整理处理器和三条清理 Cron 已配置。真实网页已验证登录、TXT 上传与恢复、A/B 账号隔离、双会话 CAS、DeepSeek 问答与 PDF 区域视觉、后台资料整理，以及整理取消、资料／历史版本清理和解析完成／取消／重试六条业务冲突接口。上传中断孤立原件、带数据的历史版本清理、资料彻底删除、关联内容选择、Storage 物理删除、账号封锁及 Auth 用户删除也已在可丢弃账号通过。原生产 Supabase 仍停在此前核验的 19 份迁移，本轮未升级。真双设备与断网、Cron 自然触发、账号邮件和备份恢复仍待验收，因此完整 M0 尚未放行。模型未配置时保留原文摘录；云端问答支持生成式回答与原文引用。Web App Manifest 已提供安装名称、图标和快捷入口；HTTPS staging 可由支持的浏览器加入桌面或主屏，但这不是离线包。详细证据见 [staging 部署记录](docs/STAGING_DEPLOYMENT.md)。
+> **当前状态：首版 Web 开发中，独立 staging 已部署。** staging Supabase 已从空项目顺序应用全部 27 份迁移，Vercel 已连接 GitHub `staging` 自动部署；原生产 Vercel 保持 `main`，且已关闭 Preview 自动部署。分钟级资料整理处理器和三条清理 Cron 已配置。真实网页已验证登录、TXT 上传与恢复、A/B 账号隔离、双会话 CAS、DeepSeek 问答与 PDF 区域视觉、后台资料整理，以及整理取消、资料／历史版本清理和解析完成／取消／重试六条业务冲突接口；后者在 Git 自动部署后重新实测均在 274–303ms 内返回 409。上传中断孤立原件清理、带数据的历史版本清理、资料彻底删除、关联内容选择、Storage 物理删除、账号封锁及 Auth 用户删除也已在可丢弃账号通过。原生产 Supabase 最后一次核验仍为 19 份迁移，尚未升级；当前 staging 代码与生产数据库不一致，不能视为正式发布。真双设备与断网、Cron 自然触发、账号邮件和备份恢复仍待验收，因此完整 M0 尚未放行。模型未配置时保留原文摘录；云端问答支持生成式回答与原文引用。Web App Manifest 已提供安装名称、图标和快捷入口；HTTPS staging 可由支持的浏览器加入桌面或主屏，但这不是离线包。详细证据见 [staging 部署记录](docs/STAGING_DEPLOYMENT.md)与[生产发布手册](docs/PRODUCTION_RELEASE.md)。
 
 PDF 当前页已提供固定区域视觉学习，由支持图像的多模态模型直接解读截图、回答区域问题或生成一次性练习。解读按摘要、图中观察、分析推导和学习要点分节展示，正文、问答与练习支持 Markdown 和公式排版。截图只在用户明确点击发送时临时传输，结果绑定资料、版本、物理页和归一化矩形，截图默认不持久化。该流程不依赖 OCR，也不生成全文索引；扫描 PDF 正文仍不能检索。当前 DeepSeek `deepseek-flash` 已通过真实登录后的截图解读、图片问答和中文练习生成，服务端账本已记录完成；详见[区域视觉说明](docs/REGION_STUDY.md)。
 
@@ -94,7 +94,7 @@ Web 的“已保存”以云端确认结果为准；编辑留在当前页面不�
 | 数据库         | Supabase PostgreSQL；原子同步资料、不可变版本与内容块，JSONB 工作区仍作为 3 MiB 兼容保存协议                                                                               |
 | 模型接入       | 服务端 Chat Completions 适配器；staging 已完成真实 DeepSeek 资料问答、区域视觉、资料整理和请求账本联调。原生产未升级，模型质量矩阵仍待验收。                               |
 | 检索与任务     | pgvector、持久索引队列、Python 3.12 有界 CLI；staging 已部署资料整理调度，向量索引处理器仍未部署云调度，当前真实问答使用关键词召回。                                       |
-| 部署目标       | Vercel；`apps/web` 为项目根目录。独立 staging 已连接 GitHub `main` 自动部署；原生产环境未升级。                                                                            |
+| 部署目标       | Vercel；`apps/web` 为项目根目录。staging 从 GitHub `staging` 自动部署；原生产从 `main` 发布，Preview 自动部署已关闭。                                                     |
 
 精确依赖版本见 [apps/web/package.json](apps/web/package.json) 和锁文件；完整目标架构见[技术方案](docs/TECH_STACK.md)。
 
@@ -163,7 +163,7 @@ conuo/
 
 ## 文档与协作
 
-[产品需求](docs/PRD.md) · [技术方案](docs/TECH_STACK.md) · [页面设计](docs/TRAE_DESIGN_PROMPT.md) · [云端配置](docs/CLOUD_SETUP.md) · [Web 存储政策](docs/WEB_CLOUD_STORAGE.md) · [云端验收](docs/CLOUD_E2E_ACCEPTANCE.md) · [模型配置](docs/MODEL_SETUP.md) · [区域视觉](docs/REGION_STUDY.md) · [流式问答](docs/STREAMING_ANSWERS.md) · [搜索与索引](docs/SEARCH_INDEXING.md) · [资料整理](docs/ORGANIZATION.md) · [知识页安全撤回](docs/KNOWLEDGE_UPDATE_WITHDRAWAL.md) · [文件版本](docs/FILE_VERSIONS.md) · [彻底删除](docs/PERMANENT_DELETION.md) · [导出格式](docs/EXPORT_FORMAT.md) · [开发状态](docs/IMPLEMENTATION_STATUS.md) · [Logo](assets/conuo-logo.png)
+[产品需求](docs/PRD.md) · [技术方案](docs/TECH_STACK.md) · [页面设计](docs/TRAE_DESIGN_PROMPT.md) · [云端配置](docs/CLOUD_SETUP.md) · [Web 存储政策](docs/WEB_CLOUD_STORAGE.md) · [云端验收](docs/CLOUD_E2E_ACCEPTANCE.md) · [生产发布](docs/PRODUCTION_RELEASE.md) · [模型配置](docs/MODEL_SETUP.md) · [区域视觉](docs/REGION_STUDY.md) · [流式问答](docs/STREAMING_ANSWERS.md) · [搜索与索引](docs/SEARCH_INDEXING.md) · [资料整理](docs/ORGANIZATION.md) · [知识页安全撤回](docs/KNOWLEDGE_UPDATE_WITHDRAWAL.md) · [文件版本](docs/FILE_VERSIONS.md) · [彻底删除](docs/PERMANENT_DELETION.md) · [导出格式](docs/EXPORT_FORMAT.md) · [开发状态](docs/IMPLEMENTATION_STATUS.md) · [Logo](assets/conuo-logo.png)
 
 功能调整应对应需求与验收场景，保留来源、人工修改和可恢复状态。知识库页面按最新书封式布局迭代；阅读器保留原设计的正文与问答分栏。实现记录应区分代码已编写、本地已验证和真实云端已验证。
 

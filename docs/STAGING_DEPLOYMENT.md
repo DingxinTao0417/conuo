@@ -1,6 +1,6 @@
 # Staging 部署与验收
 
-更新时间：2026-09-20。本文记录真实部署结果，历史开发验收不等于本环境验收。**已部署独立 staging；本轮代码已提交并推送 `main`；未升级原生产环境。**
+更新时间：2026-09-20。本文记录真实部署结果，历史开发验收不等于本环境验收。**已部署独立 staging；staging 已改为跟随 GitHub `staging` 分支；原生产 Vercel 保持 `main`，Production Preview 自动部署已关闭。原生产数据库未升级。**
 
 ## 环境与发布来源
 
@@ -9,16 +9,18 @@
 | 测试站            | https://conuo-staging.vercel.app                                                                          |
 | Vercel 项目       | `dingxintao0417s-projects/conuo-staging`                                                                  |
 | Vercel Project ID | `prj_XVdAZjFtRZ6gAqc818JZcIU6hn8M`                                                                        |
-| 最近完整验收部署  | `dpl_FP8dbxJujPjrKsxscj2N1QSNkbJc`，Ready                                                                 |
-| 对应不可变地址    | https://conuo-staging-hscc19bve-dingxintao0417s-projects.vercel.app                                       |
+| 最近完整验收部署  | `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq`，Ready，Git 自动部署                                                     |
+| 对应不可变地址    | https://conuo-staging-npo01mm1s-dingxintao0417s-projects.vercel.app                                       |
 | Supabase 项目     | `conuo-staging` / `yyleaedclbhsiowsaunt`                                                                  |
 | Supabase 资源     | 独立 Free 项目，us-east-1，Nano；由 Vercel Marketplace 管理                                               |
 | Web 运行时        | Next.js，Node 24.x；Root Directory 为 `apps/web`，允许读取工作区根文件                                    |
 | 数据库迁移        | 原 24 份从空项目顺序执行，随后追加 25—27 三份修复；历史表实际为 27 条                                     |
-| 发布来源          | GitHub `DingxinTao0417/conuo` 的 `main`；Vercel 已连接仓库，后续 push 自动创建部署                        |
+| 发布来源          | GitHub `DingxinTao0417/conuo` 的 `staging`；Vercel 已连接仓库，push 自动创建 Production 部署              |
 | 原生产环境        | `conuo` Vercel 项目及 `czcurayfzshrqievceww` Supabase 未修改；原站已有 Ready 部署，不能再表述为从未部署过 |
 
-这里使用独立 Vercel 项目的 Production target，使该项目的 Cron 可以执行；它仍是测试环境，不是原生产站上线。首次部署来自 Git 忽略的隔离快照，随后同一内容已固化到 Git，Vercel 项目已连接 GitHub 仓库。生产数据库最后一次记录为 19 份迁移，本轮没有重新核验或更改它。相对当前仓库的 27 份，预期需要补八份，但生产执行前必须再次实时核对。
+这里使用独立 Vercel 项目的 Production target，使该项目的 Cron 可以执行；它仍是测试环境，不是原生产站上线。首次部署来自 Git 忽略的隔离快照，随后同一内容已固化到 Git。2026-09-20 已创建并推送 `staging` 分支，staging 的 Production Branch 已切换为 `staging`，并以提交 `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` 触发 Git 自动部署；部署状态为 Ready。原生产项目仍跟随 `main`，但已关闭 Preview 自动部署，避免 staging 分支在生产项目生成带生产变量的预览。生产数据库最后一次记录为 19 份迁移，本轮没有重新核验或更改它。相对当前仓库的 27 份，预期需要补八份，但生产执行前必须再次实时核对。
+
+本轮只读核对确认，`conuo` 生产项目仍连接 `main`，`conuo-staging` 已连接同一仓库的 `staging`。原生产项目的 Preview 自动部署已关闭；生产网页仍可能与 19 份数据库迁移不一致，发布处置见[生产发布手册](PRODUCTION_RELEASE.md)。
 
 ## 配置与隔离
 
@@ -60,6 +62,8 @@ Vercel 以 `CRON_SECRET` 发送 Bearer；本环境 `CONUO_CLEANUP_SECRET` 与其
 | 孤立上传清理       | 分别构造 Storage 上传成功但未确认的 `reserved` 状态，以及上传确认成功但未提交工作区的 `uploaded` 状态；两者自然等待 15 分钟预留期后由正式 cleanup 一次领取 2 个、完成 2 个，Storage 对象均物理消失，无重试或失败                    |
 | 删除生命周期       | 历史版本和资料清理各领取并完成 1 个任务，Storage 原件均物理消失；资料删除选择了 2 个笔记版本、1 段对话和 2 条消息，旧快照复活返回 409；账号预览含 1 份资料、1 个版本和 1 个对象，注销后工作区返回 423，Storage 与 Auth 两阶段均完成 |
 | 本地回归与构建     | 全量 243 个测试文件／4,172 项通过；包含从零重放全部 27 份迁移的 PGlite 测试。TypeScript、格式检查、本地及 Vercel 构建通过；ESLint 0 错误，保留已有 `_result` 警告                                                                   |
+| Git 发布复现       | 推送 `staging` 后自动创建部署 `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq`，状态 Ready；部署元数据中的 ref 为 `staging`、SHA 为 `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` |
+| 其余业务冲突       | 在上述部署重新实测解析完成／取消／重试陈旧请求，分别返回 409，耗时 303／297／274ms；最终资料为 `saved`、任务为 `cancelled`，没有迟到写入 |
 
 本机证据文件：`work/staging-release/final-smoke-results.json`、`concurrency-results.json`、`endpoint-results.json`、`conflict-smoke.mjs`、`deletion-lifecycle-results.json`、`orphan-upload-lifecycle-results.json`。它们位于 Git 忽略目录，是本轮现场记录，不是可替代后续验收的永久保证。专用冲突／生命周期和孤立上传账号均已完成验证并删除；当前只保留 A/B 两个 QA 账号。没有导入用户真实旧资料，临时错误探针函数已移除。
 
@@ -77,7 +81,7 @@ Vercel 以 `CRON_SECRET` 发送 Bearer；本环境 `CONUO_CLEANUP_SECRET` 与其
 - 使用两台真实设备测试同步、离线恢复、并发编辑、解析租约与迟到结果；当前两个 API 会话不等同于真双设备。
 - 覆盖额度耗尽、重复请求、缓存过期、任务超时恢复及清理任务崩溃／重试；仅使用明确可丢弃的 QA 数据。
 - 验证注册邮件、PKCE 回调及找回密码。若要开启语义检索，另配 Embedding 并部署索引处理器。
-- 本轮代码已提交并推送 `main`；生产发布仍是独立阶段，必须以已验收提交为来源，不能直接复用旧部署快照。
+- 本轮代码已提交并推送 `staging`；生产发布仍是独立阶段，必须以已验收提交为来源，不能直接复用旧部署快照。
 - 生产前先实时核对原项目迁移历史、做好并验证数据库及原件备份，再审查增量迁移、环境变量、Auth 回调和独立调度。验收通过后再授权生产升级；本轮未执行这一步。
 
 staging Supabase 当前为 Free 方案，控制台明确显示不包含计划备份，`Restore to a new project` 也要求 Pro 及物理备份。生产演练不能把当前项目写成已有平台备份；须选择经过恢复验证的逻辑导出方案，或在获得单独授权后升级方案再验证物理备份与新项目恢复。

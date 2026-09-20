@@ -4,7 +4,7 @@
 
 ## 当前环境（2026-09-20）
 
-2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、主要业务冲突接口、孤立上传清理及带数据删除／注销主链路已通过；真双设备、断网、自然 Cron 与邮件链路仍待验收。原生产环境未升级。本轮修复已提交并推送 `main`，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)。 本机开发配置现已指向 staging，原生产配置备份在被 Git 忽略的 `work/staging-release/.env.production-before-staging.local`。
+2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、主要业务冲突接口、孤立上传清理及带数据删除／注销主链路已通过；真双设备、断网、自然 Cron 与邮件链路仍待验收。staging 现从 GitHub `staging` 分支自动部署，原生产 Vercel 保持 `main` 且已关闭 Preview 自动部署；原生产数据库未升级，发布前仍需处理代码与 schema 漂移。本轮修复已提交并推送 `staging`，Git 自动部署已用 SHA `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` 验证，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。本机开发配置现已指向 staging，原生产配置备份在被 Git 忽略的 `work/staging-release/.env.production-before-staging.local`。
 
 ## 本地配置
 
