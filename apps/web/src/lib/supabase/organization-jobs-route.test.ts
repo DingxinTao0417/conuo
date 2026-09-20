@@ -117,6 +117,7 @@ describe("durable organization job API boundary", () => {
 
   it.each([
     ["40001", 409, "ORGANIZATION_JOB_CONTEXT_CHANGED"],
+    ["PT409", 409, "ORGANIZATION_JOB_CONTEXT_CHANGED"],
     ["22023", 400, "INVALID_ORGANIZATION_JOB"],
     ["55P03", 503, "ORGANIZATION_JOB_BUSY"],
   ])("maps enqueue SQL %s without exposing its message", async (code, status, expectedCode) => {

@@ -34,7 +34,8 @@ export function workspaceSaveNeedsReadBack(cause: unknown): boolean {
   if (!cause || typeof cause !== "object") return !conflictError(cause);
   const status = "status" in cause && typeof cause.status === "number" ? cause.status : null;
   const code = "code" in cause && typeof cause.code === "string" ? cause.code : "";
-  if (status === 409 || code === "REVISION_CONFLICT" || code === "40001") return false;
+  if (status === 409 || code === "REVISION_CONFLICT" || code === "40001" || code === "PT409")
+    return false;
   if (code === "WORKSPACE_BUSY") return false;
   if (status === null && !code) return !conflictError(cause);
   return status === null || status === 0 || status >= 500;

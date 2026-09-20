@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 function previewFailure(error: { code?: string } | null): never {
-  if (error?.code === "40001")
+  if (error?.code === "40001" || error?.code === "PT409")
     throw new ApiError(
       409,
       "ACCOUNT_DELETION_STATE_CHANGED",

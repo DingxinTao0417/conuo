@@ -18,7 +18,7 @@ export function organizationJobRpcFailure(error: unknown, action: OrganizationJo
     error && typeof error === "object" && "code" in error && typeof error.code === "string"
       ? error.code
       : "";
-  if (code === "40001")
+  if (code === "40001" || code === "PT409")
     throw new ApiError(
       409,
       "ORGANIZATION_JOB_CONTEXT_CHANGED",

@@ -564,9 +564,9 @@ describe("optional saved-content source purge SQL", () => {
     expect(sameSelection.fingerprint).toBe(p.fingerprint);
     const alteredSelection = structuredClone(p);
     alteredSelection.contentSelection.selection.noteIds = ["knowledge-a"];
-    await expect(purge(alteredSelection)).rejects.toMatchObject({ code: "40001" });
+    await expect(purge(alteredSelection)).rejects.toMatchObject({ code: "PT409" });
     await save({ ...data, aiEnabled: false }, 1);
-    await expect(purge(p)).rejects.toMatchObject({ code: "40001" });
+    await expect(purge(p)).rejects.toMatchObject({ code: "PT409" });
     expect((await saved()).revision).toBe(2);
     expect((await db.query("select * from public.source_purges")).rows).toEqual([]);
   });
@@ -609,7 +609,7 @@ describe("optional saved-content source purge SQL", () => {
       const next = await preview(["note-a"], ["conversation-a"]);
       expect(next.revision).toBe(p.revision);
       expect(next.fingerprint).not.toBe(p.fingerprint);
-      await expect(purge(p)).rejects.toMatchObject({ code: "40001" });
+      await expect(purge(p)).rejects.toMatchObject({ code: "PT409" });
     }
   });
 
@@ -812,7 +812,7 @@ describe("optional saved-content source purge SQL", () => {
           ownerA,
         ]),
       ),
-    ).rejects.toMatchObject({ code: "40001" });
+    ).rejects.toMatchObject({ code: "PT409" });
     const newContent = structuredClone(result.data);
     newContent.notes.push(note("restored-copy", "knowledge", { citations: [], versions: [] }));
     newContent.conversations.push(
@@ -921,7 +921,7 @@ describe("optional saved-content source purge SQL", () => {
     const pA = await preview(["note-a"], ["conversation-a"]);
     const pB = await preview(["note-a"], ["conversation-a"], ownerB);
     expect(pA.fingerprint).not.toBe(pB.fingerprint);
-    await expect(purge(pA, ownerB)).rejects.toMatchObject({ code: "40001" });
+    await expect(purge(pA, ownerB)).rejects.toMatchObject({ code: "PT409" });
     expect((await saved()).revision).toBe(1);
     expect((await saved(ownerB)).revision).toBe(1);
   });
@@ -942,7 +942,7 @@ describe("optional saved-content source purge SQL", () => {
     const next = await preview(["note-a"]);
     expect(next.revision).toBe(p.revision);
     expect(next.fingerprint).not.toBe(p.fingerprint);
-    await expect(purge(p)).rejects.toMatchObject({ code: "40001" });
+    await expect(purge(p)).rejects.toMatchObject({ code: "PT409" });
     await purge(next);
     expect(
       (await db.query("select * from conuo_private.organization_jobs where owner_id=$1", [ownerA]))
@@ -1155,7 +1155,7 @@ describe("optional saved-content source purge SQL", () => {
           [ownerA, JSON.stringify({ citations: [citation()] })],
         ),
       ),
-    ).rejects.toMatchObject({ code: "40001" });
+    ).rejects.toMatchObject({ code: "PT409" });
   });
 
   it("invalidates every selected conversation attempt ID including its latest B-only answer when A appears only in history, and refuses replay", async () => {
@@ -1228,7 +1228,7 @@ describe("optional saved-content source purge SQL", () => {
           JSON.stringify({ content: "Resurrected B answer" }),
         ]),
       ),
-    ).rejects.toMatchObject({ code: "40001" });
+    ).rejects.toMatchObject({ code: "PT409" });
   });
 
   it("clears exact public organization requestId and private model_request_id caches while retaining unrelated completed work", async () => {
@@ -1280,6 +1280,6 @@ describe("optional saved-content source purge SQL", () => {
           [ownerA, JSON.stringify({ content: "Replayed staged body" })],
         ),
       ),
-    ).rejects.toMatchObject({ code: "40001" });
+    ).rejects.toMatchObject({ code: "PT409" });
   });
 });

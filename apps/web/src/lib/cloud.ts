@@ -994,7 +994,7 @@ function originalUploadFailure(
   if (code === "42501") return new CloudError("登录已失效，请重新登录。", 401, "UNAUTHENTICATED");
   if (code === "55P03")
     return new CloudError("云端正在处理这份原件，请稍后重试。", 503, "ORIGINAL_UPLOAD_BUSY");
-  if (code === "40001")
+  if (code === "40001" || code === "PT409")
     return new CloudError(
       stage === "reserve"
         ? "这份原件的云端状态已变化，请稍后重试。"

@@ -102,7 +102,7 @@ async function rpc(
     throw unavailable();
   }
   if (result.error) {
-    if (["40001", "P0001"].includes(result.error.code || "")) throw stateChanged();
+    if (["40001", "PT409", "P0001"].includes(result.error.code || "")) throw stateChanged();
     throw unavailable();
   }
   return result.data;

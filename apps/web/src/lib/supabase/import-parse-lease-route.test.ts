@@ -335,66 +335,70 @@ describe("import parse lease API boundary", () => {
     expect(mock.rpc).not.toHaveBeenCalled();
   });
 
-  it.each([
-    [
-      "claim",
-      () => claim(request("/api/v1/imports/parse/claim", { sourceId, versionId })),
-      "IMPORT_PARSE_LEASE_CHANGED",
-    ],
-    [
-      "finish",
-      () =>
-        finish(
-          request("/api/v1/imports/parse/finish", {
-            data: completedWorkspace(),
-            expectedRevision: 6,
-            sourceId,
-            versionId,
-            leaseToken,
-          }),
-        ),
-      "IMPORT_PARSE_FINISH_CONFLICT",
-    ],
-    [
-      "cancel",
-      () =>
-        cancel(
-          request("/api/v1/imports/parse/cancel", {
-            data: cancelledWorkspace(),
-            expectedRevision: 6,
-            sourceId,
-            versionId,
-          }),
-        ),
-      "IMPORT_PARSE_CANCEL_CONFLICT",
-    ],
-    [
-      "retry",
-      () =>
-        retry(
-          request("/api/v1/imports/parse/retry", {
-            data: retryWorkspace(),
-            expectedRevision: 6,
-            sourceId,
-            versionId,
-          }),
-        ),
-      "IMPORT_PARSE_RETRY_CONFLICT",
-    ],
-  ] as const)(
-    "maps a %s 40001 database fence to a clear redacted conflict",
-    async (_name, call, expectedCode) => {
-      mock.rpc.mockResolvedValue({
-        data: null,
-        error: { code: "40001", message: "private SQL details" },
-      });
+  it.each(["40001", "PT409"] as const)(
+    "maps %s database fences for every parse action",
+    async (databaseCode) => {
+      const actions = [
+        [
+          "claim",
+          () => claim(request("/api/v1/imports/parse/claim", { sourceId, versionId })),
+          "IMPORT_PARSE_LEASE_CHANGED",
+        ],
+        [
+          "finish",
+          () =>
+            finish(
+              request("/api/v1/imports/parse/finish", {
+                data: completedWorkspace(),
+                expectedRevision: 6,
+                sourceId,
+                versionId,
+                leaseToken,
+              }),
+            ),
+          "IMPORT_PARSE_FINISH_CONFLICT",
+        ],
+        [
+          "cancel",
+          () =>
+            cancel(
+              request("/api/v1/imports/parse/cancel", {
+                data: cancelledWorkspace(),
+                expectedRevision: 6,
+                sourceId,
+                versionId,
+              }),
+            ),
+          "IMPORT_PARSE_CANCEL_CONFLICT",
+        ],
+        [
+          "retry",
+          () =>
+            retry(
+              request("/api/v1/imports/parse/retry", {
+                data: retryWorkspace(),
+                expectedRevision: 6,
+                sourceId,
+                versionId,
+              }),
+            ),
+          "IMPORT_PARSE_RETRY_CONFLICT",
+        ],
+      ] as const;
 
-      const response = await call();
+      for (const [, call, expectedCode] of actions) {
+        mock.rpc.mockResolvedValue({
+          data: null,
+          error: { code: databaseCode, message: "private SQL details" },
+        });
 
-      expect(response.status).toBe(409);
-      const body = await response.json();
-      expect(body.code).toBe(expectedCode);
-      expect(JSON.stringify(body)).not.toContain("private SQL details");
+        const response = await call();
+
+        expect(response.status).toBe(409);
+        const body = await response.json();
+        expect(body.code).toBe(expectedCode);
+        expect(JSON.stringify(body)).not.toContain("private SQL details");
+      }
     },
   );
 

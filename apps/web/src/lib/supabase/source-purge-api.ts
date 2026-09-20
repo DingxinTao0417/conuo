@@ -27,7 +27,7 @@ export function sourcePurgeFailure(error: unknown): never {
     error && typeof error === "object" && "code" in error && typeof error.code === "string"
       ? error.code
       : "";
-  if (code === "40001")
+  if (code === "40001" || code === "PT409")
     throw new ApiError(
       409,
       "PURGE_CONTEXT_CHANGED",

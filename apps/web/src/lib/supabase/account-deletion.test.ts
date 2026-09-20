@@ -110,17 +110,20 @@ describe("account deletion preparation", () => {
     expect(mock.rpc).not.toHaveBeenCalled();
   });
 
-  it("maps a transaction conflict without exposing database details", async () => {
-    mock.rpc.mockResolvedValue({
-      data: null,
-      error: { code: "40001", message: "private lock detail" },
-    });
-    const result = await prepareAccountDeletion({ rpc: mock.rpc }, ownerId).catch(
-      (error: unknown) => error,
-    );
-    expect(result).toMatchObject({ status: 409, code: "ACCOUNT_DELETION_STATE_CHANGED" });
-    expect(String(result)).not.toContain("private lock");
-  });
+  it.each(["40001", "PT409"])(
+    "maps a %s transaction conflict without exposing database details",
+    async (code) => {
+      mock.rpc.mockResolvedValue({
+        data: null,
+        error: { code, message: "private lock detail" },
+      });
+      const result = await prepareAccountDeletion({ rpc: mock.rpc }, ownerId).catch(
+        (error: unknown) => error,
+      );
+      expect(result).toMatchObject({ status: 409, code: "ACCOUNT_DELETION_STATE_CHANGED" });
+      expect(String(result)).not.toContain("private lock");
+    },
+  );
 
   it("masks malformed or unavailable privileged results", async () => {
     mock.rpc.mockResolvedValue({ data: { deletionId: "not-a-uuid" }, error: null });

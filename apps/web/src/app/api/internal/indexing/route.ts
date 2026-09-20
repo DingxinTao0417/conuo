@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       const result = await store.rpc(name, args);
       if (result.error)
         throw new ApiError(
-          ["40001", "P0002"].includes(result.error.code)
+          ["40001", "PT409", "P0002"].includes(result.error.code)
             ? 409
             : result.error.code === "22023"
               ? 400

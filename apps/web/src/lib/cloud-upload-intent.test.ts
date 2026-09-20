@@ -170,6 +170,19 @@ describe("original upload intent cloud adapter", () => {
     );
   });
 
+  it.each(["40001", "PT409"])("maps a %s reservation fence to a cloud conflict", async (code) => {
+    const { blob, source } = await original();
+    mock.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { code, message: "private upload state" },
+    });
+
+    const error = await uploadSourceBlob(source, blob, ownerId).catch((value: unknown) => value);
+    expect(error).toMatchObject({ status: 409, code: "ORIGINAL_UPLOAD_STATE_CHANGED" });
+    expect(String(error)).not.toContain("private upload state");
+    expect(mock.upload).not.toHaveBeenCalled();
+  });
+
   it("fails closed for malformed reservation data and never exposes server RPC details", async () => {
     const { blob, source } = await original();
     mock.rpc.mockResolvedValueOnce({

@@ -187,19 +187,22 @@ describe("indexing read disclosure gate (mock SQL transport only)", () => {
     expect(mock.fetch).not.toHaveBeenCalled();
   });
 
-  it("does not disclose a batch whose lease/source permission was revoked while reserving budget", async () => {
-    mock.rpc.mockImplementation(async (name) =>
-      name === "read_embedding_batch"
-        ? { data: batch(), error: null }
-        : { data: null, error: { code: "40001", message: "private revoked source SQL" } },
-    );
-    const res = await POST(request({ action: "read", ...lease }));
-    expect(res.status).toBe(409);
-    const body = await res.text();
-    expect(body).not.toContain("保密正文");
-    expect(body).not.toContain("private revoked");
-    expect(mock.reserve).toHaveBeenCalledOnce();
-  });
+  it.each(["40001", "PT409"])(
+    "does not disclose a batch whose lease/source permission returns %s while reserving budget",
+    async (code) => {
+      mock.rpc.mockImplementation(async (name) =>
+        name === "read_embedding_batch"
+          ? { data: batch(), error: null }
+          : { data: null, error: { code, message: "private revoked source SQL" } },
+      );
+      const res = await POST(request({ action: "read", ...lease }));
+      expect(res.status).toBe(409);
+      const body = await res.text();
+      expect(body).not.toContain("保密正文");
+      expect(body).not.toContain("private revoked");
+      expect(mock.reserve).toHaveBeenCalledOnce();
+    },
+  );
 
   it.each(["budget", "heartbeat"])(
     "does not disclose after cancellation during %s",

@@ -87,7 +87,7 @@ export async function prepareAccountDeletion(
     throw unavailable();
   }
   if (result.error) {
-    if (result.error.code === "40001")
+    if (result.error.code === "40001" || result.error.code === "PT409")
       throw new ApiError(
         409,
         "ACCOUNT_DELETION_STATE_CHANGED",

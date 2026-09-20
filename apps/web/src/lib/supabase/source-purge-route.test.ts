@@ -86,6 +86,15 @@ describe("source purge route", () => {
     });
   });
 
+  it.each(["40001", "PT409"])("maps a %s stale preview to a redacted conflict", async (code) => {
+    mock.rpc.mockResolvedValue({ data: null, error: { code, message: "private purge state" } });
+    const response = await POST(request("POST", { expectedRevision: 7, fingerprint }), context);
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body).toMatchObject({ code: "PURGE_CONTEXT_CHANGED" });
+    expect(JSON.stringify(body)).not.toContain("private purge state");
+  });
+
   it("rejects malformed confirmation input before the database call", async () => {
     const response = await POST(
       request("POST", { expectedRevision: 0, fingerprint: "wrong" }),

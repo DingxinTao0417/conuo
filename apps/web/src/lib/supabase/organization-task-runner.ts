@@ -90,7 +90,8 @@ export type OrganizationTaskRunnerSummary = {
 
 function stateError(error: RpcFailure, message: string): ApiError {
   if (error?.code === "22023") return new ApiError(400, "ORGANIZATION_STATE_INVALID", message);
-  if (error?.code === "40001") return new ApiError(409, "ORGANIZATION_STATE_CHANGED", message);
+  if (error?.code === "40001" || error?.code === "PT409")
+    return new ApiError(409, "ORGANIZATION_STATE_CHANGED", message);
   if (error?.code === "42501")
     return new ApiError(503, "ORGANIZATION_PROCESSOR_FORBIDDEN", "后台整理权限尚未配置。");
   return new ApiError(503, "ORGANIZATION_PROCESSOR_UNAVAILABLE", message);

@@ -87,7 +87,7 @@ function rpcFailure(error: unknown, action: ParseAction): never {
     error && typeof error === "object" && "code" in error && typeof error.code === "string"
       ? error.code
       : "";
-  if (code === "40001") {
+  if (code === "40001" || code === "PT409") {
     const message =
       action === "finish" || action === "cancel" || action === "retry"
         ? "资料、解析任务或云端版本已改变，未保存本次解析结果。请重新打开后再试。"

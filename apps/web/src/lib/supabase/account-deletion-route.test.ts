@@ -83,6 +83,15 @@ describe("account deletion route", () => {
     await expect(response.json()).resolves.toMatchObject({ code: "ACCOUNT_DELETION_UNAVAILABLE" });
   });
 
+  it.each(["40001", "PT409"])("maps a %s preview fence to a redacted conflict", async (code) => {
+    mock.rpc.mockResolvedValue({ data: null, error: { code, message: "private deletion state" } });
+    const response = await GET(request("GET"));
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body).toMatchObject({ code: "ACCOUNT_DELETION_STATE_CHANGED" });
+    expect(JSON.stringify(body)).not.toContain("private deletion state");
+  });
+
   it("requires confirmation before it creates an admin client or queues deletion", async () => {
     const response = await POST(request("POST", { email: "reader@example.test" }));
     expect(response.status).toBe(400);
