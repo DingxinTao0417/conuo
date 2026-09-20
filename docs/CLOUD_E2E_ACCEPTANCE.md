@@ -2,7 +2,7 @@
 
 ## 独立 staging 验收（2026-09-20）
 
-2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理及六条主要业务冲突接口已通过；上传中断孤立原件、带数据的历史版本清理、资料彻底删除、关联内容选择、Storage 物理删除、账号封锁及 Auth 用户删除也已通过。一次性 signup/recovery token 的确认、密码更新、重复使用与无效 token 已通过真实路由；受控邮箱的真实注册确认邮件与同浏览器 PKCE 也已通过。真双设备、自然 Cron、真实找回密码邮件、过期链接、跨浏览器邮件点击和刷新登录状态仍待验收。原生产环境未升级。本轮已提交并推送 `staging`，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)。
+2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理及六条主要业务冲突接口已通过；上传中断孤立原件、带数据的历史版本清理、资料彻底删除、关联内容选择、Storage 物理删除、账号封锁及 Auth 用户删除也已通过。一次性 signup/recovery token 的确认、密码更新、重复使用与无效 token、受控邮箱的真实注册确认邮件与同浏览器 PKCE，以及 Chrome／Edge 跨一小时持久会话自动刷新均已通过。真双设备、自然 Cron、真实找回密码邮件、过期链接和跨浏览器邮件点击仍待验收。原生产环境未升级。本轮已提交并推送 `staging`，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)。
 
 本轮真实结果与限制统一记录在上述部署文档。下方 P32 及更早的章节是历史证据；其中的生产 19 份迁移、未部署等状态不代表当前 staging。
 
@@ -13,6 +13,8 @@
 Auth token 验收使用 Supabase Admin 为专用可丢弃账号生成一次性 signup 与 recovery token，不经邮箱传递。真实 `/auth/confirm` 使用 signup token 后建立会话，空工作区读取返回 200；同一 token 再次使用进入 `/auth/error`。recovery token 打开 `/auth/reset-password`，页面成功更新密码，旧密码随后被拒、新密码可登录；重复 recovery token 和无效 token 也进入安全错误页。测试账号最终删除。该结果验证 token 消费与应用路由，不替代真实邮件投递、PKCE 邮件点击、自然过期或刷新 token 验收。
 
 另使用受控真实邮箱完成注册确认：Auth 日志在 `2026-09-20T14:05:39Z` 记录 `/signup` 200 与 `user_confirmation_requested`，在 `14:06:05Z` 记录邮件链接 `/verify` 303 与 `user_signedup`，随后 `/token` 以 `grant_type=pkce` 返回 200，同一浏览器建立有效会话。该证据不包含邮箱、用户 ID、IP、token 或请求 ID；它仍不覆盖真实找回邮件、自然过期、跨浏览器点击或刷新会话。staging 未启用自定义 SMTP，默认模板使用 `{{ .ConfirmationURL }}`，跨浏览器所需的 token-hash 模板当前不能在控制台编辑。
+
+另在 Chrome 与 Edge 分别播种独立真实会话并关闭浏览器，等待超过一小时后重启。两份持久 Cookie 均与播种指纹一致，页面随后自动轮换 Cookie、推进到期时间，并以刷新后的身份读取工作区返回 200；专用账号和两个 Profile 在通过后删除。该结果验证当前 staging 的持久登录自动刷新，不替代真双设备、跨浏览器邮件点击或账号删除后的跨设备失效。
 
 ## P32 Web 云端模式与旧资料预览（2026-09-15）
 
@@ -148,4 +150,4 @@ Supabase PRODUCTION 现有 19 份迁移记录。第 13—16 份建立对话、�
 - 样本只包含此仓库生成的无敏感 TXT 内容；上传和清理都需要按当前任务另行确认。
 - 不自动删除 Auth 用户：Dashboard 删除账号不可恢复。测试完成后由项目所有者决定是否保留标记为 QA 的账号，或明确授权永久删除。
 - 验收记录只保存账号代号、时间、浏览器上下文、资料标识、预期和结果；不保存密码、访问令牌、完整 Storage URL 或用户资料。
-- 注册确认邮件及同浏览器 PKCE 已由受控邮箱通过；找回密码邮件、过期链接、跨浏览器点击和刷新 token 仍需继续验收。
+- 注册确认邮件、同浏览器 PKCE 和 Chrome／Edge 持久会话自动刷新已通过；找回密码邮件、过期链接和跨浏览器点击仍需继续验收。

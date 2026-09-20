@@ -4,7 +4,7 @@
 
 ## 当前环境（2026-09-20）
 
-2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、主要业务冲突接口、孤立上传清理、带数据删除／注销主链路、真实注册确认邮件及同浏览器 PKCE 已通过；真双设备、断网、自然 Cron、真实找回密码邮件、跨浏览器邮件、过期 token 与刷新会话仍待验收。staging 现从 GitHub `staging` 分支自动部署，原生产 Vercel 保持 `main` 且已关闭 Preview 自动部署；原生产数据库未升级，发布前仍需处理代码与 schema 漂移。本轮修复已提交并推送 `staging`，Git 自动部署已用完整验收基线 SHA `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` 验证；当前可变域名的实际分支和完整 SHA 以无缓存的 `/api/health` 返回为准。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。本机开发配置现已指向 staging，原生产配置备份在被 Git 忽略的 `work/staging-release/.env.production-before-staging.local`。
+2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、主要业务冲突接口、孤立上传清理、带数据删除／注销主链路、真实注册确认邮件、同浏览器 PKCE 及 Chrome／Edge 持久会话自动刷新已通过；真双设备、断网、自然 Cron、真实找回密码邮件、跨浏览器邮件与过期 token 仍待验收。staging 现从 GitHub `staging` 分支自动部署，原生产 Vercel 保持 `main` 且已关闭 Preview 自动部署；原生产数据库未升级，发布前仍需处理代码与 schema 漂移。本轮修复已提交并推送 `staging`，Git 自动部署已用完整验收基线 SHA `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` 验证；当前可变域名的实际分支和完整 SHA 以无缓存的 `/api/health` 返回为准。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。本机开发配置现已指向 staging，原生产配置备份在被 Git 忽略的 `work/staging-release/.env.production-before-staging.local`。
 
 ## 本地配置
 
@@ -142,7 +142,7 @@ Next.js 与受信 Python 处理器配置相同的 `CONUO_PROCESSOR_SECRET`，供
 
 `/auth/confirm` 只接受列出的验证类型，不接受任意跳转地址。实际邮件发送仍受所用项目的邮件服务与限额约束；需要在真实项目验证发送、过期、重复使用和恢复流程。
 
-staging 已使用受控真实邮箱通过注册确认和同浏览器 PKCE：`/signup` 返回 200，邮件 `/verify` 返回 303，随后 PKCE `/token` 返回 200。真实找回密码邮件、过期链接、跨浏览器点击和刷新会话仍待验收。当前 Email provider 已启用，但未配置自定义 SMTP；默认确认模板使用 `{{ .ConfirmationURL }}`，Supabase 控制台要求先启用自定义 SMTP 才能编辑模板。因此上方 token-hash 模板目前只是目标配置，尚未在 staging 生效。
+staging 已使用受控真实邮箱通过注册确认和同浏览器 PKCE：`/signup` 返回 200，邮件 `/verify` 返回 303，随后 PKCE `/token` 返回 200。Chrome 与 Edge 的独立持久会话也已在超过一小时并重启浏览器后自动轮换 Cookie、推进到期时间并保持工作区 200。真实找回密码邮件、过期链接和跨浏览器点击仍待验收。当前 Email provider 已启用，但未配置自定义 SMTP；默认确认模板使用 `{{ .ConfirmationURL }}`，Supabase 控制台要求先启用自定义 SMTP 才能编辑模板。因此上方 token-hash 模板目前只是目标配置，尚未在 staging 生效。
 
 ## 数据保护与版本
 
@@ -200,7 +200,7 @@ staging 已使用受控真实邮箱通过注册确认和同浏览器 PKCE：`/si
 
 `supabase/tests/workspace_isolation.sql` 可在独立本地 Supabase 数据库中运行，验证两个测试账号之间的读取隔离、直接写入禁用、创建与陈旧 revision 拒绝；执行后事务整体回滚。不要在正式账号数据库中跑测试夹具。没有数据库凭据时，本仓库不声称这些 SQL 测试已通过。
 
-原生产 Supabase 最后一次只读核验为 19 份迁移；第 11—19 份的 RLS、权限、投影触发器和基础真实账号读写证据属于该环境的历史基线。独立 staging 已从零应用全部 27 份迁移，并完成两个账号的文件隔离、并发 CAS、真实注册确认邮件、孤立上传、资料／历史版本清理及账号注销的 Storage/Auth 主链路。仍需验证刷新会话、真实找回密码邮件、过期与跨浏览器链接、真双设备、网络中断、自然 Cron、清理失败恢复、单份文件超限及快照超限。生产发布前必须重新实时核对原生产迁移历史，不能用 staging 结果替代。
+原生产 Supabase 最后一次只读核验为 19 份迁移；第 11—19 份的 RLS、权限、投影触发器和基础真实账号读写证据属于该环境的历史基线。独立 staging 已从零应用全部 27 份迁移，并完成两个账号的文件隔离、并发 CAS、真实注册确认邮件、持久会话自动刷新、孤立上传、资料／历史版本清理及账号注销的 Storage/Auth 主链路。仍需验证真实找回密码邮件、过期与跨浏览器链接、真双设备、网络中断、自然 Cron、清理失败恢复、单份文件超限及快照超限。生产发布前必须重新实时核对原生产迁移历史，不能用 staging 结果替代。
 
 第 13 份 `20260914000100_normalized_conversations_projection.sql` 已在本地 PGlite 中随完整迁移链执行，覆盖消息顺序与证据、RLS 账号隔离、禁止浏览器直接写入、账号注销隐藏、工作区级联删除、revision CAS 更新/裁剪，以及重复回答尝试导致整次工作区保存原子回滚。它也已应用到连接项目，并完成表、RLS、权限、policy 与触发器核验。
 
