@@ -4,7 +4,7 @@
 
 ## 当前环境（2026-09-20）
 
-2026-09-20 已创建独立 staging：26 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS 和真实模型后台整理已通过；真双设备、完整异常／删除链路仍待验收。原生产环境未升级。本轮修复已提交并推送 `main`，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)。 本机开发配置现已指向 staging，原生产配置备份在被 Git 忽略的 `work/staging-release/.env.production-before-staging.local`。
+2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理及主要业务冲突接口已通过；真双设备、完整删除生命周期与邮件链路仍待验收。原生产环境未升级。本轮修复已提交并推送 `main`，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)。 本机开发配置现已指向 staging，原生产配置备份在被 Git 忽略的 `work/staging-release/.env.production-before-staging.local`。
 
 ## 本地配置
 
@@ -36,8 +36,9 @@
    24. `20260915060323_source_purge_saved_content_selection.sql`：资料彻底删除时按权威预览逐篇选择关联笔记／知识页（含当前及全部历史正文）、逐个选择整段对话；另存内容墓碑、生成依赖清理和相关模型缓存收窄保留额度账行；**已应用独立 staging；原生产未应用。**
    25. `20260920000100_storage_upload_preflight.sql`：兼容 Storage 上传预检 `contentLength`，保留实际大小与活预留校验；**已应用 staging。**
    26. `20260920000200_workspace_conflict_response.sql`：工作区保存冲突转换为 PostgREST `PT409`，保留事务回滚和 CAS；**已应用 staging。**
+   27. `20260920000300_business_conflict_response.sql`：将数据库函数中 49 个显式业务 `40001` 转换为 PostgREST `PT409`，避免过期 revision、租约或状态冲突在托管链路中长时间挂起；**已应用 staging，并完成六条真实接口冲突验收。**
 
-   003 使用 `extensions` schema 下的 `vector` 扩展。托管 Supabase 的 `storage.objects` 由平台角色 `supabase_storage_admin` 拥有，且平台已启用该表的 RLS；006 只维护其 Storage policy，不能对这个平台表执行 `ALTER TABLE` 或改变其所有者。其 restrictive policy 仍会在账号注销处理中与其他 Storage policy 共同生效，不会放宽既有的对象访问隔离。旧数据不符合身份或原件路径约束时，迁移会回滚本次改动，保留此前迁移，不静默跳过。不要重写已应用的迁移；成功升级后的回退须另行评审备份恢复或前向修复。详见 [搜索与索引](SEARCH_INDEXING.md)。原生产项目历史记录已完成并核验前 19 份迁移，包含预期表和函数、私有 `originals` 桶、4 条 Storage policy，以及所有面向用户的 `public` 表 RLS。独立 staging 已应用全部 26 份；原生产的增量仍须在备份和验收后另行升级。第 11 份迁移已额外核验：`public.notes` 与 `public.note_versions` 均启用 RLS、两条仅限当前账号读取的 policy、一个 `project_workspace_notes` trigger 均存在；当时 Supabase Security Advisor 为 0 个 error。第 12 份迁移已实际执行，已核验私有 `conuo_private.import_parse_leases` 表启用 RLS、`claim_import_parse` 与 `finish_import_parse` RPC 存在，且 `save_workspace` 带有解析租约保护。第 13—16 份已创建五张只读投影表并登记迁移历史；五张表的 RLS、认证角色只读权限、owner 与账号删除闸门 policy 和四个工作区触发器均已核验。第 17 份迁移已在线核验两个 `source_purges` 字段、两个历史版本清理 RPC 与仅认证用户可执行的权限边界；没有运行任何实际资料版本清理。第 18—19 份修复了资料库 JSON 数组投影的值列与聚合别名；远端函数、迁移记录和真实账号的空资料库笔记保存及刷新重载已核验。迁移源文件仍是开发与恢复依据；其他项目仍须通过自身迁移历史或 schema 核验实际状态。
+   003 使用 `extensions` schema 下的 `vector` 扩展。托管 Supabase 的 `storage.objects` 由平台角色 `supabase_storage_admin` 拥有，且平台已启用该表的 RLS；006 只维护其 Storage policy，不能对这个平台表执行 `ALTER TABLE` 或改变其所有者。其 restrictive policy 仍会在账号注销处理中与其他 Storage policy 共同生效，不会放宽既有的对象访问隔离。旧数据不符合身份或原件路径约束时，迁移会回滚本次改动，保留此前迁移，不静默跳过。不要重写已应用的迁移；成功升级后的回退须另行评审备份恢复或前向修复。详见 [搜索与索引](SEARCH_INDEXING.md)。原生产项目历史记录已完成并核验前 19 份迁移，包含预期表和函数、私有 `originals` 桶、4 条 Storage policy，以及所有面向用户的 `public` 表 RLS。独立 staging 已应用全部 27 份；原生产的增量仍须在备份和验收后另行升级。第 11 份迁移已额外核验：`public.notes` 与 `public.note_versions` 均启用 RLS、两条仅限当前账号读取的 policy、一个 `project_workspace_notes` trigger 均存在；当时 Supabase Security Advisor 为 0 个 error。第 12 份迁移已实际执行，已核验私有 `conuo_private.import_parse_leases` 表启用 RLS、`claim_import_parse` 与 `finish_import_parse` RPC 存在，且 `save_workspace` 带有解析租约保护。第 13—16 份已创建五张只读投影表并登记迁移历史；五张表的 RLS、认证角色只读权限、owner 与账号删除闸门 policy 和四个工作区触发器均已核验。第 17 份迁移已在线核验两个 `source_purges` 字段、两个历史版本清理 RPC 与仅认证用户可执行的权限边界；没有运行任何实际资料版本清理。第 18—19 份修复了资料库 JSON 数组投影的值列与聚合别名；远端函数、迁移记录和真实账号的空资料库笔记保存及刷新重载已核验。第 25—27 份分别修复真实 Storage 上传预检、工作区冲突响应和其余 49 个显式业务冲突响应；迁移源文件仍是开发与恢复依据，其他项目仍须通过自身迁移历史或 schema 核验实际状态。
 
 3. 将 `apps/web/.env.example` 复制为 `apps/web/.env.local`，填入项目 URL 和 publishable key。旧项目的 anon key 也可用于相同公开客户端位置。**`NEXT_PUBLIC_*` 变量中不能填 secret key 或 service_role key。** `.env.local` 已由仓库忽略；不要把密钥发到聊天或提交到 Git。
 4. 重启 Web 开发服务器，再通过界面中的账号入口注册或登录。
@@ -57,7 +58,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 
 这些受控转换只能改变解析派生状态，例如正文、内容块、页码解析结果、错误、解析状态和时间；同一资料版本的原件与来源身份（文件哈希、名称、类型、大小、原件键、Storage 路径、网址和网页快照等）必须保持不变。
 
-这些规则已作为第 12 份迁移在连接的开发 Supabase 执行。已核验私有表 RLS、认领与完成 RPC、`save_workspace` 的租约保护；当时原生产迁移历史为 19 条；staging 当前为 26 条。真实两台设备的认领、心跳、完成、取消、重试、断网与迟到结果拒绝仍待联调，因此不能据此宣称完整跨设备场景已验收。
+这些规则已作为第 12 份迁移在连接的开发 Supabase 执行。已核验私有表 RLS、认领与完成 RPC、`save_workspace` 的租约保护；当时原生产迁移历史为 19 条；staging 当前为 27 条。真实 staging 已验证解析完成、取消和重试的陈旧 revision 快速返回 409 且不写入；真实两台设备的认领、心跳、断网与迟到结果拒绝仍待联调，因此不能据此宣称完整跨设备场景已验收。
 
 ### 原件上传预留、配额与清理（第 21、25 份迁移，staging 已应用）
 

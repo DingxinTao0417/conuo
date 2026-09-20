@@ -9,16 +9,16 @@
 | 测试站            | https://conuo-staging.vercel.app                                                                          |
 | Vercel 项目       | `dingxintao0417s-projects/conuo-staging`                                                                  |
 | Vercel Project ID | `prj_XVdAZjFtRZ6gAqc818JZcIU6hn8M`                                                                        |
-| 最近完整验收部署  | `dpl_AUbasQbmRfT8asSrtMvWkzrZWdhZ`，Ready                                                                 |
-| 对应不可变地址    | https://conuo-staging-an2hc9cmn-dingxintao0417s-projects.vercel.app                                       |
+| 最近完整验收部署  | `dpl_FP8dbxJujPjrKsxscj2N1QSNkbJc`，Ready                                                                 |
+| 对应不可变地址    | https://conuo-staging-hscc19bve-dingxintao0417s-projects.vercel.app                                       |
 | Supabase 项目     | `conuo-staging` / `yyleaedclbhsiowsaunt`                                                                  |
 | Supabase 资源     | 独立 Free 项目，us-east-1，Nano；由 Vercel Marketplace 管理                                               |
 | Web 运行时        | Next.js，Node 24.x；Root Directory 为 `apps/web`，允许读取工作区根文件                                    |
-| 数据库迁移        | 原 24 份从空项目顺序执行，随后追加 25、26 两份修复；历史表实际为 26 条                                    |
+| 数据库迁移        | 原 24 份从空项目顺序执行，随后追加 25—27 三份修复；历史表实际为 27 条                                     |
 | 发布来源          | GitHub `DingxinTao0417/conuo` 的 `main`；Vercel 已连接仓库，后续 push 自动创建部署                        |
 | 原生产环境        | `conuo` Vercel 项目及 `czcurayfzshrqievceww` Supabase 未修改；原站已有 Ready 部署，不能再表述为从未部署过 |
 
-这里使用独立 Vercel 项目的 Production target，使该项目的 Cron 可以执行；它仍是测试环境，不是原生产站上线。首次部署来自 Git 忽略的隔离快照，随后同一内容已固化到 Git，Vercel 项目已连接 GitHub 仓库。生产数据库最后一次记录为 19 份迁移，本轮没有重新核验或更改它。相对当前仓库的 26 份，预期需要补七份，但生产执行前必须再次实时核对。
+这里使用独立 Vercel 项目的 Production target，使该项目的 Cron 可以执行；它仍是测试环境，不是原生产站上线。首次部署来自 Git 忽略的隔离快照，随后同一内容已固化到 Git，Vercel 项目已连接 GitHub 仓库。生产数据库最后一次记录为 19 份迁移，本轮没有重新核验或更改它。相对当前仓库的 27 份，预期需要补八份，但生产执行前必须再次实时核对。
 
 ## 配置与隔离
 
@@ -56,22 +56,23 @@ Vercel 以 `CRON_SECRET` 发送 Bearer；本环境 `CONUO_CLEANUP_SECRET` 与其
 | 并发 CAS           | 同 revision 的两个会话保存分别返回 200（300ms）和 409（608ms）；旧 revision 重试 270ms 返回 409；只有成功请求推进 revision                                                            |
 | 后台 AI 整理       | 任务 `50379a58-46a5-4625-8fca-9cad66a01ce7` 于 09:15:46 UTC 入队，由分钟调度自动处理，09:16:02.711 UTC 成为 `ready`，`mode=model`，1 条摘要引用、7 个标签、4 个主题；账本 `completed` |
 | 内部入口鉴权       | processor 与三个 cleanup 无密钥 401、正确密钥 200；三个 cleanup 另有 Vercel 控制台 Run 的真实 200 日志                                                                                |
-| 本地回归与构建     | 全量 242 个测试文件／4,161 项通过；包含从零重放全部 26 份迁移的 PGlite 测试。TypeScript、格式检查、本地及 Vercel 构建通过；ESLint 0 错误，保留已有 `_result` 警告                     |
+| 业务冲突响应       | 第 27 份迁移将 49 个显式业务 `40001` 改为 `PT409`，迁移后旧码为 0；整理取消、资料／历史版本清理、解析完成／取消／重试均在真实接口快速返回 409，且陈旧请求没有写入                     |
+| 本地回归与构建     | 全量 243 个测试文件／4,172 项通过；包含从零重放全部 27 份迁移的 PGlite 测试。TypeScript、格式检查、本地及 Vercel 构建通过；ESLint 0 错误，保留已有 `_result` 警告                     |
 
-本机证据文件：`work/staging-release/final-smoke-results.json`、`concurrency-results.json`、`endpoint-results.json`。它们是本轮现场记录，不是可替代后续验收的永久保证。当前保留 A/B 两个 QA 账号和 A 的两份自编资料，供继续验证；没有导入用户真实旧资料。临时错误探针函数已移除。
+本机证据文件：`work/staging-release/final-smoke-results.json`、`concurrency-results.json`、`endpoint-results.json`、`conflict-smoke.mjs`。它们位于 Git 忽略目录，是本轮现场记录，不是可替代后续验收的永久保证。当前保留 A/B 两个 QA 账号和一个专用的可丢弃冲突／生命周期账号，供继续验证；没有导入用户真实旧资料。临时错误探针函数已移除。
 
 ## 本次发现并修复
 
 1. **真实 Storage 预检拒绝上传。** 平台上传权限预检传入 `metadata.contentLength`，原 policy 只读 `size`。第 25 份 [迁移](../supabase/migrations/20260920000100_storage_upload_preflight.sql) 兼容该字段，同时维持 owner、精确路径、活预留与字节数相等检查。有 `size` 时必须严格检查，不能用备用字段绕过。浏览器改为上传原始 ArrayBuffer；完成 RPC 继续核对实际对象大小。
 2. **工作区冲突超时。** staging 上单独抛出 `40001` 的无业务写入探针也超时；分别调用 `PT409`、`22023` 和成功路径迅速返回。第 26 份 [迁移](../supabase/migrations/20260920000200_workspace_conflict_response.sql) 在 `save_workspace` 边界将 serialization failure 转成 `PT409`，保留完整事务回滚、CAS、锁和依赖防复活保护；Web 同时兼容新旧错误码。云端内部为何挂起尚未证实，不能断言某层自动重试是根因。
-3. **Cron 配置位置。** Vercel Root Directory 为 `apps/web`，配置已移到 [apps/web/vercel.json](../apps/web/vercel.json)，这次实际注册了三个清理任务。
+3. **其余业务冲突超时。** 第 27 份 [迁移](../supabase/migrations/20260920000300_business_conflict_response.sql) 审计并改写 `public` 与 `conuo_private` 中 49 个显式业务 `40001`；迁移后旧码为 0，函数 OID、签名及授权保持不变，真正的 PostgreSQL serialization failure 语义不受影响。真实 staging 使用陈旧 revision 验证整理取消、资料彻底删除、历史版本清理、解析完成、解析取消和解析重试，分别在 250—294ms 量级返回对应 409；请求前后 revision 与内容核对证明没有误写。
+4. **Cron 配置位置。** Vercel Root Directory 为 `apps/web`，配置已移到 [apps/web/vercel.json](../apps/web/vercel.json)，这次实际注册了三个清理任务。
 
-其他解析、整理、删除 RPC 仍有 `40001` 业务围栏。本轮只修复并实测工作区保存边界；这些端点的冲突路径可能受同一平台现象影响，必须在升级生产前逐项复现、修复和验收，不能声称全部异常链路已通过。
+仓库与 staging 的显式业务冲突已统一为 `PT409`；Web 在滚动迁移期间仍兼容旧 `40001`。本轮真实接口覆盖上述六条用户可见主路径，数据库完整迁移链另保证 49 个旧业务码全部归零。真双设备中的解析租约竞争、网络中断和迟到结果仍属于下一轮行为验收，不能由陈旧 revision 探针替代。
 
 ## 下一轮验收与生产门槛
 
 - 使用两台真实设备测试同步、离线恢复、并发编辑、解析租约与迟到结果；当前两个 API 会话不等同于真双设备。
-- 逐项验证非工作区 RPC 的过期版本／租约冲突返回，特别是解析完成、取消／重试、整理取消和彻底删除。
 - 覆盖额度耗尽、重复请求、缓存过期、任务超时恢复，以及有数据的清理／账号注销；仅使用明确可丢弃的 QA 数据。
 - 验证注册邮件、PKCE 回调及找回密码。若要开启语义检索，另配 Embedding 并部署索引处理器。
 - 本轮代码已提交并推送 `main`；生产发布仍是独立阶段，必须以已验收提交为来源，不能直接复用旧部署快照。
