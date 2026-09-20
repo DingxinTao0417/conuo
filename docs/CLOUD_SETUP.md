@@ -4,7 +4,7 @@
 
 ## 当前环境（2026-09-20）
 
-2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、主要业务冲突接口、孤立上传清理及带数据删除／注销主链路已通过；真双设备、断网、自然 Cron 与邮件链路仍待验收。staging 现从 GitHub `staging` 分支自动部署，原生产 Vercel 保持 `main` 且已关闭 Preview 自动部署；原生产数据库未升级，发布前仍需处理代码与 schema 漂移。本轮修复已提交并推送 `staging`，Git 自动部署已用 SHA `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` 验证；当前可变域名的实际分支和完整 SHA 以无缓存的 `/api/health` 返回为准，该探针首次上线验证为 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。本机开发配置现已指向 staging，原生产配置备份在被 Git 忽略的 `work/staging-release/.env.production-before-staging.local`。
+2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、主要业务冲突接口、孤立上传清理、带数据删除／注销主链路、真实注册确认邮件及同浏览器 PKCE 已通过；真双设备、断网、自然 Cron、真实找回密码邮件、跨浏览器邮件、过期 token 与刷新会话仍待验收。staging 现从 GitHub `staging` 分支自动部署，原生产 Vercel 保持 `main` 且已关闭 Preview 自动部署；原生产数据库未升级，发布前仍需处理代码与 schema 漂移。本轮修复已提交并推送 `staging`，Git 自动部署已用完整验收基线 SHA `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` 验证；当前可变域名的实际分支和完整 SHA 以无缓存的 `/api/health` 返回为准。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。本机开发配置现已指向 staging，原生产配置备份在被 Git 忽略的 `work/staging-release/.env.production-before-staging.local`。
 
 ## 本地配置
 
@@ -142,6 +142,8 @@ Next.js 与受信 Python 处理器配置相同的 `CONUO_PROCESSOR_SECRET`，供
 
 `/auth/confirm` 只接受列出的验证类型，不接受任意跳转地址。实际邮件发送仍受所用项目的邮件服务与限额约束；需要在真实项目验证发送、过期、重复使用和恢复流程。
 
+staging 已使用受控真实邮箱通过注册确认和同浏览器 PKCE：`/signup` 返回 200，邮件 `/verify` 返回 303，随后 PKCE `/token` 返回 200。真实找回密码邮件、过期链接、跨浏览器点击和刷新会话仍待验收。当前 Email provider 已启用，但未配置自定义 SMTP；默认确认模板使用 `{{ .ConfirmationURL }}`，Supabase 控制台要求先启用自定义 SMTP 才能编辑模板。因此上方 token-hash 模板目前只是目标配置，尚未在 staging 生效。
+
 ## 数据保护与版本
 
 | 对象         | 当前实现                                                                                                                                                                                 |
@@ -180,7 +182,7 @@ Next.js 与受信 Python 处理器配置相同的 `CONUO_PROCESSOR_SECRET`，供
 
 用户明确接受原件不完整的备份时，对应当前或历史版本保留 `originalMissing: true`，去除不可用的 `blobKey` 和 `storagePath`，从而允许已有正文与其他完整资料正常同步；阅读和再次导出继续显示该版原件缺失。这与仍持有原件句柄但读取、校验或上传失败不同，后者仍会阻止同步并报错。补回原文件采用新版本，不给旧历史版填入当前版字节。
 
-目前 API 检查快照结构、账号路径和版本，并未逐份向 Storage 核验对象实际属性；资料彻底删除与账号注销已有独立 outbox 和受保护执行入口，但真实 Storage/Auth 删除、Cron、崩溃恢复和跨账号隔离仍需在部署环境联调。文件发布完整性、文件和通用 API 的持久按用户限流仍需后续实现和联调。新增模型账本的次数预占不代表其他接口已经具备持久限流，也不能据此宣布正式上线验收完成。
+目前 API 检查快照结构、账号路径和版本，并未逐份向 Storage 核验对象实际属性。staging 已完成跨账号 Storage 隔离，以及上传中断、历史版本、资料和账号注销的带数据 Storage/Auth 删除主链路；自然 Cron、清理器崩溃／租约恢复、跨设备竞争和生产环境仍待联调。文件发布完整性、文件和通用 API 的持久按用户限流仍需后续实现和联调。新增模型账本的次数预占不代表其他接口已经具备持久限流，也不能据此宣布正式上线验收完成。
 
 浏览器文件导入及替换上限为单文件 **30 MiB**；底层 Storage 上传校验与桶配置的 50 MiB 上限不扩大应用入口的限制。每份资料最多保留 **200 个历史版本**，另有当前版；达到上限拒绝新增，不自动裁剪。工作区 JSONB 的当前与历史文字、切块、笔记及整理任务／结果合计上限 **3 MiB**，原件字节单独存储（数据库按 JSONB 文本大小计算，可能略大于紧凑 JSON）。这是首个可运行增量的限制，不是最终产品容量。超限会明确拒绝保存，保留当前页面修改供重试或导出；不会显示已保存。
 
@@ -198,7 +200,7 @@ Next.js 与受信 Python 处理器配置相同的 `CONUO_PROCESSOR_SECRET`，供
 
 `supabase/tests/workspace_isolation.sql` 可在独立本地 Supabase 数据库中运行，验证两个测试账号之间的读取隔离、直接写入禁用、创建与陈旧 revision 拒绝；执行后事务整体回滚。不要在正式账号数据库中跑测试夹具。没有数据库凭据时，本仓库不声称这些 SQL 测试已通过。
 
-连接的 Supabase 项目已实际完成全部 19 份迁移；第 11 份的 `notes`、`note_versions` RLS、两条读取 policy、`project_workspace_notes` trigger 与当时 0 个 Security Advisor error 已核验。第 12 份 `20260913233000_import_parse_leases.sql` 也已核验私有租约表 RLS、认领/完成 RPC 和 `save_workspace` 的令牌保护。第 13—16 份新增的五张表、五条只读 policy、认证角色只读权限和四个工作区触发器均已在线核验；该次核验时远端没有工作区记录，快照期望数与投影实际行数均为 `0/0`。第 17 份已核对 `source_purges` 的 `purge_scope`、`version_id`、两个 public RPC 及权限边界。第 18—19 份以真实账号完成了函数修复、迁移记录、首次空资料库笔记保存及刷新重载核验。没有以真实资料运行清理事务。这些均是 schema 与安全边界核验，不替代应用流程验收。其 PGlite 本地 SQL 测试覆盖认领、心跳、令牌围栏完成、取消、重试及迟到结果拒绝，但真实跨设备竞态尚未验证。仍需验证：两个账号的文件读取/上传/删除拒绝、并发保存只有一方成功、刷新 token、注册邮件、找回密码、跨设备读取、网络中断、单份文件超限、快照超限，以及资料删除后的引用失效、账号注销的 Storage/Auth 顺序、迟到上传重开队列、失败重试和最终 Auth 删除。
+原生产 Supabase 最后一次只读核验为 19 份迁移；第 11—19 份的 RLS、权限、投影触发器和基础真实账号读写证据属于该环境的历史基线。独立 staging 已从零应用全部 27 份迁移，并完成两个账号的文件隔离、并发 CAS、真实注册确认邮件、孤立上传、资料／历史版本清理及账号注销的 Storage/Auth 主链路。仍需验证刷新会话、真实找回密码邮件、过期与跨浏览器链接、真双设备、网络中断、自然 Cron、清理失败恢复、单份文件超限及快照超限。生产发布前必须重新实时核对原生产迁移历史，不能用 staging 结果替代。
 
 第 13 份 `20260914000100_normalized_conversations_projection.sql` 已在本地 PGlite 中随完整迁移链执行，覆盖消息顺序与证据、RLS 账号隔离、禁止浏览器直接写入、账号注销隐藏、工作区级联删除、revision CAS 更新/裁剪，以及重复回答尝试导致整次工作区保存原子回滚。它也已应用到连接项目，并完成表、RLS、权限、policy 与触发器核验。
 

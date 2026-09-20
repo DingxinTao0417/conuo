@@ -68,7 +68,7 @@ NEXT_PUBLIC_CONUO_LOCAL_ORGANIZATION_RUNNER_ENABLED=true
 3. 配置受信任的调度器定期调用 `/api/internal/organization-processor`；该入口每次只处理有界批次，不会自行常驻或无限循环。
 4. 在确认前三项均已部署后，于构建环境设置 `NEXT_PUBLIC_CONUO_ORGANIZATION_PROCESSOR_ENABLED=true` 并重新构建 Web。这是浏览器可见的发布声明，不能填入任何密钥，也不替代处理器健康检查。
 
-2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理和整理取消冲突响应已通过；真双设备、完整删除生命周期与邮件链路仍待验收。原生产环境未升级；代码已提交并推送，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)。staging 上述四项条件均已满足，真实任务由调度领取并发布成功。Cron 也不提供精确一次保证；重复、超时或漏调由数据库任务状态、租约、暂存结果和后续领取处理。
+2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理和整理取消冲突响应已通过；上传中断、历史版本、资料及账号注销的带数据删除主链路也已完成。真双设备、自然 Cron、清理失败恢复和剩余邮件场景仍待验收。原生产环境未升级；代码已提交并推送，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)。staging 上述四项条件均已满足，真实任务由调度领取并发布成功。Cron 也不提供精确一次保证；重复、超时或漏调由数据库任务状态、租约、暂存结果和后续领取处理。
 
 ## 审核与人工修改保护
 

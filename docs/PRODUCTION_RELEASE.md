@@ -103,7 +103,8 @@ staging Supabase 当前为 Free 方案，不包含计划数据库备份；控制
 - [x] Git 自动部署和精确 SHA 探针已通过；完整验收基线部署 `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq` 对应 SHA `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a`，`/api/health` 首次上线验证对应 SHA `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。
 - [ ] 真实双设备完成同时编辑、断网、响应丢失、旧页面恢复联网、删除防复活、阅读位置和笔记冲突。
 - [x] Admin 生成的一次性 signup/recovery token 已通过真实确认、重置、密码更新、重复使用和无效 token 路由；测试账号已删除。
-- [ ] 真实注册／找回邮件投递、PKCE 邮件点击、真正过期 token 及刷新登录状态通过。
+- [x] 受控邮箱的真实注册确认邮件及同浏览器 PKCE 回调已通过。
+- [ ] 真实找回密码邮件、跨浏览器邮件点击、真正过期 token 及刷新登录状态通过；跨浏览器 token-hash 模板还受未配置自定义 SMTP 限制。
 - [ ] 三条 Vercel Cron 至少各观察一次自然触发，并完成清理器崩溃、租约到期和可重试 Storage 故障。
 - [ ] staging 备份在新隔离项目恢复成功，并从零跑完 27 份迁移。
 - [ ] 其余 staging 闸门关闭后，重新冻结最终候选 Git SHA、Vercel Deployment ID、不可变部署地址和数据库迁移上界。
