@@ -71,7 +71,7 @@ Vercel 以 `CRON_SECRET` 发送 Bearer；本环境 `CONUO_CLEANUP_SECRET` 与其
 
 1. **真实 Storage 预检拒绝上传。** 平台上传权限预检传入 `metadata.contentLength`，原 policy 只读 `size`。第 25 份 [迁移](../supabase/migrations/20260920000100_storage_upload_preflight.sql) 兼容该字段，同时维持 owner、精确路径、活预留与字节数相等检查。有 `size` 时必须严格检查，不能用备用字段绕过。浏览器改为上传原始 ArrayBuffer；完成 RPC 继续核对实际对象大小。
 2. **工作区冲突超时。** staging 上单独抛出 `40001` 的无业务写入探针也超时；分别调用 `PT409`、`22023` 和成功路径迅速返回。第 26 份 [迁移](../supabase/migrations/20260920000200_workspace_conflict_response.sql) 在 `save_workspace` 边界将 serialization failure 转成 `PT409`，保留完整事务回滚、CAS、锁和依赖防复活保护；Web 同时兼容新旧错误码。云端内部为何挂起尚未证实，不能断言某层自动重试是根因。
-3. **其余业务冲突超时。** 第 27 份 [迁移](../supabase/migrations/20260920000300_business_conflict_response.sql) 审计并改写 `public` 与 `conuo_private` 中 49 个显式业务 `40001`；迁移后旧码为 0，函数 OID、签名及授权保持不变，真正的 PostgreSQL serialization failure 语义不受影响。真实 staging 使用陈旧 revision 验证整理取消、资料彻底删除、历史版本清理、解析完成、解析取消和解析重试，分别在 250—294ms 量级返回对应 409；请求前后 revision 与内容核对证明没有误写。
+3. **其余业务冲突超时。** 第 27 份 [迁移](../supabase/migrations/20260920000300_business_conflict_response.sql) 审计并改写 `public` 与 `conuo_private` 中 49 个显式业务 `40001`；迁移后旧码为 0，函数 OID、签名及授权保持不变，真正的 PostgreSQL serialization failure 语义不受影响。真实 staging 使用陈旧 revision 验证整理取消、资料彻底删除、历史版本清理、解析完成、解析取消和解析重试，均在 10 秒界限内快速返回对应 409；最新部署复验的三条解析路径耗时 274—303ms。请求前后 revision 与内容核对证明没有误写。
 4. **Cron 配置位置。** Vercel Root Directory 为 `apps/web`，配置已移到 [apps/web/vercel.json](../apps/web/vercel.json)，这次实际注册了三个清理任务。
 
 仓库与 staging 的显式业务冲突已统一为 `PT409`；Web 在滚动迁移期间仍兼容旧 `40001`。本轮真实接口覆盖上述六条用户可见主路径，数据库完整迁移链另保证 49 个旧业务码全部归零。真双设备中的解析租约竞争、网络中断和迟到结果仍属于下一轮行为验收，不能由陈旧 revision 探针替代。

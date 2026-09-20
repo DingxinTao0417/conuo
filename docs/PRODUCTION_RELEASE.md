@@ -12,8 +12,8 @@
 | ------------- | ------------------------------------------ | -------------------------------------------------- |
 | Vercel 项目   | `conuo-staging`                            | `conuo`                                            |
 | Git 来源      | `DingxinTao0417/conuo` / `staging`         | `DingxinTao0417/conuo` / `main`                    |
-| 当前生产部署  | `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq`         | `dpl_3e4rufiRocoy1E4UvRuDe3fNpZ56`                 |
-| 当前 Git 提交 | `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` | `0c2474e1e36cfe4b3715629dd9fd5e62daeb66f2`         |
+| 最近 staging 部署 | `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq`         | —                                                   |
+| 对应 Git 提交    | `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a` | `0c2474e1e36cfe4b3715629dd9fd5e62daeb66f2`         |
 | 数据库迁移    | 27 份，已核验                              | 最后一次只读核验为 19 份；发布前须重新实时核对     |
 | Vercel 变量   | 16 个，仅 Production                       | 19 个，Production 与 Preview（Preview 自动部署已关闭） |
 | 清理 Cron     | 三条已注册，手动触发 200                   | 三条也已随同一 `vercel.json` 注册                  |
