@@ -2,7 +2,7 @@
 
 更新日期：2026-09-20。范围：Web 开发增量及独立 staging 部署。
 
-本项目已有可运行的 Web 工作台，支持导入、阅读与版本历史、笔记与知识审核、普通搜索、原始资料问答、PDF 区域截图学习及个人 ZIP 备份恢复。当前已使用自编 QA 资料完成真实 DeepSeek 问答、回答另存笔记、截图解读／提问／出题、资料分析、跨资料主题生成与人工接受，并确认相关笔记和知识正文的云端保存及刷新恢复；知识页也已基于固定原始依据收到流式问答成功终态，知识页正文本身不充当证据。2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级资料整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、六条主要业务冲突接口，以及孤立上传、带数据历史版本、资料、Storage 和账号 Auth 删除主链路均已通过；一次性 signup/recovery token 的确认与密码更新、真实等待后的过期 signup token、受控邮箱的真实注册确认邮件及同浏览器 PKCE、Chrome／Edge 跨一小时持久会话自动刷新也已通过。真双设备、自然 Cron、真实找回密码邮件和跨浏览器邮件点击仍待验收。原生产数据库未升级，生产网页代码与 schema 仍可能不一致。本轮已提交并推送 `staging`；可变域名的当前版本由 `/api/health` 返回 Vercel 环境、Git 分支和完整 SHA，首次探针验证为 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。 **完整 M0 仍未验收。**
+本项目已有可运行的 Web 工作台，支持导入、阅读与版本历史、笔记与知识审核、普通搜索、原始资料问答、PDF 区域截图学习及个人 ZIP 备份恢复。当前已使用自编 QA 资料完成真实 DeepSeek 问答、回答另存笔记、截图解读／提问／出题、资料分析、跨资料主题生成与人工接受，并确认相关笔记和知识正文的云端保存及刷新恢复；知识页也已基于固定原始依据收到流式问答成功终态，知识页正文本身不充当证据。2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级资料整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、六条主要业务冲突接口，以及孤立上传、带数据历史版本、资料、Storage 和账号 Auth 删除主链路均已通过；一次性 signup/recovery token 的确认与密码更新、真实等待后的过期 signup token、受控邮箱的真实注册确认邮件及同浏览器 PKCE、Chrome／Edge 跨一小时持久会话自动刷新也已通过。真实找回请求已获 Auth 200 且服务端发送时间随后更新，但实际收件与跨浏览器点击尚未通过；真双设备和自然 Cron 也仍待验收。原生产数据库未升级，生产网页代码与 schema 仍可能不一致。本轮已提交并推送 `staging`；可变域名的当前版本由 `/api/health` 返回 Vercel 环境、Git 分支和完整 SHA，首次探针验证为 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。 **完整 M0 仍未验收。**
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
 
@@ -15,10 +15,11 @@
 - 修复前工作区旧 revision 请求挂起；修复后工作区及整理取消、资料／历史版本清理、解析完成／取消／重试均快速返回 409，陈旧请求没有写入。`40001` 的平台内部原因仍未证实。
 - 专用可丢弃账号通过正式解析租约完成带数据删除生命周期：历史版本和资料清理均完成且 Storage 原件物理消失；资料删除按预览清理所选笔记版本、对话和消息，旧快照不能复活；账号注销后访问被封锁，Storage 与 Auth 删除均完成。该账号已删除，只保留 A/B QA 账号。
 - 另一可丢弃账号分别留下已上传的 `reserved` 和 `uploaded` 原件，不写入工作区。两条预留按正式 15 分钟期限自然过期后，上传 cleanup 一次领取并完成 2 个对象，Storage 均物理消失，无重试或失败；专用 Auth 账号已删除。
-- Supabase 控制台确认 staging Free 方案不含计划备份，恢复到新项目要求 Pro 和物理备份；数据库恢复演练仍须采用经验证的逻辑导出，或单独授权升级后再做物理恢复，不能把当前环境写成已有平台灾备。
-- 新增受项目 ref 硬保护的数据库与 Storage 灾备脚本及独立演练手册。真实 staging Storage 已备份 1 个桶、6 个对象、834 字节，本机逐对象长度与 SHA-256 复核通过；数据库逻辑导出仍缺 Docker／Podman、`psql`、数据库密码和隔离恢复项目，尚未执行或恢复。
+- Supabase 控制台确认 staging Free 方案不含计划备份，恢复到新项目要求 Pro 和物理备份；用户已明确不在本机安装 PostgreSQL，数据库恢复演练只采用单独授权升级后的 Supabase 托管物理备份恢复，不能把当前环境写成已有平台灾备。
+- 新增受项目 ref 硬保护的 Storage 灾备脚本及独立演练手册。真实 staging Storage 已备份 1 个桶、6 个对象、834 字节，本机逐对象长度与 SHA-256 复核通过。用户已明确不在本机安装 PostgreSQL；数据库恢复只走 Supabase 托管物理备份恢复到新隔离项目的路径，当前 Free 方案不具备该能力，升级 Pro、等待可用备份和创建恢复项目仍需单独授权。
 - Chrome 与 Edge 分别保留独立真实会话超过一小时并关闭浏览器；重启后两份播种 Cookie 指纹均一致，随后自动轮换、推进到期时间，工作区请求均返回 200。专用账号和两个持久 Profile 已删除，结果文件不含 Cookie、token、账号或密码。
 - 专用 signup token 在真实等待超过配置有效期后访问 `/auth/confirm`，于 `2026-09-20T16:50:44Z` 进入 `/auth/error`，没有建立会话；专用可丢弃账号随后删除。结果文件不含 token、账号或密码。
+- 受控账号的真实找回密码请求于 `2026-09-20T17:08:51Z` 被 staging Auth 接受，服务端 `recovery_sent_at` 于下一秒更新；尚未取得邮箱实际收件与跨浏览器点击证据，因此邮件链路保持未完成。
 - 同一主机上的独立 Chrome／Edge 进程已完成真实页面的同时保存、断网重连、提交后响应丢失、旧页面删除防复活、笔记冲突手工合并及阅读位置选择／回切；权威云端终态、笔记历史和落选阅读位置均核对通过。它们仍不能替代两台物理设备、解析租约和迟到解析结果验收。
 - 全量 243 个测试文件／4,172 项、TypeScript、格式、本地及 Vercel 构建通过；ESLint 0 错误、1 条既有警告。
 - 本地开发配置已备份并切至 staging，3000 无运行服务；测试账号、资料及调度保留。**已部署 staging／已提交推送／未升级生产。** 环境、发布 ID、证据与剩余矩阵见 [部署记录](STAGING_DEPLOYMENT.md)。下方各阶段“未部署”等表述保留为当时的历史记录。
