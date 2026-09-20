@@ -57,6 +57,8 @@ Vercel 以 `CRON_SECRET` 发送 Bearer；本环境 `CONUO_CLEANUP_SECRET` 与其
 | Storage 与账号隔离 | A 上传／下载原件 SHA-256 一致；B 下载 A 路径失败、查询 A 工作区返回 0 行，B 仍无工作区                                                                                                                                                                                                                                                                                              |
 | 浏览器导入         | 文件选择器上传 348 字节自编 TXT，完成预留、ArrayBuffer 直传、保存和解析；刷新后仍有正文和 2 个内容块，下载哈希一致                                                                                                                                                                                                                                                                  |
 | 并发 CAS           | 同 revision 的两个会话保存分别返回 200（300ms）和 409（608ms）；旧 revision 重试 270ms 返回 409；只有成功请求推进 revision                                                                                                                                                                                                                                                          |
+| 双浏览器同步       | 同一主机的独立 Chrome／Edge 进程从相同 revision 同时保存，准确得到一次 200 和一次 409；断网编辑在页面保留，重连后保存并刷新恢复；服务端已提交但响应被截断时，通过权威回读确认成功且没有重复提交                                                                                                                                                                                     |
+| 冲突与防复活       | 独立 Chrome／Edge 已完成资料离线改名与另一端软删除竞态，删除状态胜出且旧端不能把资料恢复为有效内容；笔记同时编辑进入专用冲突对照，手工合并后正文包含双方修改，两个落选版本均保留在历史                                                                                                                                                                                              |
 | 后台 AI 整理       | 任务 `50379a58-46a5-4625-8fca-9cad66a01ce7` 于 09:15:46 UTC 入队，由分钟调度自动处理，09:16:02.711 UTC 成为 `ready`，`mode=model`，1 条摘要引用、7 个标签、4 个主题；账本 `completed`                                                                                                                                                                                               |
 | 内部入口鉴权       | processor 与三个 cleanup 无密钥 401、正确密钥 200；三个 cleanup 另有 Vercel 控制台 Run 的真实 200 日志                                                                                                                                                                                                                                                                              |
 | 业务冲突响应       | 第 27 份迁移将 49 个显式业务 `40001` 改为 `PT409`，迁移后旧码为 0；整理取消、资料／历史版本清理、解析完成／取消／重试均在真实接口快速返回 409，且陈旧请求没有写入                                                                                                                                                                                                                   |
@@ -69,7 +71,7 @@ Vercel 以 `CRON_SECRET` 发送 Bearer；本环境 `CONUO_CLEANUP_SECRET` 与其
 | 发布版本探针       | 当前域名的 `/api/health` 无缓存返回 Vercel 运行时环境、Git 分支和完整 SHA；首次上线验证返回 `production`、`staging`、`d64ee3f76bdb24cdfcfed76cbd958a615183feb5`                                                                                                                                                                                                                     |
 | 其余业务冲突       | 在上述部署重新实测解析完成／取消／重试陈旧请求，分别返回 409，耗时 303／297／274ms；最终资料为 `saved`、任务为 `cancelled`，没有迟到写入                                                                                                                                                                                                                                            |
 
-本机证据文件：`work/staging-release/final-smoke-results.json`、`concurrency-results.json`、`endpoint-results.json`、`conflict-smoke.mjs`、`deletion-lifecycle-results.json`、`orphan-upload-lifecycle-results.json`、`auth-email-registration-results.json`、`auth-refresh-results.json`。它们位于 Git 忽略目录，是本轮现场记录，不是可替代后续验收的永久保证；邮件与刷新证据只保留时间、浏览器代号、布尔断言和 HTTP 状态，不含邮箱、用户 ID、IP、cookie、token 或请求 ID。专用冲突／生命周期、孤立上传和会话刷新账号均已完成验证并删除；当前只保留 A/B 两个 QA 账号及受控邮件验收账号。没有导入用户真实旧资料，临时错误探针函数已移除。
+本机证据文件：`work/staging-release/final-smoke-results.json`、`concurrency-results.json`、`endpoint-results.json`、`conflict-smoke.mjs`、`deletion-lifecycle-results.json`、`orphan-upload-lifecycle-results.json`、`browser-offline-response-loss-results.json`、`two-browser-workspace-conflict-results.json`、`two-browser-delete-no-revival-results.json`、`two-browser-note-conflict-results.json`、`auth-email-registration-results.json`、`auth-refresh-results.json`。它们位于 Git 忽略目录，是本轮现场记录，不是可替代后续验收的永久保证；邮件与刷新证据只保留时间、浏览器代号、布尔断言和 HTTP 状态，不含邮箱、用户 ID、IP、cookie、token 或请求 ID。专用冲突／生命周期、孤立上传和会话刷新账号均已完成验证并删除；当前只保留 A/B 两个 QA 账号及受控邮件验收账号。没有导入用户真实旧资料，临时错误探针函数已移除。
 
 ## 本次发现并修复
 
@@ -82,7 +84,7 @@ Vercel 以 `CRON_SECRET` 发送 Bearer；本环境 `CONUO_CLEANUP_SECRET` 与其
 
 ## 下一轮验收与生产门槛
 
-- 使用两台真实设备测试同步、离线恢复、并发编辑、解析租约与迟到结果；当前两个 API 会话不等同于真双设备。
+- 同一主机上的独立 Chrome／Edge 已覆盖同时保存、断网重连、提交后响应丢失、旧页面删除防复活和笔记冲突合并。仍需使用两台物理设备复核这些场景，并补阅读位置冲突、解析租约、迟到解析结果及真实设备网络切换；同主机浏览器不能替代这一门槛。
 - 覆盖额度耗尽、重复请求、缓存过期、任务超时恢复及清理任务崩溃／重试；仅使用明确可丢弃的 QA 数据。
 - 继续验证真实找回密码邮件、真正过期 token 与跨浏览器邮件点击；真实注册确认邮件、同浏览器 PKCE 和 Chrome／Edge 持久会话自动刷新已通过。staging 未启用自定义 SMTP，默认确认模板仍使用 `{{ .ConfirmationURL }}`，Supabase 控制台要求先配置自定义 SMTP 才能编辑模板，因此跨浏览器 token-hash 模板当前尚未配置。若要开启语义检索，另配 Embedding 并部署索引处理器。
 - 本轮代码已提交并推送 `staging`；生产发布仍是独立阶段，必须以已验收提交为来源，不能直接复用旧部署快照。
