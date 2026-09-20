@@ -79,6 +79,8 @@ staging 已改为跟随 `staging` 分支，原生产项目继续跟随 `main`；
 
 staging Supabase 当前为 Free 方案，不包含计划数据库备份；控制台的 “Restore to a new project” 需要 Pro 和可用物理备份。本机当前也没有 `pg_dump`、`pg_restore`、`psql`、Supabase CLI 登录 token 或数据库密码。因此“已备份”与“已恢复验证”目前都不成立。
 
+仓库已增加不落密钥的数据库与 Storage 演练脚本，并按官方 CLI 流程固定角色、Schema、数据、迁移历史、对象字节及 SHA-256 校验步骤。staging 私有 Storage 的 1 个桶、6 个对象、834 字节已真实导出并通过本机逐对象长度与 SHA-256 复核；数据库备份和隔离项目恢复仍未执行，因此发布闸门保持未通过。完整命令、隔离要求与验收矩阵见 [Staging 灾备恢复演练](DISASTER_RECOVERY.md)。
+
 生产发布只能选择以下一种经过实测的方案：
 
 1. 升级到支持物理备份的方案，在新项目恢复，并核对 Auth、业务表、私有 schema、Storage 元数据、对象字节和权限。

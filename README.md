@@ -163,7 +163,7 @@ conuo/
 
 ## 文档与协作
 
-[产品需求](docs/PRD.md) · [技术方案](docs/TECH_STACK.md) · [页面设计](docs/TRAE_DESIGN_PROMPT.md) · [云端配置](docs/CLOUD_SETUP.md) · [Web 存储政策](docs/WEB_CLOUD_STORAGE.md) · [云端验收](docs/CLOUD_E2E_ACCEPTANCE.md) · [生产发布](docs/PRODUCTION_RELEASE.md) · [模型配置](docs/MODEL_SETUP.md) · [区域视觉](docs/REGION_STUDY.md) · [流式问答](docs/STREAMING_ANSWERS.md) · [搜索与索引](docs/SEARCH_INDEXING.md) · [资料整理](docs/ORGANIZATION.md) · [知识页安全撤回](docs/KNOWLEDGE_UPDATE_WITHDRAWAL.md) · [文件版本](docs/FILE_VERSIONS.md) · [彻底删除](docs/PERMANENT_DELETION.md) · [导出格式](docs/EXPORT_FORMAT.md) · [开发状态](docs/IMPLEMENTATION_STATUS.md) · [Logo](assets/conuo-logo.png)
+[产品需求](docs/PRD.md) · [技术方案](docs/TECH_STACK.md) · [页面设计](docs/TRAE_DESIGN_PROMPT.md) · [云端配置](docs/CLOUD_SETUP.md) · [Web 存储政策](docs/WEB_CLOUD_STORAGE.md) · [云端验收](docs/CLOUD_E2E_ACCEPTANCE.md) · [生产发布](docs/PRODUCTION_RELEASE.md) · [灾备演练](docs/DISASTER_RECOVERY.md) · [模型配置](docs/MODEL_SETUP.md) · [区域视觉](docs/REGION_STUDY.md) · [流式问答](docs/STREAMING_ANSWERS.md) · [搜索与索引](docs/SEARCH_INDEXING.md) · [资料整理](docs/ORGANIZATION.md) · [知识页安全撤回](docs/KNOWLEDGE_UPDATE_WITHDRAWAL.md) · [文件版本](docs/FILE_VERSIONS.md) · [彻底删除](docs/PERMANENT_DELETION.md) · [导出格式](docs/EXPORT_FORMAT.md) · [开发状态](docs/IMPLEMENTATION_STATUS.md) · [Logo](assets/conuo-logo.png)
 
 功能调整应对应需求与验收场景，保留来源、人工修改和可恢复状态。知识库页面按最新书封式布局迭代；阅读器保留原设计的正文与问答分栏。实现记录应区分代码已编写、本地已验证和真实云端已验证。
 
