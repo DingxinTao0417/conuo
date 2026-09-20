@@ -4,7 +4,7 @@
 
 ## 当前环境（2026-09-20）
 
-2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理及主要业务冲突接口已通过；真双设备、完整删除生命周期与邮件链路仍待验收。原生产环境未升级。本轮修复已提交并推送 `main`，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)。 本机开发配置现已指向 staging，原生产配置备份在被 Git 忽略的 `work/staging-release/.env.production-before-staging.local`。
+2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、主要业务冲突接口、孤立上传清理及带数据删除／注销主链路已通过；真双设备、断网、自然 Cron 与邮件链路仍待验收。原生产环境未升级。本轮修复已提交并推送 `main`，详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)。 本机开发配置现已指向 staging，原生产配置备份在被 Git 忽略的 `work/staging-release/.env.production-before-staging.local`。
 
 ## 本地配置
 
@@ -66,7 +66,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 
 该迁移会把 `originals` 的 INSERT policy 收紧为仅允许匹配未过期预留、精确路径和 Storage 元数据大小的请求。账号容量在同一账号锁内按物理 Storage 对象与未完成预留去重计算；本地实现当前沿用每份 30 MiB、每账号 512 MiB 的保守值，但这不是对外存储套餐承诺。已有原件路径会回填为已提交记录，不会因为普通资料元数据保存而被拒绝。
 
-未完成的预留不会由浏览器直接释放：超过租约后，service-role RPC 让 `GET /api/internal/original-upload-cleanup` 领取有限对象批次，删除后才标记为释放；`404` 仍是幂等成功。应用目录 [vercel.json](../apps/web/vercel.json) 已在 staging 注册每天 `03:20 UTC` 的受保护 Cron。该入口复用 `SUPABASE_SECRET_KEY`（或旧版 `SUPABASE_SERVICE_ROLE_KEY`）和至少 32 个可见 ASCII 字符的 `CONUO_CLEANUP_SECRET`（或 Vercel `CRON_SECRET`）。staging 的迁移、变量及 Cron 已部署；真实上传和跨账号隔离通过，中断上传、有数据清理及自然定时触发仍待验收。
+未完成的预留不会由浏览器直接释放：超过租约后，service-role RPC 让 `GET /api/internal/original-upload-cleanup` 领取有限对象批次，删除后才标记为释放；`404` 仍是幂等成功。应用目录 [vercel.json](../apps/web/vercel.json) 已在 staging 注册每天 `03:20 UTC` 的受保护 Cron。该入口复用 `SUPABASE_SECRET_KEY`（或旧版 `SUPABASE_SERVICE_ROLE_KEY`）和至少 32 个可见 ASCII 字符的 `CONUO_CLEANUP_SECRET`（或 Vercel `CRON_SECRET`）。staging 的迁移、变量及 Cron 已部署；真实上传和跨账号隔离通过。已分别验证上传后未确认的 `reserved` 和确认后未提交工作区的 `uploaded` 两种中断状态：自然等待 15 分钟预留期后，正式 cleanup 一次领取并完成两个对象，Storage 均物理消失。自然定时触发及清理器崩溃／重试仍待验收。
 
 ### 显式导入旧匿名资料
 
