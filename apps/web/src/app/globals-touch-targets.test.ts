@@ -60,3 +60,23 @@ describe("source row touch target styles", () => {
     expect(declarations(mobile, ".source-open")).toContain("width: calc(100% - 125px);");
   });
 });
+
+describe("phone overlay and navigation styles", () => {
+  it("keeps library filter and view panels inside the phone viewport", () => {
+    const mobile = mediaBlock("@media (max-width: 620px)", ".library-menu-popover-sheet");
+    const rules = declarations(mobile, ".library-menu-popover-sheet");
+
+    expect(rules).toContain("position: fixed;");
+    expect(rules).toContain("inset: auto 12px calc(64px + env(safe-area-inset-bottom));");
+    expect(rules).toContain("width: auto;");
+    expect(rules).toContain("overflow-y: auto;");
+  });
+
+  it("keeps settings panes on one horizontally scrollable row", () => {
+    const mobile = mediaBlock("@media (max-width: 620px)", "overscroll-behavior-x: contain;");
+    const rules = declarations(mobile, ".settings-panes");
+
+    expect(rules).toContain("flex-wrap: nowrap;");
+    expect(rules).toContain("overflow-x: auto;");
+  });
+});

@@ -144,7 +144,11 @@ export default function LibraryToolbar({
           )}
         </button>
         {openMenu === "filter" && (
-          <section className="library-menu-popover" role="dialog" aria-label="筛选资料">
+          <section
+            className="library-menu-popover library-menu-popover-sheet"
+            role="dialog"
+            aria-label="筛选资料"
+          >
             <label className="library-menu-field">
               资料类型
               <select
@@ -253,7 +257,11 @@ export default function LibraryToolbar({
           视图
         </button>
         {openMenu === "view" && (
-          <section className="library-menu-popover" role="dialog" aria-label="资料视图设置">
+          <section
+            className="library-menu-popover library-menu-popover-sheet"
+            role="dialog"
+            aria-label="资料视图设置"
+          >
             <label className="library-menu-field">
               排序
               <select

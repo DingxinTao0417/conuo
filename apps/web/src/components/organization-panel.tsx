@@ -836,14 +836,14 @@ export default function OrganizationPanel(props: OrganizationPanelProps) {
               >
                 {selectedIds.length > 1 ? `分析所选资料（${selectedIds.length}）` : "分析这份资料"}
               </button>
-              <span>
-                {durableProcessorEnabled
-                  ? "单份分析生成摘要和归类建议；主题草稿可综合多份资料。"
-                  : localDevelopmentRunnerEnabled
-                    ? "本地开发页面运行：仅在当前页面内手动执行，离开页面会停止；不会自动排队。"
-                    : "后台整理等待部署后启用；当前不会创建新的资料分析或主题草稿任务。"}
-              </span>
             </div>
+            <p className="organization-generate-help">
+              {durableProcessorEnabled
+                ? "单份分析生成摘要和归类建议；主题草稿可综合多份资料。"
+                : localDevelopmentRunnerEnabled
+                  ? "本地开发页面运行：仅在当前页面内手动执行，离开页面会停止；不会自动排队。"
+                  : "后台整理等待部署后启用；当前不会创建新的资料分析或主题草稿任务。"}
+            </p>
             {sourceBatchResult && (
               <section
                 className={`organization-batch-result${sourceBatchResult.failed.length ? " organization-batch-result-partial" : ""}`}

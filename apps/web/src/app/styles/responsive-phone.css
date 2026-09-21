@@ -186,6 +186,16 @@
     min-height: 33px;
     padding-inline: 10px;
   }
+  .library-menu-popover-sheet {
+    position: fixed;
+    inset: auto 12px calc(64px + env(safe-area-inset-bottom));
+    width: auto;
+    max-height: min(70dvh, 560px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 14px;
+    box-shadow: 0 20px 50px #241d4d2e;
+  }
   .source-list {
     border-left: 0;
     border-right: 0;
@@ -378,6 +388,22 @@
   }
   .settings-card {
     padding: 18px;
+  }
+  .settings-panes {
+    flex-wrap: nowrap;
+    max-width: none;
+    margin-inline: -20px;
+    padding-inline: 20px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .settings-panes::-webkit-scrollbar {
+    display: none;
+  }
+  .settings-panes button {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
   .setting-row {
     gap: 15px;

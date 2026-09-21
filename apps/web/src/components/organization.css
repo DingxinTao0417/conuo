@@ -348,9 +348,8 @@
   flex-wrap: wrap;
   gap: 9px;
 }
-.organization-generate-actions > span {
-  flex-basis: 100%;
-  margin-top: 1px;
+.organization-generate-help {
+  margin-top: 10px;
   color: #8b8793;
   font-size: 11px;
   line-height: 1.7;
@@ -1052,7 +1051,16 @@
     font-size: 11px;
   }
   .organization-generate-actions {
+    position: sticky;
+    bottom: calc(60px + env(safe-area-inset-bottom));
+    z-index: 8;
     gap: 8px;
+    margin: 0 -8px -8px;
+    padding: 10px 8px 8px;
+    border-top: 1px solid #efedf3;
+    background: #fffffff2;
+    box-shadow: 0 -10px 24px #3329560d;
+    backdrop-filter: blur(10px);
   }
   .organization-generate-actions > .btn {
     flex: 1;

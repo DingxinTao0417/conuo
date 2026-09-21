@@ -1,5 +1,6 @@
 "use client";
-import { FileText, ShieldCheck } from "lucide-react";
+import { useMemo, useState } from "react";
+import { FileText, Search, ShieldCheck, X } from "lucide-react";
 import type { Chunk, Citation, Source } from "@/lib/types";
 import {
   sourceCaptureScopeNotice,
@@ -14,6 +15,8 @@ type RecognizedContentState = {
   title: string;
   description: string;
 };
+
+const RECOGNIZED_CONTENT_PAGE_SIZE = 30;
 
 /**
  * Keeps source processing language consistent with the actual retrieval
@@ -88,17 +91,45 @@ export default function RecognizedContentPanel({
   source: Source;
   onOpenSource: (citation?: Citation) => void;
 }) {
+  const sourceKey = `${source.id}:${source.versionId}`;
+  const [view, setView] = useState({
+    sourceKey,
+    query: "",
+    visibleCount: RECOGNIZED_CONTENT_PAGE_SIZE,
+  });
+  const query = view.sourceKey === sourceKey ? view.query : "";
+  const visibleCount =
+    view.sourceKey === sourceKey ? view.visibleCount : RECOGNIZED_CONTENT_PAGE_SIZE;
   const state = recognizedContentState(source);
   const presentationStatus = sourcePresentationStatus(source);
   const supportsKeywordSearch = presentationStatus === "ready" || presentationStatus === "partial";
-  const chunks = source.chunks
-    .filter(
-      (chunk) =>
-        chunk.sourceId === source.id &&
-        chunk.versionId === source.versionId &&
-        Boolean(chunk.text.trim()),
-    )
-    .sort((left, right) => left.order - right.order);
+  const chunks = useMemo(
+    () =>
+      source.chunks
+        .filter(
+          (chunk) =>
+            chunk.sourceId === source.id &&
+            chunk.versionId === source.versionId &&
+            Boolean(chunk.text.trim()),
+        )
+        .sort((left, right) => left.order - right.order),
+    [source.chunks, source.id, source.versionId],
+  );
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const matchedChunks = useMemo(
+    () =>
+      chunks.flatMap((chunk, index) => {
+        const location = recognizedChunkLocation(chunk, index);
+        if (
+          normalizedQuery &&
+          !`${location} ${chunk.text}`.toLocaleLowerCase().includes(normalizedQuery)
+        )
+          return [];
+        return [{ chunk, location }];
+      }),
+    [chunks, normalizedQuery],
+  );
+  const visibleChunks = matchedChunks.slice(0, visibleCount);
   const notices = [sourceCaptureScopeNotice(source), sourceParserCoverageNotice(source)].filter(
     Boolean,
   );
@@ -140,7 +171,9 @@ export default function RecognizedContentPanel({
             <h3 id="recognized-content-title">已识别内容</h3>
             <p>
               {chunks.length
-                ? `当前显示 ${chunks.length} 段可定位的原文。`
+                ? normalizedQuery
+                  ? `找到 ${matchedChunks.length} 段，当前显示 ${visibleChunks.length} 段。`
+                  : `共 ${chunks.length} 段，当前显示 ${visibleChunks.length} 段。`
                 : "当前没有可定位的已识别原文。"}
             </p>
           </div>
@@ -151,11 +184,42 @@ export default function RecognizedContentPanel({
           )}
         </header>
 
-        {chunks.length ? (
-          <ol>
-            {chunks.map((chunk, index) => {
-              const location = recognizedChunkLocation(chunk, index);
-              return (
+        {chunks.length > RECOGNIZED_CONTENT_PAGE_SIZE || normalizedQuery ? (
+          <div className="recognized-content-tools">
+            <label className="recognized-content-search">
+              <Search size={14} aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                aria-label="搜索已识别内容"
+                placeholder="搜索页码、章节或正文"
+                onChange={(event) => {
+                  setView({
+                    sourceKey,
+                    query: event.target.value,
+                    visibleCount: RECOGNIZED_CONTENT_PAGE_SIZE,
+                  });
+                }}
+              />
+              {query && (
+                <button
+                  type="button"
+                  aria-label="清除已识别内容搜索"
+                  onClick={() =>
+                    setView({ sourceKey, query: "", visibleCount: RECOGNIZED_CONTENT_PAGE_SIZE })
+                  }
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              )}
+            </label>
+          </div>
+        ) : null}
+
+        {visibleChunks.length ? (
+          <>
+            <ol>
+              {visibleChunks.map(({ chunk, location }) => (
                 <li key={chunk.id}>
                   <button
                     type="button"
@@ -177,13 +241,38 @@ export default function RecognizedContentPanel({
                     <small>打开原文</small>
                   </button>
                 </li>
-              );
-            })}
-          </ol>
+              ))}
+            </ol>
+            {visibleChunks.length < matchedChunks.length && (
+              <button
+                type="button"
+                className="recognized-content-more"
+                onClick={() =>
+                  setView((current) => ({
+                    sourceKey,
+                    query,
+                    visibleCount:
+                      (current.sourceKey === sourceKey
+                        ? current.visibleCount
+                        : RECOGNIZED_CONTENT_PAGE_SIZE) + RECOGNIZED_CONTENT_PAGE_SIZE,
+                  }))
+                }
+              >
+                继续显示{" "}
+                {Math.min(RECOGNIZED_CONTENT_PAGE_SIZE, matchedChunks.length - visibleCount)} 段
+              </button>
+            )}
+          </>
         ) : (
           <div className="recognized-content-empty">
-            <FileText size={18} aria-hidden="true" />
-            <p>{state.description}</p>
+            {normalizedQuery ? (
+              <Search size={18} aria-hidden="true" />
+            ) : (
+              <FileText size={18} aria-hidden="true" />
+            )}
+            <p>
+              {normalizedQuery ? "没有找到匹配的已识别内容，请换个关键词。" : state.description}
+            </p>
           </div>
         )}
       </section>
