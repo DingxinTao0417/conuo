@@ -51,7 +51,7 @@ describe("AI usage route authorization", () => {
     );
     expect(mock.requireUser).toHaveBeenCalledTimes(2);
     expect(response.headers.get("Cache-Control")).toContain("no-store");
-    expect(response.headers.get("Vary")).toBe("Cookie");
+    expect(response.headers.get("Vary")).toBe("Cookie, Authorization");
   });
 
   it.each([

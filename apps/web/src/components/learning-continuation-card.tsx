@@ -1,8 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { ArrowUpRight, FolderOpen, Sparkles } from "lucide-react";
 import type { PrimaryLearningContinuation } from "@/lib/learning-continue";
+import { projectMarkdownVisibleText } from "@/lib/markdown-excerpt";
 import "./learning-continuation-card.css";
 
 function positionLabel(continuation: PrimaryLearningContinuation) {
@@ -22,6 +23,14 @@ export default function LearningContinuationCard({
   onContinue: () => void;
 }) {
   const { source, conversation } = continuation;
+  const summary = useMemo(() => {
+    const projection =
+      source.kind === "markdown" || source.kind === "web"
+        ? projectMarkdownVisibleText(source.text)
+        : null;
+    const text = projection?.ok ? projection.visibleText : source.text;
+    return text.replace(/\s+/gu, " ").trim().slice(0, 150) || "打开资料，继续阅读。";
+  }, [source.kind, source.text]);
   return (
     <article className="learning-continuation-card">
       <div className="learning-continuation-icon">{icon}</div>
@@ -35,15 +44,7 @@ export default function LearningContinuationCard({
           <span>{positionLabel(continuation)}</span>
         </p>
       </div>
-      <p className="learning-continuation-summary">
-        {source.text
-          ? source.text
-              .replace(/<[^>]*>/gu, " ")
-              .replace(/\s+/gu, " ")
-              .trim()
-              .slice(0, 150)
-          : "打开资料，继续阅读。"}
-      </p>
+      <p className="learning-continuation-summary">{summary}</p>
       {conversation && (
         <div className="learning-continuation-question">
           <Sparkles size={17} aria-hidden="true" />

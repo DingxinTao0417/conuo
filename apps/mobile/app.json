@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Conuo",
+    "slug": "conuo-mobile",
+    "version": "0.1.0",
+    "orientation": "default",
+    "scheme": "conuo",
+    "userInterfaceStyle": "light",
+    "platforms": ["ios", "web"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.conuo.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": ["expo-secure-store"],
+    "web": {
+      "name": "Conuo 客户端设计预览",
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}

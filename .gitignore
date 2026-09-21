@@ -8,6 +8,10 @@ out/
 dist/
 coverage/
 *.tsbuildinfo
+.expo/
+release/
+/apps/mobile/ios/
+/apps/mobile/android/
 /apps/web/public/pdf.worker.min.mjs
 /apps/web/public/conuo-logo.png
 

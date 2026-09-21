@@ -1,172 +1,100 @@
-<p align="center">
-  <img src="assets/conuo-logo.png" width="120" height="120" alt="Conuo logo: companion pages forming the letter C" />
-</p>
-
-<h1 align="center">Conuo · 可诺</h1>
-
-<p align="center"><strong>Learn it, together.</strong></p>
-<p align="center">An AI learning companion centered on your personal library</p>
+<p align="center"><img src="assets/conuo-logo.png" width="120" height="120" alt="Conuo logo" /></p>
+<h1 align="center">Conuo</h1>
+<p align="center"><strong>A companion for learning from your own sources.</strong></p>
+<p align="center">An AI learning workspace built around your personal library</p>
 <p align="center"><a href="README.md">简体中文</a> · <strong>English</strong></p>
 
-<p align="center">
-  <a href="docs/PRD.md">Product requirements</a> ·
-  <a href="docs/IMPLEMENTATION_STATUS.md">Implementation status</a> ·
-  <a href="docs/CLOUD_E2E_ACCEPTANCE.md">Cloud acceptance</a> ·
-  <a href="docs/CLOUD_SETUP.md">Cloud setup</a> ·
-  <a href="docs/REGION_STUDY.md">Region study</a> ·
-  <a href="docs/TRAE_DESIGN_PROMPT.md">Page design</a>
-</p>
+Conuo organizes files, web pages, and notes into a searchable personal knowledge base with traceable sources. Ask while reading, verify the original evidence, save your understanding, and continue from where you left off.
 
----
+**Collect → Read and ask → Verify sources → Save understanding → Continue learning**
 
-Conuo aims to organize files, web pages, and notes into a searchable personal knowledge base with traceable sources. Ask questions while reading, check the original material, save your own understanding, and pick up where you left off.
+## Current status
 
-**The web app requires sign-in and uses cloud storage as its sole durable workspace.** Workspace data, notes, reading positions, and accepted knowledge updates live in Supabase PostgreSQL; originals live in private Storage. The page stages edits and upload bytes in memory and reloads from the cloud after refresh. Local and cloud workspaces will coexist only in the future desktop app. See [Web storage policy](docs/WEB_CLOUD_STORAGE.md).
+The web app is deployed to isolated [staging](https://conuo-staging.vercel.app), with production release checks still in progress. The main natural Cron checks passed. The project owner confirmed physical two-device sync and the real same-browser password-recovery flow. Cleanup resilience, cross-browser email links, disaster recovery, and other remaining gates are tracked in the [deployment record](docs/STAGING_DEPLOYMENT.md) and [production runbook](docs/PRODUCTION_RELEASE.md). The original production environment has not been upgraded.
 
-> **Status: the first web release is in development, and an isolated staging environment is deployed.** Staging Supabase has applied all 27 migrations from a clean project, and Vercel now deploys staging automatically from GitHub `staging`; the original production project remains on `main` with Preview auto-deployments disabled. The minute-level organization processor plus three cleanup cron jobs are configured. Live web checks cover sign-in, TXT upload and recovery, A/B account isolation, two-session CAS, DeepSeek Q&A and PDF region study, background organization, and six business-conflict paths: organization cancellation, source and historical-version purge, and parse completion, cancellation, and retry. The three parse conflict paths were rechecked after the Git deployment and returned 409 in 274–303 ms. Interrupted-upload orphan cleanup, data-bearing historical-version cleanup, permanent source deletion with saved-content choices, physical Storage deletion, account fencing, Auth-user deletion, a real signup-confirmation email, its same-browser PKCE callback, a signup link that expired after a real wait, and hour-old persistent-session refresh in Chrome and Edge have also passed. Auth has accepted a real password-recovery request and recorded its send time, but inbox delivery and the cross-browser callback are still unverified. The original production Supabase project was last verified at 19 migrations and has not been upgraded, so the current staging code is not a production release. Real two-device and offline behavior, natural cron execution, the remaining recovery-email flow, cross-browser email links, and backup restoration remain pending, so full M0 is not released. Without a configured model, source excerpts remain available; cloud Q&A supports generated answers with source citations. The Web App Manifest provides an install name, icons, and shortcuts; compatible browsers can install the HTTPS staging site, but this is not an offline package. See the [staging deployment record](docs/STAGING_DEPLOYMENT.md) and [production release runbook](docs/PRODUCTION_RELEASE.md) for evidence and gates.
+Windows/macOS and iOS/iPadOS are in local design and development. **They are not signed or published, and Apple-device acceptance is not complete.** The new native Bearer API support has not been deployed, so the existing staging deployment is not yet evidence of a working native end-to-end flow. Expo Web preview displays labeled demo content only; it does not support real sign-in or replace native testing.
 
-The PDF reader now supports fixed-region visual study on the current page: an image-capable multimodal model can directly explain the screenshot, answer a region-specific question, or generate a one-off exercise. Explanations have a summary and separate observation, reasoning, and takeaway sections; explanation text, Q&A, and exercises render Markdown and math. A screenshot is transmitted only after an explicit send action, remains non-persistent by default, and the result is bound to the source, version, physical page, and normalized rectangle. The flow does not depend on OCR or create a full-text index; scanned-PDF body text is still not searchable. The configured DeepSeek `deepseek-flash` adapter has passed a live screenshot-input smoke test; signed-in explanation, image Q&A, and Chinese exercise generation have now passed live request-ledger checks. See [Region study](docs/REGION_STUDY.md).
+| Platform        | Approach and current scope                                                                                                      | Later stages                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Web             | Next.js + React; existing cloud learning workspace under active improvement                                                     | Independent cloud release gates                                                                |
+| Windows / macOS | Electron D0 secure host; D1 reuses and validates the complete web app in the desktop host                                       | D2 local database, file cache, and offline/cloud coexistence; D3 browsing and distribution     |
+| iOS             | Expo SDK 57 + React Native 0.86; sign-in, cloud source/knowledge reading, single-source JSON Q&A, and text notes in development | Only part of I1 is being started; sharing, full reading, and release follow the platform PRD   |
+| iPadOS          | Shared iOS project with adaptive tablet layouts                                                                                 | P1 cloud reading workspace; Pencil, multiple windows, sharing, and deeper reading belong to P2 |
+| Android         | Long-term target                                                                                                                | Outside this native development increment                                                      |
 
-**Collect materials → Read and ask → Check the source → Save your understanding → Keep learning**
+The web app and initial clients use the cloud as the authoritative data store. Browser edits and pending originals stay in session memory; secure native credential storage is not a local library. Local/cloud coexistence belongs to desktop D2. No complete offline workspace is currently provided. See the [web storage policy](docs/WEB_CLOUD_STORAGE.md) and platform PRDs.
 
-PDF reading offers single-page and continuous-scroll modes, retaining the available position within a page when switching. Progress follows physical pages, with nearby pages rendered on demand. Phones keep the mode control above the reading area; tablets and wide screens use the reading tools. See [PDF reading modes](docs/PDF_READING_MODES.md).
+## Web feature overview
 
-After a confirmed account-deletion request, the web app stops that account's tasks and access, clears its temporary page state, and keeps a session fence. After refresh, cloud identity and deletion gates are checked again. Legacy IndexedDB copies are not active workspaces and are not cleaned automatically. Staging has completed real account fencing, Storage cleanup, and Auth-user deletion for an account with an original; cross-device deletion and cleanup failure recovery remain pending. See [Originals and legacy caches](docs/LOCAL_ORIGINALS.md).
+| Capability             | Existing features                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Sources and knowledge  | Learning spaces, library shelves, tags, filters, ordinary search, and trash; original sources remain distinct from AI knowledge pages |
+| Files and web pages    | PDF, DOCX, Markdown, TXT, and public-page imports; originals and versions retained; backup restoration and export                     |
+| Reading                | Single-page/continuous PDF views, text reading, annotations, source citations, and cloud reading positions                            |
+| Source-grounded Q&A    | Explicit source scopes, Markdown and formula rendering, original citations, and per-source AI permission                              |
+| Region study           | Send a selected PDF region for explanation, questions, or one-off exercises; no OCR prerequisite or full-document index               |
+| Knowledge organization | Summaries, tags, topic drafts, page updates, and relationships; review before saving, with provenance and history                     |
+| Notes and continuation | Rich-text notes, excerpts, conversation records, continuation, and unresolved questions                                               |
+| Accounts and saving    | Supabase Auth, private Storage, cloud revision conflicts, source deletion, and account closure                                        |
 
-Applied AI knowledge-page updates can be withdrawn after comparing the original, applied, and current content. Proven independent edits are retained; overlapping edits or repeated positions require an explicit choice or a plain-text merge. Confirmation creates a history version and seals the whole job, including when every change is kept; web actions wait for cloud acknowledgment. Unapplied review selections and edits remain in page memory and are lost on refresh. See [Safe knowledge-update withdrawal](docs/KNOWLEDGE_UPDATE_WITHDRAWAL.md).
+A saved state requires cloud acknowledgment. Connectivity loss does not create an anonymous or local workspace. AI output does not silently replace sources. Native coverage is tracked separately and must not be inferred from this web feature table.
 
 ## Quick start
 
-Use **Node.js 24+** and npm. From the repository root:
+Requires **Node.js 24+** and npm. From the repository root:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000). Configure Supabase, then register or sign in to use the workspace. Missing configuration shows setup guidance; signed-out visitors see the account entry instead of an anonymous workspace. Demo materials are added only when you explicitly choose them.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000). Follow [cloud setup](docs/CLOUD_SETUP.md) using the [web environment example](apps/web/.env.example), then sign in. Missing configuration or authentication does not create an anonymous workspace. Development/build scripts prepare the PDF worker and logo.
 
-Development and build scripts prepare the PDF worker and application logo automatically. Press `Ctrl+C` in the running terminal to stop the development server.
-
-Follow [Cloud setup](docs/CLOUD_SETUP.md) to configure `apps/web/.env.local`, database migrations, and Auth callbacks. Start with [apps/web/.env.example](apps/web/.env.example). Public `NEXT_PUBLIC_*` variables may contain the project URL and publishable/anon key only, never privileged server keys. Optional generation uses server-only model credentials and a Supabase request-ledger key; see [Model setup](docs/MODEL_SETUP.md). Do not commit real configuration or send credentials in chat.
-
-## What works today
-
-| Capability                       | Current implementation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Materials and collections        | Create learning spaces, browse book-style collection covers, edit tags and space associations, search, and restore items from the recycle bin. Sort materials by latest update, latest addition, or name; list rows show update time and the URL restores the order. The first-material path names a collection first and preselects it as the import destination.                                                                                                                                                    |
-| File import                      | PDF, DOCX, Markdown, and TXT; retain originals, content hashes, source version identifiers, and text chunks. Reuse identical content or keep a separate copy. New materials start with AI use disabled and require an explicit import opt-in; unapproved materials can still be parsed, read, and found by ordinary search. The browser prechecks per-file and batch conditions, then checks retained-original allowance after hashing and before saving.                                                             |
-| File replacement and history     | Preview and explicitly save a new version, including switches between these formats. Keep the library title, tags, collections, permissions, and each original; earlier citations open the exact read-only version. A retained version can be promoted back to current, or—after a server-derived impact preview and explicit confirmation—cleaned individually without replacing historical citations. See [File versions](docs/FILE_VERSIONS.md).                                                                   |
-| Web collections                  | Preview public articles and save text, a selection, or a link. Support manual paste, confirmed refresh and historical reading, preserving URLs, capture times and earlier citations. New webpages also start with AI use disabled; the explicit import opt-in applies to both files and webpages. See [Web import](docs/WEB_IMPORT.md).                                                                                                                                                                               |
-| Reading                          | Original PDF pages, pagination, zoom, text selection, and highlights; text reading, original downloads, and saved reading positions. The current PDF page supports a fixed region selection; scanned PDFs can be retained, but their body text still receives no OCR.                                                                                                                                                                                                                                                 |
-| Region visual study              | After an explicit send, a model with image support can explain a PDF region, answer a region-specific question, or generate a one-off exercise. The screenshot is temporary and non-persistent by default; results bind to the source, version, physical page, and normalized rectangle and do not enter full-text or library-wide indexes. See [Region study](docs/REGION_STUDY.md).                                                                                                                                 |
-| Web install entry                | Provides a Web App Manifest, 180/192/512 brand icons, library and Q&A shortcuts, and standalone-window metadata for iOS/iPadOS. Settings show a direct browser prompt, Safari home-screen guidance, or installed state when applicable; when served over HTTPS, compatible browsers can add the app to a desktop or home screen, without an offline package or service worker.                                                                                                                                        |
-| Evidence and citations           | Search a selection, current document, selected sources, or current space. Results are labeled as source excerpts and preserve document, version, page, or section references.                                                                                                                                                                                                                                                                                                                                         |
-| Keyword and semantic search      | The material toolbar supports keyword and question search with shared type, tag, and date filters. Question mode shows verifiable source excerpts and can prefill the bounded question flow with 1–5 selected sources, but never sends automatically. See [Search and indexing](docs/SEARCH_INDEXING.md).                                                                                                                                                                                                             |
-| Generative integration           | Server-side model adapter, citation/region checks, and request ledger. Web answers stream previews and save only after final confirmation. The local DeepSeek `deepseek-flash` adapter has passed a live multimodal screenshot-input smoke test; vision still requires `CONUO_MODEL_VISION_ENABLED=true`. The existing server-side ledger key is configured in the ignored local environment file, and live source Q&A and region-study checks have passed. See [Model setup](docs/MODEL_SETUP.md).                   |
-| Organization and topic drafts    | Single-source summaries, tag and topic suggestions; choose 1–10 sources to generate up to 3 topic drafts for individual acceptance, editing, or dismissal. Tags require explicit selection and support locking and guarded undo; see [Organization](docs/ORGANIZATION.md).                                                                                                                                                                                                                                            |
-| Knowledge updates and withdrawal | Accept or ignore up to 12 source-backed changes; preview original, applied, and current content before withdrawing an applied job. Retain independent edits and resolve conflicts through an explicit choice or plain-text merge. Confirmation saves history and seals the whole job; web actions wait for cloud acknowledgment. See [Safe withdrawal](docs/KNOWLEDGE_UPDATE_WITHDRAWAL.md).                                                                                                                          |
-| Notes                            | Tiptap editing, saved excerpts and responses, knowledge-page drafts, and note version recovery, with source citations retained.                                                                                                                                                                                                                                                                                                                                                                                       |
-| Knowledge-page library           | Browse knowledge pages grouped by collection, with distinct AI draft, manual draft, and saved states. Cards show summaries, associated-source counts, and update times. Status filters and title, body, or source search are restored from the URL.                                                                                                                                                                                                                                                                   |
-| Cloud data and export            | PostgreSQL stores account workspaces and private Storage stores originals. Review and export the full workspace or one knowledge base; external cited sources and their annotations are explicitly listed. ZIP exports include every included current and retained source version's original, text, and citation mappings, plus notes, conversations, and annotations. Notes, knowledge pages, and their history include Markdown, safe HTML, and exact original content; see [Export format](docs/EXPORT_FORMAT.md). |
-| Permanent source deletion        | Confirm a server-derived impact preview to delete all source versions. Saved notes, knowledge pages, and conversations remain by default. Explicit whole-document/history and whole-conversation choices plus tombstones are supported; staging has passed saved-content selection, physical Storage deletion, and stale-snapshot resurrection protection. See [Permanent deletion](docs/PERMANENT_DELETION.md).                                                                                                      |
-| Restore from backup              | Preview a Conuo ZIP and restore new copies with history and citations. Originals are verified and missing files require acknowledgment; restored sources start with AI disabled. Signed-in restoration waits for cloud acknowledgment. See [Backup restoration](docs/BACKUP_RESTORE.md).                                                                                                                                                                                                                              |
-
-The web app shows a saved state only after cloud acknowledgment; edits in page memory are not saved data. An initial cloud-read failure keeps the workspace unavailable and never creates an empty replacement or starts an overwrite. Failed saves remain retryable; leaving or signing out protects unsaved changes without a “keep a local draft and exit” option. Cloud search requires a signed-in account and confirmed save. **New AI answers still use original sources only**; ordinary search includes notes and accepted knowledge pages, excluding drafts by default.
-
-Filter ordinary search by notes or knowledge pages and creation time before typing; an empty query browses the selected type. The URL restores type and date filters, and turning AI off keeps readable results visible. Source tags and favorites do not apply to notes or knowledge pages. Bulk tags show per-source results after cloud acknowledgment and retry failed items only; see [Bulk tags](docs/BULK_TAGS.md).
-
-Bulk space association and recycling also wait for cloud acknowledgment before showing per-source success, no change, or failure. A failed save can persist the latest snapshot while retaining the first successful items; continued review includes only sources newly associated by this operation. See [Bulk source actions](docs/BULK_SOURCE_ACTIONS.md).
-
-Live source analysis returned a summary, 8 tag suggestions, and 5 topic suggestions. Two sources generated 3 knowledge topics; an accepted page and its citations were saved to the cloud and restored after refresh. Staging now runs the durable organization queue, processor, and minute scheduler, and a real background task completed after page submission. Automatic analysis remains off, while knowledge-page updates and relationship analysis still run with the browser request. Separate vector jobs persist with leases, checkpoints, cancellation, and retries, but the [Python indexing processor](apps/processor/README.md) still requires an explicit run and has no cloud scheduler. Suggestions require human review. See [Cloud acceptance](docs/CLOUD_E2E_ACCEPTANCE.md).
-
-## Technology stack
-
-Settings show AI request counts, UTC reset rules, and local times. Missing server-side ledger configuration is shown as unknown, never a fabricated zero balance. Official originals are read from private Storage under the current account's permissions; imports and restoration stage bytes only in memory. Legacy anonymous materials are read only after an explicit import request, then validated and restored as new copies in the current cloud account. The old copies and originals remain intact. See [Model setup](docs/MODEL_SETUP.md) and [Originals and legacy caches](docs/LOCAL_ORIGINALS.md).
-
-| Layer                    | Selection and status                                                                                                                                                                                                                                                                                  |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web and API              | Next.js 16 · React 19 · TypeScript; App Router and `/api/v1/` Route Handlers                                                                                                                                                                                                                          |
-| Styling                  | Tailwind CSS 4 and component CSS; book-style collection browsing and a reader based on the TraeWork prototype                                                                                                                                                                                         |
-| Reading and editing      | PDF.js · Tiptap; Mammoth for DOCX text extraction; PDF region captures are created in the browser and sent to a multimodal model only through an explicit action                                                                                                                                      |
-| Session staging          | Memory snapshots and pending upload bytes; browser-based text chunking and keyword retrieval                                                                                                                                                                                                          |
-| Cloud identity and files | Supabase Auth + Storage; isolated staging has all 27 migrations and passed TXT upload, recovery, original-hash, and A/B account-isolation checks. The original production project remains at its previously recorded 19 migrations. Real two-device concurrency and offline scenarios remain pending. |
-| Database                 | Supabase PostgreSQL; atomic source, immutable-version, and chunk projection, with the 3 MiB JSONB workspace retained as the compatibility save protocol                                                                                                                                               |
-| Model integration        | Server-side Chat Completions adapter; staging has passed live DeepSeek source Q&A, region study, organization, and request-ledger checks. The original production environment is not upgraded, and the broader model-quality matrix remains pending.                                                  |
-| Retrieval and jobs       | pgvector, a durable indexing queue, and a bounded Python 3.12 CLI; staging schedules organization tasks, while the vector indexing processor still has no cloud scheduler and live Q&A currently uses keyword retrieval.                                                                              |
-| Deployment target        | Vercel with `apps/web` as the project root. Staging deploys automatically from GitHub `staging`; the original production environment remains on `main` with Preview auto-deployments disabled.                                                                                                        |
-
-Exact versions are recorded in [apps/web/package.json](apps/web/package.json) and the lockfile. See the [technical plan](docs/TECH_STACK.md) for the target architecture.
+Public configuration may contain the project URL and publishable/anon key only. Model credentials and privileged Supabase keys remain on the server and must not enter client bundles or Git. See [model setup](docs/MODEL_SETUP.md).
 
 ## Development commands
 
-Run these commands from the repository root:
+| Command                                              | Purpose                                         |
+| ---------------------------------------------------- | ----------------------------------------------- |
+| `npm run dev`                                        | Web development server                          |
+| `npm run build` / `npm start`                        | Build / run the web production build            |
+| `npm run typecheck` / `npm run lint` / `npm test`    | Web type, static, and test checks               |
+| `npm run desktop:dev`                                | Electron development host                       |
+| `npm run desktop:build`                              | Local desktop build; not signing or publication |
+| `npm run mobile:dev`                                 | Expo native development entry                   |
+| `npm run mobile:preview`                             | Mobile/tablet web demo preview                  |
+| `npm run clients:typecheck` / `npm run clients:test` | Client type and test checks                     |
 
-| Command             | Purpose                                  |
-| ------------------- | ---------------------------------------- |
-| `npm run dev`       | Start the local web development server   |
-| `npm run typecheck` | Check TypeScript types                   |
-| `npm run lint`      | Run ESLint                               |
-| `npm run test`      | Run Vitest tests                         |
-| `npm run build`     | Create a Next.js production build        |
-| `npm start`         | Run an existing production build locally |
+Client test evidence and platform build limitations are recorded in [client implementation](docs/CLIENT_IMPLEMENTATION.md); Web cloud acceptance is recorded in [implementation status](docs/IMPLEMENTATION_STATUS.md). Migration tests use PGlite and do not require installing or starting local PostgreSQL. Apple system builds and physical-device acceptance require the corresponding environment; browser previews do not replace them.
 
-Local tests cover imports, citations, retrieval scope isolation, persistence races, exports, and API boundaries, and execute real migrations with PGlite + pgvector. Python test commands are in the [processor guide](apps/processor/README.md). These results do not establish real Supabase concurrency, email authentication, or cross-device synchronization. See [Implementation status](docs/IMPLEMENTATION_STATUS.md) for the verification record.
+## Technology and structure
 
-## Repository structure
+Next.js, React, TypeScript, and Tailwind CSS power the web app and shared API. PDF.js and Tiptap support existing reading and editing. Supabase provides Auth, PostgreSQL, private Storage, and pgvector; Vercel hosts the web app/API. The bounded Python indexing CLI and cloud schedulers have separate deployment boundaries. See the [technical plan](docs/TECH_STACK.md).
 
 ```text
 conuo/
-├── apps/web/
-│   ├── src/app/                     # Pages, Auth callbacks, business API
-│   ├── src/components/              # Collections, reader, notes, accounts
-│   ├── src/lib/                     # Import, retrieval, persistence, cloud, tests
-│   ├── scripts/prepare-assets.mjs   # Prepare the PDF worker and logo
-│   ├── .env.example                 # Public connection and optional server variables
-│   └── package.json
-├── apps/processor/                 # Bounded Python vector processor and local tests
-├── supabase/
-│   ├── migrations/                 # Database and private Storage migration
-│   └── tests/                      # RLS checks for an isolated database
-├── assets/conuo-logo.png
-├── docs/
-│   ├── PRD.md
-│   ├── TECH_STACK.md
-│   ├── TRAE_DESIGN_PROMPT.md
-│   ├── CLOUD_SETUP.md
-│   ├── WEB_CLOUD_STORAGE.md
-│   ├── MODEL_SETUP.md
-│   ├── REGION_STUDY.md
-│   ├── SEARCH_INDEXING.md
-│   ├── ORGANIZATION.md
-│   ├── KNOWLEDGE_UPDATE_WITHDRAWAL.md
-│   ├── FILE_VERSIONS.md
-│   ├── EXPORT_FORMAT.md
-│   └── IMPLEMENTATION_STATUS.md
-├── README.md
-├── README.en.md
-├── package.json                    # npm workspace and root scripts
-└── package-lock.json
+├── apps/web/          # Web app, shared API, and tests
+├── apps/desktop/      # Electron desktop host
+├── apps/mobile/       # Expo iOS / iPadOS project with distinct layouts
+├── apps/processor/    # Bounded Python indexing CLI
+├── supabase/          # Migrations and isolation checks
+├── docs/              # Shared/platform PRDs, feature guides, release evidence
+├── assets/            # Brand assets
+├── README.md          # Default Simplified Chinese entry
+└── README.en.md       # English
 ```
 
-Design resources and prototypes live in the local `conuo-design/` directory, which is excluded by `.gitignore` and is not a runtime dependency. Local environment files, dependencies, build output, and test artifacts are also excluded from Git.
+Local `conuo-design/` assets are retained and ignored by Git; they are not runtime dependencies. The old page-generation prompt is retired. The shared/platform PRDs and [UI guide](docs/UI_STYLE_GUIDE.md) are the current design references.
 
-## Roadmap and boundaries
+## Documentation
 
-- **M0 · Web in development**: knowledge review, typed relationships, file and web version chains, ordinary search, and source indexing are implemented. Background organization, orphan-upload cleanup, the main data-bearing deletion/account-closure path, a real signup-confirmation email, and same-browser PKCE have passed in staging; real two-device, offline, natural cron, remaining email scenarios, backup-restoration, and model-quality validation remain.
-- **Later web releases**: assess library-wide OCR, more file formats, background knowledge organization, and complete exercise-attempt and review flows. A one-off exercise from a PDF region does not mean those systems are complete.
-- **Other platforms**: development currently targets responsive web only. Standalone phone, iPad, Windows, and macOS clients will be evaluated after the core web experience stabilizes and have not been scheduled; local and cloud coexistence in desktop clients requires separate design and acceptance.
+- Product: [Shared PRD](docs/PRD.md) · [Windows/macOS](docs/DESKTOP_PRD.md) · [iOS](docs/IOS_PRD.md) · [iPadOS](docs/IPADOS_PRD.md)
+- Development: [Technical plan](docs/TECH_STACK.md) · [UI guide](docs/UI_STYLE_GUIDE.md) · [Implementation status](docs/IMPLEMENTATION_STATUS.md)
+- Cloud: [Setup](docs/CLOUD_SETUP.md) · [Acceptance](docs/CLOUD_E2E_ACCEPTANCE.md) · [Deployment](docs/STAGING_DEPLOYMENT.md) · [Production release](docs/PRODUCTION_RELEASE.md) · [Disaster recovery](docs/DISASTER_RECOVERY.md)
+- Features: [File versions](docs/FILE_VERSIONS.md) · [Region study](docs/REGION_STUDY.md) · [Streaming answers](docs/STREAMING_ANSWERS.md) · [Search](docs/SEARCH_INDEXING.md) · [Organization](docs/ORGANIZATION.md) · [Backup restoration](docs/BACKUP_RESTORE.md) · [Export](docs/EXPORT_FORMAT.md)
 
-Permanent-source deletion and account deletion have protocols and protected server-side execution paths: [the former](docs/PERMANENT_DELETION.md) retains saved content by default and supports explicit whole-note/knowledge-page choices including all history and whole-conversation cleanup. Account deletion requires an impact preview plus email/password/`DELETE` confirmation and uses a Storage/Auth two-stage outbox. The required migrations and three cleanup cron jobs are deployed in staging. Both interrupted-upload states, data-bearing historical-version and source cleanup, physical Storage deletion, account fencing, and Auth Admin deletion have passed. Natural cron execution, crash recovery, and full two-device concurrency still need integration validation. Historical browser-cache deletion tests do not define the current web storage mode. Full M0 acceptance and server disaster recovery remain unfinished. Personal ZIP backups restore as new cloud copies; see [Backup restoration](docs/BACKUP_RESTORE.md). Organization records are limited to 1,000 jobs and share the 3 MiB workspace snapshot limit with other content. Settings can preview and remove dismissed, failed, and cancelled terminal records; active jobs and pending reviews remain. The [PRD](docs/PRD.md) defines the intended scope; [Implementation status](docs/IMPLEMENTATION_STATUS.md) records actual progress.
-
-File imports and replacements are limited to 30 MiB each and 20 files / 150 MiB per browser batch. Admission uses a conservative 512 MiB retained-original reservation per account. Migrations 21 and 25 are applied in staging and have passed real upload and cross-account isolation checks, but this is neither local-storage capacity nor a cloud-plan commitment, and the original production project is not upgraded. Imports recheck duplicates and capacity in page memory, then upload originals and commit the cloud revision CAS through the save queue. Initial loads, refreshes, and cross-page reloads use the cloud; tabs do not exchange workspaces through shared IndexedDB. Cloud conflicts preserve current-page edits for an explicit decision without automatic merging or a local draft that survives refresh. Each source retains at most 200 historical versions, and all text and chunks share the 3 MiB snapshot limit without automatic trimming. After an impact confirmation, a retained version can become current; a signed-in, saved workspace can also clean one historical version after server preview and explicit confirmation. Earlier citations are not substituted. Parsing runs in the browser. Live originals, A/B account isolation, source Q&A, and region study have passed; full two-device concurrency and offline validation remain pending.
-
-## Documentation and collaboration
-
-[Requirements](docs/PRD.md) · [Technical plan](docs/TECH_STACK.md) · [Page design](docs/TRAE_DESIGN_PROMPT.md) · [Cloud setup](docs/CLOUD_SETUP.md) · [Web storage policy](docs/WEB_CLOUD_STORAGE.md) · [Cloud acceptance](docs/CLOUD_E2E_ACCEPTANCE.md) · [Production release](docs/PRODUCTION_RELEASE.md) · [Disaster-recovery drill](docs/DISASTER_RECOVERY.md) · [Model setup](docs/MODEL_SETUP.md) · [Region study](docs/REGION_STUDY.md) · [Streaming answers](docs/STREAMING_ANSWERS.md) · [Search and indexing](docs/SEARCH_INDEXING.md) · [Organization](docs/ORGANIZATION.md) · [Safe knowledge-update withdrawal](docs/KNOWLEDGE_UPDATE_WITHDRAWAL.md) · [File versions](docs/FILE_VERSIONS.md) · [Permanent deletion](docs/PERMANENT_DELETION.md) · [Export format](docs/EXPORT_FORMAT.md) · [Implementation status](docs/IMPLEMENTATION_STATUS.md) · [Logo](assets/conuo-logo.png)
-
-Detailed project documents are currently in Simplified Chinese. Map feature changes to requirements and acceptance scenarios, retain provenance and manual edits, and make recovery possible. The collection view follows the latest book-cover layout; the reader retains the original reading-and-questions split view. Distinguish written code, local verification, and real cloud validation in progress records.
+Track requirements, implementation, local checks, cloud/device acceptance, signing, and publication separately. Detailed product documents are currently maintained in Simplified Chinese.
 
 ## License
 
-A project license has not been selected, and the repository does not contain a `LICENSE` file. Design-system and icon resources remain subject to their original licenses.
+A project license has not been selected, and the repository has no `LICENSE` file. Third-party components and assets retain their respective licenses.

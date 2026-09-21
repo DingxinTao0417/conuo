@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Cloud, LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { isCloudConfigured, subscribeSession, type CloudUser } from "@/lib/cloud";
-import AccountPanel from "./account-panel";
+import AccountPanel, { type AccountEntryMode } from "./account-panel";
 import Workspace from "./workspace";
 import "./web-cloud-entry.css";
 
@@ -17,6 +17,7 @@ const ignorePanelAction = () => {};
 export default function WebCloudEntry() {
   const [entry, setEntry] = useState<EntryState>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
+  const [accountMode, setAccountMode] = useState<AccountEntryMode>("login");
   const verifiedUser = useRef<CloudUser | null>(null);
 
   useEffect(() => {
@@ -73,9 +74,17 @@ export default function WebCloudEntry() {
                 ? "正在连接你的工作区"
                 : entry.kind === "unavailable"
                   ? "云端服务暂不可用"
-                  : "登录，继续学习"}
+                  : accountMode === "signup"
+                    ? "创建你的学习空间"
+                    : accountMode === "reset"
+                      ? "找回密码"
+                      : "登录，继续学习"}
             </h1>
-            <p>资料、笔记与学习记录统一保存至云端，登录后即可继续。</p>
+            <p>
+              {entry.kind === "login" && accountMode === "reset"
+                ? "输入注册时使用的邮箱，我们会发送重置密码的链接。"
+                : "资料、笔记与学习记录统一保存至云端，登录后即可继续。"}
+            </p>
           </div>
           {entry.kind === "loading" ? (
             <p className="web-cloud-entry-status" role="status">
@@ -98,7 +107,12 @@ export default function WebCloudEntry() {
             </div>
           ) : (
             <div className="web-cloud-login">
-              <AccountPanel onSessionChange={ignorePanelAction} onClose={ignorePanelAction} />
+              <AccountPanel
+                appearance="entry"
+                onModeChange={setAccountMode}
+                onSessionChange={ignorePanelAction}
+                onClose={ignorePanelAction}
+              />
             </div>
           )}
         </section>

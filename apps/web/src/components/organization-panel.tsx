@@ -648,7 +648,7 @@ export default function OrganizationPanel(props: OrganizationPanelProps) {
           ? "与问答共用每日模型次数。任务是否在关闭页面后继续，取决于已部署的后台处理器；可刷新状态核对。"
           : localDevelopmentRunnerEnabled
             ? localDevelopmentOrganizationRunnerAvailabilityMessage()
-            : "已有任务记录仍可刷新、查看或停止；当前不能承诺 source／knowledge 任务在关闭页面后继续。"}
+            : "已有任务仍可刷新、查看或停止。当前请保持页面打开，资料分析和知识页生成尚不能在后台继续。"}
       </p>
       {(disabledReason || displayedStatusMessage) && (
         <p

@@ -1,0 +1,54 @@
+{
+  "name": "@conuo/desktop",
+  "version": "0.1.4",
+  "private": true,
+  "description": "Conuo desktop preview for Windows and macOS",
+  "author": "Conuo",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "dev": "npm run build && electron .",
+    "start": "electron .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "smoke": "npm run build && node scripts/smoke.mjs",
+    "pack": "npm run build && electron-builder --dir --publish never",
+    "dist:win": "npm run build && electron-builder --win portable --x64 --publish never",
+    "dist:mac": "npm run build && electron-builder --mac dmg --arm64 --x64 --publish never"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "electron": "44.4.3",
+    "electron-builder": "26.15.3",
+    "typescript": "7.0.2"
+  },
+  "build": {
+    "appId": "com.conuo.desktop.preview",
+    "productName": "Conuo Preview",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "artifactName": "Conuo-Preview-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "dist/ui/icon.png",
+      "signExecutable": false
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.education",
+      "icon": "dist/ui/icon.png",
+      "identity": null,
+      "hardenedRuntime": true
+    }
+  }
+}

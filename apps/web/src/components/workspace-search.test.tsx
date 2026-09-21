@@ -130,6 +130,36 @@ describe("WorkspaceSearch external library filters", () => {
     );
   }
 
+  it("presents Markdown excerpts without changing original search locators or plain text", async () => {
+    const markdown = source("markdown", "markdown", [], false);
+    markdown.text = "## 微积分 **C#** 与 #学习标签";
+    markdown.chunks[0]!.text = markdown.text;
+    const plain = source("plain", "text", [], false);
+    plain.text = "## 微积分 C# 与 #学习标签";
+    plain.chunks[0]!.text = plain.text;
+    data = { ...data, sources: [markdown, plain], notes: [] };
+    await render({ data });
+
+    const hits = [...host.querySelectorAll<HTMLButtonElement>(".workspace-search-hit")];
+    const rendered = hits.find((hit) => hit.textContent?.includes("微积分资料 markdown"))!;
+    expect(rendered.querySelector(".workspace-search-snippet")?.textContent).toBe(
+      "微积分 C# 与 #学习标签",
+    );
+    const literal = hits.find((hit) => hit.textContent?.includes("微积分资料 plain"))!;
+    expect(literal.querySelector(".workspace-search-snippet")?.textContent).toBe(plain.text);
+    await act(async () => rendered.click());
+    expect(props.onOpen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        snippet: markdown.text,
+        objectId: markdown.id,
+        versionId: markdown.versionId,
+        blockId: markdown.chunks[0]!.id,
+        locator: expect.objectContaining({ kind: "chunk", order: 0, section: "正文" }),
+      }),
+    );
+    expect(markdown.chunks[0]!.text).toBe("## 微积分 **C#** 与 #学习标签");
+  });
+
   it("uses source kind, every library tag, and favorite state for local results", async () => {
     await render({
       externalFilters: {

@@ -48,6 +48,9 @@ export function ImportModal({
   onOpen: (id: string) => void;
 }) {
   const [tab, setTab] = useState("file");
+  const [webOpened, setWebOpened] = useState(false);
+  const [webDraft, setWebDraft] = useState({ dirty: false, saving: false });
+  const [exitAction, setExitAction] = useState<(() => void) | null>(null);
   const [target, setTarget] = useState(spaceId);
   const [aiAllowed, setAiAllowed] = useState(false);
   const [starting, setStarting] = useState(0);
@@ -254,234 +257,296 @@ export function ImportModal({
   function importFiles(files: FileList | File[]) {
     return queueImportFiles(files, target);
   }
+  function requestExit(action: () => void) {
+    if (webDraft.saving) return;
+    if (webDraft.dirty) setExitAction(() => action);
+    else action();
+  }
   return (
-    <Modal title="导入学习资料" onClose={onClose} wide>
-      <div className="modal-body">
-        <div className="tabs">
-          <button className={tab === "file" ? "active" : ""} onClick={() => setTab("file")}>
-            上传文件
-          </button>
-          <button className={tab === "web" ? "active" : ""} onClick={() => setTab("web")}>
-            保存网页
-          </button>
-        </div>
-        <label>
-          保存到
-          <select className="field" value={target} onChange={(e) => setTarget(e.target.value)}>
-            <option value="">收件箱</option>
-            {spaces.map((s) => (
-              <option value={s.id} key={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="checkbox-row import-ai-consent">
-          <input
-            type="checkbox"
-            aria-label="允许 AI 使用本次导入的资料"
-            checked={aiAllowed}
-            onChange={(event) => setAiAllowed(event.target.checked)}
-          />
-          <span>
-            <strong>允许 AI 使用本次导入的资料</strong>
-            <small>
-              用于带出处的问答、摘要和整理；未勾选仍可解析、阅读与普通搜索，可在资料详情随时更改。
-            </small>
-          </span>
-        </label>
-        {tab === "file" ? (
-          <>
-            <input
-              type="file"
-              multiple
-              accept=".pdf,.docx,.md,.markdown,.txt"
-              ref={fileRef}
-              className="visually-hidden"
-              aria-label="选择要导入的文件"
-              onChange={(e) => {
-                if (e.target.files) void importFiles(e.target.files);
-                e.target.value = "";
-              }}
-            />
+    <>
+      <Modal
+        title="导入学习资料"
+        onClose={() => requestExit(onClose)}
+        wide
+        dismissible={!webDraft.saving}
+      >
+        <div className="modal-body">
+          <div className="tabs">
             <button
-              className={`dropzone ${dragging ? "dragging" : ""}`}
-              onClick={() => fileRef.current?.click()}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragging(false);
-                void importFiles(e.dataTransfer.files);
-              }}
+              className={tab === "file" ? "active" : ""}
+              disabled={webDraft.saving}
+              onClick={() => setTab("file")}
             >
-              {starting ? <Loader2 size={30} className="spin" /> : <Upload size={30} />}
-              <b>{starting ? "正在保留原文件…" : "点击选择，或把文件拖到这里"}</b>
-              <span>
-                PDF、DOCX、Markdown、TXT · 单个文件不超过{" "}
-                {formatImportQuotaBytes(LOCAL_IMPORT_QUOTA_POLICY.maxFileBytes)}
-              </span>
-              <small>原文件保存后，解析可在后台继续、取消或重新开始。</small>
+              上传文件
             </button>
-            <div
-              className="notice import-quota"
-              aria-label={storageMode === "cloud" ? "导入保护额度" : "本机导入额度"}
-              role="status"
+            <button
+              className={tab === "web" ? "active" : ""}
+              disabled={webDraft.saving}
+              onClick={() => {
+                setWebOpened(true);
+                setTab("web");
+              }}
             >
-              <span>
-                <b>账户已用</b> {formatImportQuotaBytes(quotaUsage.bytes)} /{" "}
-                {formatImportQuotaBytes(quotaUsage.accountLimitBytes)}
-              </span>
-              <small>剩余 {formatImportQuotaBytes(quotaUsage.accountRemainingBytes)}</small>
+              保存网页
+            </button>
+          </div>
+          <label>
+            保存到
+            <select
+              className="field"
+              value={target}
+              disabled={webDraft.saving}
+              onChange={(e) => setTarget(e.target.value)}
+            >
+              <option value="">收件箱</option>
+              {spaces.map((s) => (
+                <option value={s.id} key={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="checkbox-row import-ai-consent">
+            <input
+              type="checkbox"
+              aria-label="允许 AI 使用本次导入的资料"
+              checked={aiAllowed}
+              disabled={webDraft.saving}
+              onChange={(event) => setAiAllowed(event.target.checked)}
+            />
+            <span>
+              <strong>允许 AI 使用本次导入的资料</strong>
               <small>
-                每批最多 {quotaUsage.batchFileLimit} 个文件，合计{" "}
-                {formatImportQuotaBytes(quotaUsage.batchByteLimit)}
+                用于带出处的问答、摘要和整理；未勾选仍可解析、阅读与普通搜索，可在资料详情随时更改。
               </small>
-              {quotaUsage.accountRemainingBytes === 0 ? (
-                <small>额度已满时会先判重；是否可继续将由导入时判定。</small>
-              ) : null}
-            </div>
-          </>
-        ) : (
-          <WebImportForm
-            targetSpaceId={target}
-            cloudUserId={cloudUserId}
-            aiAllowed={aiAllowed}
-            onImport={onWebImport}
-            onSaved={(source) =>
-              setLogs((current) => [
-                ...current,
-                {
-                  title: source.title,
-                  detail:
-                    source.status === "link-only"
-                      ? "已加入链接收藏；没有正文，不参与正文检索。"
-                      : `已加入资料库 · ${source.chunks.length} 个内容块，请留意工作台保存状态。`,
-                  id: source.id,
-                },
-              ])
-            }
-          />
-        )}
-        {(visibleJobs.length > 0 || visibleLogs.length > 0) && (
-          <div className="import-results" aria-live="polite">
-            <div
-              className={`import-cloud-confirmation ${cloudConfirmation.tone}`}
-              aria-label="云端确认"
-              role="status"
-            >
-              <Cloud size={16} />
-              <div className="grow">
-                <b>云端确认</b>
-                <p>{cloudConfirmation.detail}</p>
+            </span>
+          </label>
+          {tab === "file" && (
+            <>
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.docx,.md,.markdown,.txt"
+                ref={fileRef}
+                className="visually-hidden"
+                aria-label="选择要导入的文件"
+                onChange={(e) => {
+                  if (e.target.files) void importFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                className={`dropzone ${dragging ? "dragging" : ""}`}
+                onClick={() => fileRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  void importFiles(e.dataTransfer.files);
+                }}
+              >
+                {starting ? <Loader2 size={30} className="spin" /> : <Upload size={30} />}
+                <b>{starting ? "正在保留原文件…" : "点击选择，或把文件拖到这里"}</b>
+                <span>
+                  PDF、DOCX、Markdown、TXT · 单个文件不超过{" "}
+                  {formatImportQuotaBytes(LOCAL_IMPORT_QUOTA_POLICY.maxFileBytes)}
+                </span>
+                <small>原文件保存后，解析可在后台继续、取消或重新开始。</small>
+              </button>
+              <div
+                className="notice import-quota"
+                aria-label={storageMode === "cloud" ? "导入保护额度" : "本机导入额度"}
+                role="status"
+              >
+                <span>
+                  <b>账户已用</b> {formatImportQuotaBytes(quotaUsage.bytes)} /{" "}
+                  {formatImportQuotaBytes(quotaUsage.accountLimitBytes)}
+                </span>
+                <small>剩余 {formatImportQuotaBytes(quotaUsage.accountRemainingBytes)}</small>
+                <small>
+                  每批最多 {quotaUsage.batchFileLimit} 个文件，合计{" "}
+                  {formatImportQuotaBytes(quotaUsage.batchByteLimit)}
+                </small>
+                {quotaUsage.accountRemainingBytes === 0 ? (
+                  <small>额度已满时会先判重；是否可继续将由导入时判定。</small>
+                ) : null}
               </div>
-            </div>
-            {visibleJobs.map((job) => {
-              const source = sourceForJob(job);
-              return (
-                <div key={job.id}>
+            </>
+          )}
+          <div hidden={tab !== "web"}>
+            {webOpened && (
+              <WebImportForm
+                targetSpaceId={target}
+                cloudUserId={cloudUserId}
+                aiAllowed={aiAllowed}
+                onDraftStateChange={setWebDraft}
+                onImport={onWebImport}
+                onSaved={(source) =>
+                  setLogs((current) => [
+                    ...current,
+                    {
+                      title: source.title,
+                      detail:
+                        source.status === "link-only"
+                          ? "已加入链接收藏；没有正文，不参与正文检索。"
+                          : `已加入资料库 · ${source.chunks.length} 个内容块，请留意工作台保存状态。`,
+                      id: source.id,
+                    },
+                  ])
+                }
+              />
+            )}
+          </div>
+          {(visibleJobs.length > 0 || visibleLogs.length > 0) && (
+            <div className="import-results" aria-live="polite">
+              <div
+                className={`import-cloud-confirmation ${cloudConfirmation.tone}`}
+                aria-label="云端确认"
+                role="status"
+              >
+                <Cloud size={16} />
+                <div className="grow">
+                  <b>云端确认</b>
+                  <p>{cloudConfirmation.detail}</p>
+                </div>
+              </div>
+              {visibleJobs.map((job) => {
+                const source = sourceForJob(job);
+                return (
+                  <div key={job.id}>
+                    <FileText size={16} />
+                    <div className="grow">
+                      <b>{source?.title || job.filename}</b>
+                      <p>{jobDetail(job, source)}</p>
+                    </div>
+                    {source && !source.deletedAt && (
+                      <button
+                        className="text-button"
+                        disabled={webDraft.saving}
+                        onClick={() => requestExit(() => onOpen(source.id))}
+                      >
+                        查看
+                      </button>
+                    )}
+                    {(job.status === "queued" || job.status === "running") && (
+                      <button className="text-button" onClick={() => onCancelImport(job.id)}>
+                        取消
+                      </button>
+                    )}
+                    {(job.status === "failed" || job.status === "cancelled") && (
+                      <button
+                        className="text-button"
+                        disabled={!source || !!source.deletedAt || !job.originalSaved}
+                        title={
+                          source?.deletedAt
+                            ? "请先在回收站恢复资料，再重新解析。"
+                            : !source
+                              ? "对应资料的当前版本已不可用，无法重新解析。"
+                              : !job.originalSaved
+                                ? "原文件尚未保存，请重新选择文件。"
+                                : undefined
+                        }
+                        onClick={() => {
+                          void onRetryImport(job.id).catch((cause) =>
+                            setLogs((current) => [
+                              ...current,
+                              {
+                                title: source?.title || job.filename,
+                                detail:
+                                  cause instanceof Error ? cause.message : "重新解析失败，请重试。",
+                              },
+                            ]),
+                          );
+                        }}
+                      >
+                        重新解析
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {visibleLogs.map(({ log, index: logIndex }) => (
+                <div key={logIndex}>
                   <FileText size={16} />
                   <div className="grow">
-                    <b>{source?.title || job.filename}</b>
-                    <p>{jobDetail(job, source)}</p>
+                    <b>{log.title}</b>
+                    <p>{log.detail}</p>
                   </div>
-                  {source && !source.deletedAt && (
-                    <button className="text-button" onClick={() => onOpen(source.id)}>
-                      查看
-                    </button>
-                  )}
-                  {(job.status === "queued" || job.status === "running") && (
-                    <button className="text-button" onClick={() => onCancelImport(job.id)}>
-                      取消
-                    </button>
-                  )}
-                  {(job.status === "failed" || job.status === "cancelled") && (
+                  {log.id && (
                     <button
                       className="text-button"
-                      disabled={!source || !!source.deletedAt || !job.originalSaved}
-                      title={
-                        source?.deletedAt
-                          ? "请先在回收站恢复资料，再重新解析。"
-                          : !source
-                            ? "对应资料的当前版本已不可用，无法重新解析。"
-                            : !job.originalSaved
-                              ? "原文件尚未保存，请重新选择文件。"
-                              : undefined
-                      }
+                      disabled={webDraft.saving}
+                      onClick={() => requestExit(() => onOpen(log.id!))}
+                    >
+                      阅读
+                    </button>
+                  )}
+                  {log.duplicate && (
+                    <button
+                      className="text-button"
                       onClick={() => {
-                        void onRetryImport(job.id).catch((cause) =>
-                          setLogs((current) => [
-                            ...current,
-                            {
-                              title: source?.title || job.filename,
-                              detail:
-                                cause instanceof Error ? cause.message : "重新解析失败，请重试。",
-                            },
-                          ]),
-                        );
+                        const duplicate = log.duplicate!;
+                        if (
+                          queueImportFiles(
+                            [duplicate.file],
+                            duplicate.target,
+                            true,
+                            duplicate.aiAllowed,
+                          )
+                        )
+                          setLogs((current) =>
+                            current.map((item, index) =>
+                              index === logIndex
+                                ? {
+                                    ...item,
+                                    detail: "正在保留独立副本…",
+                                    duplicate: undefined,
+                                  }
+                                : item,
+                            ),
+                          );
                       }}
                     >
-                      重新解析
+                      保留副本
                     </button>
                   )}
                 </div>
-              );
-            })}
-            {visibleLogs.map(({ log, index: logIndex }) => (
-              <div key={logIndex}>
-                <FileText size={16} />
-                <div className="grow">
-                  <b>{log.title}</b>
-                  <p>{log.detail}</p>
-                </div>
-                {log.id && (
-                  <button className="text-button" onClick={() => onOpen(log.id!)}>
-                    阅读
-                  </button>
-                )}
-                {log.duplicate && (
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      const duplicate = log.duplicate!;
-                      if (
-                        queueImportFiles(
-                          [duplicate.file],
-                          duplicate.target,
-                          true,
-                          duplicate.aiAllowed,
-                        )
-                      )
-                        setLogs((current) =>
-                          current.map((item, index) =>
-                            index === logIndex
-                              ? {
-                                  ...item,
-                                  detail: "正在保留独立副本…",
-                                  duplicate: undefined,
-                                }
-                              : item,
-                          ),
-                        );
-                    }}
-                  >
-                    保留副本
-                  </button>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+          <div className="modal-actions">
+            <span className="muted">资料默认仅你可见；后台任务会保存在当前工作区。</span>
+            <button className="btn" disabled={webDraft.saving} onClick={() => requestExit(onClose)}>
+              {webDraft.saving ? "正在确认保存…" : "完成"}
+            </button>
           </div>
-        )}
-        <div className="modal-actions">
-          <span className="muted">资料默认仅你可见；后台任务会保存在当前工作区。</span>
-          <button className="btn" onClick={onClose}>
-            完成
-          </button>
         </div>
-      </div>
-    </Modal>
+      </Modal>
+      {exitAction && (
+        <Modal title="放弃未保存的网页草稿？" onClose={() => setExitAction(null)}>
+          <div className="modal-body">
+            <p>网址、标题和正文还没有加入资料库，仅保留在当前页面。放弃后无法恢复。</p>
+            <div className="modal-actions">
+              <button className="btn" onClick={() => setExitAction(null)}>
+                继续编辑
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={() => {
+                  setExitAction(null);
+                  exitAction();
+                }}
+              >
+                放弃草稿并离开
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }

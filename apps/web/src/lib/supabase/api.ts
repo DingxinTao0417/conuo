@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { accountDeletionAccessSchema, type AccountDeletionAccess } from "@/lib/account-deletion";
 import { getSupabaseConfig } from "./config";
 import { createClient } from "./server";
+import { createBearerClient } from "./bearer-client";
 
 export class ApiError extends Error {
   constructor(
@@ -18,7 +19,7 @@ export function json(data: unknown, status = 200) {
     status,
     headers: {
       "Cache-Control": "private, no-store, max-age=0",
-      Vary: "Cookie",
+      Vary: "Cookie, Authorization",
       "X-Content-Type-Options": "nosniff",
     },
   });
@@ -56,18 +57,30 @@ function isLoopbackAliasOrigin(origin: string, requestUrl: URL): boolean {
 }
 
 /**
- * Confirm the cookie session and then consult the database-side deletion gate.
+ * Confirm the cookie session or explicit native bearer identity, then consult
+ * the database-side deletion gate. An explicit Authorization header never
+ * falls back to cookies, including when it is malformed or expired.
  * Every normal route is denied as soon as an account deletion request exists;
  * the dedicated deletion endpoint opts in only to display its safe status or
  * replay an idempotent request.
  */
 export async function requireUser(request: Request, options: RequireUserOptions = {}) {
-  if (!getSupabaseConfig()) throw new ApiError(503, "CLOUD_NOT_CONFIGURED", "尚未配置云端服务。");
-  const supabase = await createClient();
+  const config = getSupabaseConfig();
+  if (!config) throw new ApiError(503, "CLOUD_NOT_CONFIGURED", "尚未配置云端服务。");
+  const authorization = request.headers.get("Authorization");
+  // A single bounded RFC 6750 bearer value; reject duplicate/combined headers,
+  // unsupported schemes and whitespace inside the credential before any I/O.
+  const bearer =
+    authorization !== null && authorization.length <= 8192
+      ? /^Bearer ([A-Za-z0-9._~+\/-]+=*)$/i.exec(authorization)?.[1]
+      : undefined;
+  if (authorization !== null && !bearer)
+    throw new ApiError(401, "UNAUTHENTICATED", "登录凭据无效，请重新登录。");
+  const supabase = bearer ? createBearerClient(bearer, config) : await createClient();
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = bearer ? await supabase.auth.getUser(bearer) : await supabase.auth.getUser();
   if (error || !user) throw new ApiError(401, "UNAUTHENTICATED", "请先登录，再连接云端资料。");
   if (request.headers.get("X-Conuo-User") !== user.id)
     throw new ApiError(409, "SESSION_CHANGED", "当前账号已改变，请重新载入对应账号的资料。");

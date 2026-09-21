@@ -109,8 +109,7 @@ export default function StorageUsagePanel({ sources, onOpenRecycleBin }: Storage
       </div>
       <div className="storage-usage-footnote">
         <p>
-          这是 Conuo Web 的原件导入保护线，不代表浏览器、Supabase
-          或未来套餐的实际容量；正文、笔记和索引不计入此数字。
+          这里显示 Conuo Web 的原件导入上限，不代表云端服务的总容量。正文、笔记和索引不计入此数字。
         </p>
         {breakdown.recycleBin.originals > 0 && (
           <button className="text-button" type="button" onClick={onOpenRecycleBin}>

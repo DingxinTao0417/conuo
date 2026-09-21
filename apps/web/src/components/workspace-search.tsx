@@ -8,6 +8,7 @@ import {
   crossLibrarySourceReasonLabel,
 } from "@/lib/cross-library-ask";
 import { materializeSearchCandidates, searchWorkspace } from "@/lib/search";
+import { projectMarkdownVisibleText } from "@/lib/markdown-excerpt";
 import type { SearchCandidate, SearchHit, SearchRequest, SearchScope } from "@/lib/search-types";
 import type { Source, SourceKind, WorkspaceData } from "@/lib/types";
 import "./workspace-search.css";
@@ -25,6 +26,14 @@ type SourceSearchHit = Extract<SearchHit, { kind: "source" }>;
 type QuestionSearchHit = SourceSearchHit & {
   locator: Extract<SourceSearchHit["locator"], { kind: "chunk" }>;
 };
+
+function visibleSnippet(hit: SearchHit) {
+  const projection =
+    hit.kind === "source" && (hit.sourceKind === "markdown" || hit.sourceKind === "web")
+      ? projectMarkdownVisibleText(hit.snippet)
+      : null;
+  return (projection?.ok ? projection.visibleText : hit.snippet).replace(/\s+/gu, " ").trim();
+}
 export type WorkspaceSearchIntent = "keyword" | "question";
 
 export interface WorkspaceSearchAskDraft {
@@ -438,7 +447,7 @@ export default function WorkspaceSearch({
                       <strong>{hit.title}</strong>
                       <span>{available ? "可用于资料问答" : reason}</span>
                     </span>
-                    <span className="workspace-search-snippet">{hit.snippet}</span>
+                    <span className="workspace-search-snippet">{visibleSnippet(hit)}</span>
                     <span className="workspace-search-location">
                       {`${hit.sourceKind === "text" ? "TXT" : hit.sourceKind === "markdown" ? "Markdown" : hit.sourceKind === "web" ? "网页" : hit.sourceKind.toUpperCase()} · ${hit.locator.page ? `第 ${hit.locator.page} 页` : hit.locator.section}`}
                       {hit.warnings.length ? ` · ${hit.warnings.join("；")}` : ""}
@@ -470,7 +479,9 @@ export default function WorkspaceSearch({
                 <strong>{hit.title}</strong>
                 <span>{hit.provenance.label}</span>
               </span>
-              <span className="workspace-search-snippet">{hit.snippet || "匹配标题或标签"}</span>
+              <span className="workspace-search-snippet">
+                {visibleSnippet(hit) || "匹配标题或标签"}
+              </span>
               <span className="workspace-search-location">
                 {hit.kind === "source"
                   ? `${hit.sourceKind === "text" ? "TXT" : hit.sourceKind === "markdown" ? "Markdown" : hit.sourceKind === "web" ? "网页" : hit.sourceKind.toUpperCase()} · ${hit.locator.kind === "chunk" ? (hit.locator.page ? `第 ${hit.locator.page} 页` : hit.locator.section) : "标题 / 标签"}`

@@ -1,39 +1,43 @@
-<p align="center">
-  <img src="assets/conuo-logo.png" width="120" height="120" alt="Conuo Logo：相伴的书页与字母 C" />
-</p>
-
-<h1 align="center">Conuo · 可诺</h1>
-
+<p align="center"><img src="assets/conuo-logo.png" width="120" height="120" alt="Conuo Logo" /></p>
+<h1 align="center">Conuo</h1>
 <p align="center"><strong>陪你把知识学会。</strong></p>
 <p align="center">以个人资料库为基础的 AI 陪伴学习工作台</p>
 <p align="center"><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
 
-<p align="center">
-  <a href="docs/PRD.md">产品需求</a> ·
-  <a href="docs/IMPLEMENTATION_STATUS.md">开发状态</a> ·
-  <a href="docs/CLOUD_E2E_ACCEPTANCE.md">云端验收</a> ·
-  <a href="docs/CLOUD_SETUP.md">云端配置</a> ·
-  <a href="docs/REGION_STUDY.md">区域视觉</a> ·
-  <a href="docs/TRAE_DESIGN_PROMPT.md">页面设计</a>
-</p>
-
----
-
-Conuo 希望把文件、网页和笔记组织为可检索、可追溯的个人知识库。阅读时提出问题，回到原文核对依据，把自己的理解保存下来，下次从上次的问题继续。
-
-**Web 版采用云端唯一正式存储，登录后使用。** 工作区、笔记、阅读进度和已接受的知识更新保存到 Supabase PostgreSQL，原件保存在私有 Storage。页面只用内存暂存编辑和上传字节，刷新后重新读取云端；本地与云端共存留给未来桌面版。详见 [Web 存储政策](docs/WEB_CLOUD_STORAGE.md)。
-
-> **当前状态：首版 Web 开发中，独立 staging 已部署。** staging Supabase 已从空项目顺序应用全部 27 份迁移，Vercel 已连接 GitHub `staging` 自动部署；原生产 Vercel 保持 `main`，且已关闭 Preview 自动部署。分钟级资料整理处理器和三条清理 Cron 已配置。真实网页已验证登录、TXT 上传与恢复、A/B 账号隔离、双会话 CAS、DeepSeek 问答与 PDF 区域视觉、后台资料整理，以及整理取消、资料／历史版本清理和解析完成／取消／重试六条业务冲突接口；后者在 Git 自动部署后重新实测均在 274–303ms 内返回 409。上传中断孤立原件清理、带数据的历史版本清理、资料彻底删除、关联内容选择、Storage 物理删除、账号封锁、Auth 用户删除、真实注册确认邮件、同浏览器 PKCE、真实等待后的过期 signup 链路，以及 Chrome／Edge 跨一小时的持久会话自动刷新也已通过。真实找回请求已由 Auth 接受并记录发送时间，但实际收件与跨浏览器回调尚无证据。原生产 Supabase 最后一次核验仍为 19 份迁移，尚未升级；当前 staging 代码与生产数据库不一致，不能视为正式发布。真双设备与断网、Cron 自然触发、真实找回密码邮件的后半链路、跨浏览器邮件和备份恢复仍待验收，因此完整 M0 尚未放行。模型未配置时保留原文摘录；云端问答支持生成式回答与原文引用。Web App Manifest 已提供安装名称、图标和快捷入口；HTTPS staging 可由支持的浏览器加入桌面或主屏，但这不是离线包。详细证据见 [staging 部署记录](docs/STAGING_DEPLOYMENT.md)与[生产发布手册](docs/PRODUCTION_RELEASE.md)。
-
-PDF 当前页已提供固定区域视觉学习，由支持图像的多模态模型直接解读截图、回答区域问题或生成一次性练习。解读按摘要、图中观察、分析推导和学习要点分节展示，正文、问答与练习支持 Markdown 和公式排版。截图只在用户明确点击发送时临时传输，结果绑定资料、版本、物理页和归一化矩形，截图默认不持久化。该流程不依赖 OCR，也不生成全文索引；扫描 PDF 正文仍不能检索。当前 DeepSeek `deepseek-flash` 已通过真实登录后的截图解读、图片问答和中文练习生成，服务端账本已记录完成；详见[区域视觉说明](docs/REGION_STUDY.md)。
+Conuo 将文件、网页和笔记组织成可检索、可追溯的个人知识库。阅读时提问，回到原文核对依据，保存自己的理解，下次从上次的问题继续。
 
 **收集资料 → 阅读提问 → 核对原文 → 保存理解 → 继续学习**
 
-PDF 阅读支持“单页／连续滚动”，可在读到中途切换并保持可用的页内位置；连续模式按实际物理页更新进度，附近页面按需绘制。手机端切换入口常驻阅读区上方，平板与宽屏沿用阅读工具。详见 [PDF 阅读模式](docs/PDF_READING_MODES.md)。
+## 当前状态
 
-账号注销确认后，Web 停止该账号的任务与访问、清理当前页面的暂存内容，并保留会话封锁；刷新后由云端身份与注销闸门重新核验。当前 Web 不以旧 IndexedDB 缓存作为可用工作区，也不自动清理遗留副本。staging 已真实完成带原件账号的访问封锁、Storage 清理和 Auth 用户删除；跨设备注销与清理任务异常恢复仍待验收。旧缓存格式和兼容边界见[原件与遗留缓存说明](docs/LOCAL_ORIGINALS.md)。
+Web 已部署独立 [staging](https://conuo-staging.vercel.app)，仍在完成生产发布验收。主自然 Cron 已通过；项目负责人已确认物理双设备同步与同浏览器真实找回密码通过。清理韧性、跨浏览器邮件与灾备等剩余门槛见[部署记录](docs/STAGING_DEPLOYMENT.md)和[生产发布手册](docs/PRODUCTION_RELEASE.md)。原生产尚未升级。
 
-已应用的知识页 AI 更新可以先对照更新前、AI 更新后与当前内容，再局部撤回：保留能确认的后续独立编辑，重叠或重复位置由用户选择或纯文本合并。确认会新增历史并封存该任务，全保留也不能再采用剩余建议；Web 等待云端保存确认。尚未应用的审核勾选和编辑只在当前页面暂存，刷新不恢复。详见[知识页安全撤回](docs/KNOWLEDGE_UPDATE_WITHDRAWAL.md)。
+Windows/macOS 与 iOS/iPadOS 已进入本地设计开发，**尚未签名、发布或完成 Apple 真机验收**。本轮移动 Bearer API 改动尚未部署，不能将现有 staging 视为原生整链路已就绪。Expo Web 预览只展示明确标注的示例，不提供真实登录，也不替代原生验收。
+
+| 平台            | 路线与当前范围                                                                           | 后续边界                                                      |
+| --------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Web             | Next.js + React；现有云端学习工作台持续完善                                              | 正式发布按独立云端门槛推进                                    |
+| Windows / macOS | Electron D0 安全宿主起步，D1 复用并验收完整 Web 云端功能                                 | D2 才实现本地数据库、文件缓存与离线共存；D3 系统浏览及分发    |
+| iOS             | Expo SDK 57 + React Native 0.86；开发登录、云端资料/知识阅读、单资料 JSON 问答与文本笔记 | 当前只是 I1 部分起步；系统分享、完整阅读与发布按平台 PRD 验收 |
+| iPadOS          | 与 iOS 共用工程，采用平板自适应布局                                                      | P1 云端宽屏核心；P2 才进入 Pencil、多窗口、分享与深度阅读增强 |
+| Android         | 长期目标                                                                                 | 不在本轮原生开发范围                                          |
+
+Web 和首批客户端以云端作为正式资料存储。浏览器业务输入与原件仅在会话内存暂存；原生安全认证存储不等于本地资料库。桌面 D2 才提供本地与云端共存，当前没有完整离线工作区。详见 [Web 存储政策](docs/WEB_CLOUD_STORAGE.md)及各平台 PRD。
+
+## Web 功能概览
+
+| 能力         | 现有功能                                                                          |
+| ------------ | --------------------------------------------------------------------------------- |
+| 资料与知识库 | 学习空间、资料书架、标签、筛选、普通搜索与回收站；资料和 AI 知识页分别管理        |
+| 文件与网页   | PDF、DOCX、Markdown、TXT、公开网页导入；保留原件与版本；支持备份恢复和导出        |
+| 阅读         | PDF 单页/连续滚动、正文阅读、批注、引用回跳与云端阅读位置                         |
+| 基于资料问答 | 当前资料或明确选择范围提问；回答支持 Markdown、公式与原文引用；AI 使用须先授权    |
+| 区域视觉学习 | 明确发送 PDF 当前区域截图后解读、提问或生成一次性练习；不依赖 OCR，不创建全文索引 |
+| 知识整理     | 摘要、标签、主题草稿、知识页更新与关系建议；人工审核后保存，保留来源和历史        |
+| 笔记与接续   | 富文本笔记、摘录、对话记录、继续学习和未解决问题                                  |
+| 账号与保存   | Supabase Auth、私有 Storage、云端版本冲突保护、资料删除与账号注销流程             |
+
+“已保存”以云端确认结果为准；断网不创建匿名或本地工作区。AI 生成内容不自动替代原始资料。原生客户端实际覆盖范围单独记录，不由此表推断。
 
 ## 快速开始
 
@@ -44,129 +48,53 @@ npm install
 npm run dev
 ```
 
-打开 [http://127.0.0.1:3000](http://127.0.0.1:3000)。先完成 Supabase 配置，再注册或登录使用工作台。未配置时显示配置提示，未登录时显示账号入口；不会创建匿名工作区。示例资料需要主动添加，首次打开不会自动混入演示内容。
+打开 [http://127.0.0.1:3000](http://127.0.0.1:3000)。按[云端配置](docs/CLOUD_SETUP.md)填写 [Web 环境示例](apps/web/.env.example)，配置后登录使用；未配置或未登录时不会创建匿名工作区。PDF worker 与 Logo 由开发/构建脚本准备。
 
-开发与构建脚本会自动准备 PDF worker 和应用 Logo，无需手动复制。停止开发服务器可在运行终端按 `Ctrl+C`。
-
-按[云端开发配置](docs/CLOUD_SETUP.md)设置 `apps/web/.env.local`、数据库迁移与 Auth 回调。环境变量示例在 [apps/web/.env.example](apps/web/.env.example)；`NEXT_PUBLIC_*` 公开变量只能使用项目 URL 和 publishable／anon key，不能放服务端特权密钥。可选生成式问答的模型密钥和 Supabase 请求账本密钥仅放服务端变量，配置方法见[模型服务配置](docs/MODEL_SETUP.md)。不要提交真实配置或在聊天中发送密钥。
-
-## 当前可以体验什么
-
-| 能力               | 当前实现                                                                                                                                                                                                                                                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 资料与知识库       | 创建学习空间，以书封式知识库浏览资料；首次添加资料会先命名知识库并预选它作为导入目标；支持手动标签、空间关联、搜索、列表与回收站恢复。资料可按最近更新、最近添加或名称排列，列表展示更新时间，排序会随资料库 URL 恢复。                                                                                                              |
-| 文件导入           | PDF、DOCX、Markdown、TXT；保留原件、内容哈希、资料版本标识和文本块，相同内容可复用或保留副本。新资料默认不允许 AI 使用，需在导入时明确勾选；未授权资料仍可解析、阅读和普通搜索。当前浏览器会预检单文件与批量条件，并在哈希判重和实际保存前核对保留原件额度。                                                                         |
-| 文件替换与历史     | 预览后明确将文件保存为新版本，支持上述格式互换；保留资料名称、标签、归属、权限及各版原件，旧引用回到只读历史版。当前相同内容拒绝重复换版；详见[文件版本](docs/FILE_VERSIONS.md)。                                                                                                                                                    |
-| 网页收藏           | 主动提取公开文章，保存正文、选段或仅链接；支持手动粘贴、确认刷新与历史快照阅读，保留网址、时间和旧引用。新网页默认不允许 AI 使用，导入弹窗的明确勾选同时适用于文件和网页；详见 [网页导入](docs/WEB_IMPORT.md)。                                                                                                                      |
-| 阅读               | PDF 原页、分页缩放、文字选择与高亮；文本阅读、原件下载和阅读位置保存。PDF 当前页可框选固定区域；扫描 PDF 可保留原件，但正文仍无 OCR。                                                                                                                                                                                                |
-| 区域视觉学习       | 明确发送 PDF 当前区域后，由支持图像的模型解读、回答区域问题或生成一次性练习。截图临时传输且默认不持久化，结果固定到资料、版本、物理页和归一化矩形；不进入全文检索或整库索引。详见[区域视觉说明](docs/REGION_STUDY.md)。                                                                                                              |
-| Web 安装入口       | 提供 Web App Manifest、180/192/512 品牌图标、资料库与问答快捷入口，以及 iOS/iPadOS 独立窗口元数据。设置会按浏览器状态显示直接安装、Safari 添加主屏或已安装状态；通过 HTTPS 部署后，支持的浏览器可将其加入桌面或主屏，未提供离线资料包或服务工作线程。                                                                                |
-| 原文检索与引用     | 针对选段、当前资料、选定资料或当前空间检索；明确标为原文摘录，引用保留资料、版本、页码或章节。                                                                                                                                                                                                                                       |
-| 普通与语义搜索     | 资料工具栏提供关键词和问题两种搜索，共用类型、标签和时间筛选。问题模式展示可核对的原文片段，可选 1—5 份并预填跨库问答，但不会自动发送；详见[搜索与索引](docs/SEARCH_INDEXING.md)。                                                                                                                                                   |
-| 生成式问答接入     | 服务端模型适配、出处／区域绑定、权限复核和请求账本；Web 问答流式预览并在完整确认后保存。本机 DeepSeek `deepseek-flash` 已通过真实截图输入的多模态适配器冒烟测试；视觉仍需显式设置 `CONUO_MODEL_VISION_ENABLED=true`。现有账本密钥已在忽略的本地环境文件配置，真实资料问答和区域视觉已联调通过。详见[模型配置](docs/MODEL_SETUP.md)。 |
-| 资料整理与主题草稿 | 单份摘要、标签和主题建议；选择 1—10 份资料生成最多 3 个主题草稿，逐项接受、编辑或忽略。标签需手动勾选，支持固定与受保护的撤回；详见[资料整理说明](docs/ORGANIZATION.md)。                                                                                                                                                            |
-| 知识页更新与撤回   | 逐项接受或忽略最多 12 项原文支持的更新；已应用任务可预览三方内容，保留独立人工编辑，冲突需选择或纯文本合并。确认后保留历史并封存整个任务；Web 等待云端保存确认，详见[安全撤回](docs/KNOWLEDGE_UPDATE_WITHDRAWAL.md)。                                                                                                                |
-| 笔记               | Tiptap 编辑、摘录与回答保存、知识页草稿、历史版本恢复；保留来源引用。                                                                                                                                                                                                                                                                |
-| 知识页资料库       | 按知识库主题分组浏览知识页，区分 AI 草稿、人工草稿与已保存状态；卡片展示摘要、关联资料数和更新时间。支持状态筛选与标题、正文、来源搜索，筛选和搜索会随 URL 恢复。                                                                                                                                                                    |
-| 云端保存与导出     | 登录账号的工作区保存于 PostgreSQL，原件保存于私有 Storage；可审阅并导出整个工作区或指定知识库。ZIP 保留纳入资料的当前与全部历史原件、文字、引用映射、笔记、对话和标注；库外引用资料及其批注会在预览中明确列出。笔记、知识页及其历史包含 Markdown、安全 HTML 与原始正文备份，详见[导出格式](docs/EXPORT_FORMAT.md)。                  |
-| 资料彻底删除       | 云端影响预览后确认删除全部资料版本；独立笔记、知识页和对话默认保留。支持逐篇选择含历史正文、逐个整对话清理及防复活墓碑；staging 已真实完成关联内容选择、Storage 物理删除及旧快照防复活验证。详见[彻底删除](docs/PERMANENT_DELETION.md)。                                                                                             |
-| 从备份恢复         | 预览 Conuo ZIP 后恢复为新增副本，保留历史和引用；核对原件与缺失清单，新增资料默认关闭 AI。登录后等待当前账号云端保存确认，详见[备份恢复](docs/BACKUP_RESTORE.md)。                                                                                                                                                                   |
-
-Web 的“已保存”以云端确认结果为准；编辑留在当前页面不等于已保存。初始云端读取失败时保持加载错误，不创建空库或发起覆盖写入；保存未确认时提示重试，离开和退出会保护未保存内容，不提供“保留本机草稿并退出”。登录且保存确认后才能使用云端搜索；**新问答仍只检索原始资料**，普通搜索已包含笔记和已接受知识页，草稿默认排除。
-
-普通搜索可先按笔记／知识页及创建时间筛选，再输入关键词；空关键词按所选类型浏览。类型与日期通过 URL 恢复，关闭 AI 不隐藏普通结果，资料标签与收藏不应用到笔记／知识页。批量添加标签会在云端保存确认后逐项展示结果，并仅重试失败项；详见[批量标签](docs/BULK_TAGS.md)。
-
-批量关联学习空间和移入回收站也等待云端保存确认，逐项显示已处理、无需修改和失败。保存失败可重存最新快照，保留首次成功项；继续审核只带入本次成功新增的资料。详见[批量资料操作](docs/BULK_SOURCE_ACTIONS.md)。
-
-资料分析已通过真实模型生成摘要、8 个标签与 5 个主题建议；两份资料生成 3 个知识主题，人工接受后的知识页及引用已云端保存并刷新恢复。staging 的持久整理队列、processor 与分钟调度已真实发布后台任务，关闭页面后仍可继续；自动分析默认关闭，知识页更新和关系分析仍随浏览器请求。独立向量任务已保存在数据库，支持租约、检查点、取消和重试，但 [Python 索引处理器](apps/processor/README.md)仍需显式运行，尚未部署云调度。整理建议需人工审核后应用，详见[云端验收](docs/CLOUD_E2E_ACCEPTANCE.md)。
-
-## 技术栈
-
-设置页提供 AI 请求用量、UTC 重置规则和本机时间；缺少服务端账本配置时显示未知，不制造零余额。正式原件按当前账号权限从私有 Storage 读取，导入与恢复过程中只在内存暂存。旧匿名资料仅在用户明确发起“导入旧版资料”时只读访问，校验后恢复为当前云端账号的新副本；旧资料和原件保留，不自动合并或删除。详见[模型配置](docs/MODEL_SETUP.md)和[原件与遗留缓存说明](docs/LOCAL_ORIGINALS.md)。
-
-| 层级           | 选型与状态                                                                                                                                                                 |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web 与 API     | Next.js 16 · React 19 · TypeScript；App Router 与 `/api/v1/` Route Handlers                                                                                                |
-| 样式           | Tailwind CSS 4 与组件样式；知识库采用书封式文件管理布局，阅读器延续 TraeWork 原型                                                                                          |
-| 阅读与编辑     | PDF.js · Tiptap；DOCX 文本提取使用 Mammoth；PDF 区域截图在浏览器内生成，仅由明确发送动作交给多模态模型                                                                     |
-| 会话暂存       | 内存快照与待上传原件；浏览器内文本切块与关键词检索                                                                                                                         |
-| 云端账号与文件 | Supabase Auth + Storage；独立 staging 已应用 27 份迁移，并完成 TXT 上传、恢复、原件哈希及 A/B 账号隔离验证。原生产仍为此前记录的 19 份迁移；真双设备并发与断网矩阵待验收。 |
-| 数据库         | Supabase PostgreSQL；原子同步资料、不可变版本与内容块，JSONB 工作区仍作为 3 MiB 兼容保存协议                                                                               |
-| 模型接入       | 服务端 Chat Completions 适配器；staging 已完成真实 DeepSeek 资料问答、区域视觉、资料整理和请求账本联调。原生产未升级，模型质量矩阵仍待验收。                               |
-| 检索与任务     | pgvector、持久索引队列、Python 3.12 有界 CLI；staging 已部署资料整理调度，向量索引处理器仍未部署云调度，当前真实问答使用关键词召回。                                       |
-| 部署目标       | Vercel；`apps/web` 为项目根目录。staging 从 GitHub `staging` 自动部署；原生产从 `main` 发布，Preview 自动部署已关闭。                                                      |
-
-精确依赖版本见 [apps/web/package.json](apps/web/package.json) 和锁文件；完整目标架构见[技术方案](docs/TECH_STACK.md)。
+公开配置只能包含项目 URL 与 publishable/anon key。模型密钥和 Supabase 特权密钥只放服务端，不打包到客户端、不提交到 Git。模型接入见[模型配置](docs/MODEL_SETUP.md)。
 
 ## 开发命令
 
-以下命令均在仓库根目录执行：
+| 命令                                                 | 用途                           |
+| ---------------------------------------------------- | ------------------------------ |
+| `npm run dev`                                        | Web 开发服务器                 |
+| `npm run build` / `npm start`                        | 构建 / 运行 Web 生产构建       |
+| `npm run typecheck` / `npm run lint` / `npm test`    | Web 类型、静态与测试检查       |
+| `npm run desktop:dev`                                | 启动 Electron 开发宿主         |
+| `npm run desktop:build`                              | 桌面本地构建；不等于签名或发布 |
+| `npm run mobile:dev`                                 | Expo 原生开发入口              |
+| `npm run mobile:preview`                             | 移动/平板 Web 示例预览         |
+| `npm run clients:typecheck` / `npm run clients:test` | 客户端类型与测试检查           |
 
-| 命令                | 用途                    |
-| ------------------- | ----------------------- |
-| `npm run dev`       | 启动本地 Web 开发服务器 |
-| `npm run typecheck` | TypeScript 类型检查     |
-| `npm run lint`      | ESLint 检查             |
-| `npm run test`      | 运行 Vitest 测试        |
-| `npm run build`     | 生成 Next.js 生产构建   |
-| `npm start`         | 本地运行已有生产构建    |
+测试结果与平台构建限制见[客户端开发记录](docs/CLIENT_IMPLEMENTATION.md)，Web 云端验收证据见[开发状态](docs/IMPLEMENTATION_STATUS.md)。迁移测试使用 PGlite，不需要安装或启动本地 PostgreSQL。Apple 原生系统构建与真机验收需对应环境，浏览器预览无法替代。
 
-本地测试覆盖导入、引用、范围隔离、持久化竞态、导出及 API 边界，并以 PGlite + pgvector 执行真实迁移。Python 验证命令见[处理器说明](apps/processor/README.md)。这些结果不代表真实 Supabase 多连接、登录邮件或跨设备同步已验收；运行记录见[开发状态](docs/IMPLEMENTATION_STATUS.md)。
+## 技术与目录
 
-## 目录结构
+Web 和统一业务 API 使用 Next.js、React、TypeScript、Tailwind CSS；PDF.js 和 Tiptap 负责现有阅读与编辑。Supabase 提供 Auth、PostgreSQL、私有 Storage 与 pgvector，Vercel 承载 Web/API。Python 有界索引 CLI 与云端任务调度有各自部署边界，详见[技术方案](docs/TECH_STACK.md)。
 
 ```text
 conuo/
-├── apps/web/
-│   ├── src/app/                     # 页面、Auth 回调与业务 API
-│   ├── src/components/              # 知识库、阅读器、笔记和账号界面
-│   ├── src/lib/                     # 导入、检索、保存、云端与测试
-│   ├── scripts/prepare-assets.mjs   # 准备 PDF worker 和 Logo
-│   ├── .env.example                 # 公开连接配置与可选服务端变量示例
-│   └── package.json
-├── apps/processor/                 # Python 有界向量任务处理器与本地测试
-├── supabase/
-│   ├── migrations/                 # 数据库与私有 Storage 迁移
-│   └── tests/                      # 待在隔离数据库运行的 RLS 验证
-├── assets/conuo-logo.png
-├── docs/
-│   ├── PRD.md
-│   ├── TECH_STACK.md
-│   ├── TRAE_DESIGN_PROMPT.md
-│   ├── CLOUD_SETUP.md
-│   ├── WEB_CLOUD_STORAGE.md
-│   ├── MODEL_SETUP.md
-│   ├── REGION_STUDY.md
-│   ├── SEARCH_INDEXING.md
-│   ├── ORGANIZATION.md
-│   ├── KNOWLEDGE_UPDATE_WITHDRAWAL.md
-│   ├── FILE_VERSIONS.md
-│   ├── EXPORT_FORMAT.md
-│   └── IMPLEMENTATION_STATUS.md
-├── README.md
-├── README.en.md
-├── package.json                    # npm 工作区与根命令
-└── package-lock.json
+├── apps/web/          # Web、统一业务 API 与测试
+├── apps/desktop/      # Electron 桌面宿主
+├── apps/mobile/       # Expo iOS / iPadOS 同工程双布局
+├── apps/processor/    # Python 有界索引 CLI
+├── supabase/          # 数据库迁移与隔离验证
+├── docs/              # 公共/平台 PRD、功能说明与发布证据
+├── assets/            # 品牌资源
+├── README.md          # 默认中文入口
+└── README.en.md       # English
 ```
 
-本地 `conuo-design/` 保存设计资源与原型，已由 `.gitignore` 排除，不作为运行时依赖。`.env.local`、依赖、构建结果与测试产物同样不纳入 Git。
+本地 `conuo-design/` 设计资产保留并由 Git 忽略，不是运行时依赖。旧页面生成提示词已退出当前文档体系，设计依据改为公共/平台 PRD 与[界面规范](docs/UI_STYLE_GUIDE.md)。
 
-## 路线图与边界
+## 文档
 
-- **M0 · Web 开发中**：已有知识页审核、类型化关系、文件与网页版本链、普通搜索及资料索引管线；staging 已部署后台资料整理并通过孤立上传清理、带数据删除、注销主链路、真实注册确认邮件与同浏览器 PKCE，继续验证真双设备、断网、自然 Cron、剩余账号邮件场景、备份恢复及模型质量。
-- **后续 Web**：按使用反馈评估整库 OCR、更多文件格式、后台知识整理，以及完整练习作答与回顾。首版 PDF 区域的一次性练习不代表这些系统已经完成。
-- **其他平台**：目前只开发响应式 Web。手机、iPad、Windows、macOS 独立客户端在 Web 核心功能稳定后另行评估，尚未排期；桌面版本地与云端共存需单独设计和验收。
+- 产品：[公共 PRD](docs/PRD.md) · [Windows/macOS](docs/DESKTOP_PRD.md) · [iOS](docs/IOS_PRD.md) · [iPadOS](docs/IPADOS_PRD.md)
+- 开发：[技术方案](docs/TECH_STACK.md) · [界面规范](docs/UI_STYLE_GUIDE.md) · [开发状态](docs/IMPLEMENTATION_STATUS.md)
+- 云端：[配置](docs/CLOUD_SETUP.md) · [验收](docs/CLOUD_E2E_ACCEPTANCE.md) · [部署](docs/STAGING_DEPLOYMENT.md) · [生产发布](docs/PRODUCTION_RELEASE.md) · [灾备](docs/DISASTER_RECOVERY.md)
+- 功能：[文件版本](docs/FILE_VERSIONS.md) · [区域视觉](docs/REGION_STUDY.md) · [流式问答](docs/STREAMING_ANSWERS.md) · [搜索](docs/SEARCH_INDEXING.md) · [知识整理](docs/ORGANIZATION.md) · [备份恢复](docs/BACKUP_RESTORE.md) · [导出](docs/EXPORT_FORMAT.md)
 
-资料彻底删除和账号注销已有协议与受保护服务端执行入口：[前者](docs/PERMANENT_DELETION.md)默认保留另存内容，并支持逐篇笔记／知识页含全部历史和整对话选择清理；后者要求影响预览、邮箱/密码/`DELETE` 确认，通过 Storage/Auth 两阶段 outbox 停止访问和清理原件。所需迁移和三条清理 Cron 已在 staging 部署；两种上传中断状态的孤立原件、带数据的历史版本清理、资料彻底删除、Storage 物理删除、账号封锁与 Auth Admin 删除均已通过。自然 Cron、崩溃恢复和完整双设备并发仍待联调。旧浏览器缓存删除保护的历史实现与验证不代表当前 Web 存储模式，完整 M0 和服务端灾难恢复仍有待完成项。个人 ZIP 可恢复为新增云端副本，详见[备份恢复](docs/BACKUP_RESTORE.md)。整理记录当前最多 1000 个，和其他内容共用 3 MiB 工作区快照上限；设置页可在影响确认后清理已收起、失败和已停止的终态记录，待审核及执行中的任务会保留。详细范围以 [PRD](docs/PRD.md) 为准，实际进度以[开发状态](docs/IMPLEMENTATION_STATUS.md)为准。
-
-文件导入与替换上限为每个 30 MiB；浏览器每批最多 20 个文件、合计 150 MiB。入口按每账号 512 MiB 的保守阈值执行原件预留；第 21、25 份迁移已在 staging 应用并完成真实上传与跨账号隔离验证，但这不是本机存储额度或正式云端套餐承诺，原生产仍未升级。导入在当前页面内存中重新判重并检查容量，再由保存队列上传原件、提交云端 revision CAS。初始加载、刷新和跨页面重载只读取云端，其他标签页不以共享 IndexedDB 交换工作区。发生云端冲突时保留当前页面编辑供明确处理，不自动合并，也不提供可跨刷新恢复的本机草稿。每份资料最多保留 200 个历史版本，全部版本文字与片段共用 3 MiB 工作区上限，不自动裁剪历史。版本记录可在影响确认后把一个确切旧版恢复为当前版；登录且保存完成后，也可通过服务端影响预览和“清理”确认单独清理历史版本，旧引用不会被替换。解析仍在浏览器执行；真实原件、A/B 隔离、资料问答与区域视觉已联调，完整双设备并发与断网矩阵仍待验收。
-
-## 文档与协作
-
-[产品需求](docs/PRD.md) · [技术方案](docs/TECH_STACK.md) · [页面设计](docs/TRAE_DESIGN_PROMPT.md) · [云端配置](docs/CLOUD_SETUP.md) · [Web 存储政策](docs/WEB_CLOUD_STORAGE.md) · [云端验收](docs/CLOUD_E2E_ACCEPTANCE.md) · [生产发布](docs/PRODUCTION_RELEASE.md) · [灾备演练](docs/DISASTER_RECOVERY.md) · [模型配置](docs/MODEL_SETUP.md) · [区域视觉](docs/REGION_STUDY.md) · [流式问答](docs/STREAMING_ANSWERS.md) · [搜索与索引](docs/SEARCH_INDEXING.md) · [资料整理](docs/ORGANIZATION.md) · [知识页安全撤回](docs/KNOWLEDGE_UPDATE_WITHDRAWAL.md) · [文件版本](docs/FILE_VERSIONS.md) · [彻底删除](docs/PERMANENT_DELETION.md) · [导出格式](docs/EXPORT_FORMAT.md) · [开发状态](docs/IMPLEMENTATION_STATUS.md) · [Logo](assets/conuo-logo.png)
-
-功能调整应对应需求与验收场景，保留来源、人工修改和可恢复状态。知识库页面按最新书封式布局迭代；阅读器保留原设计的正文与问答分栏。实现记录应区分代码已编写、本地已验证和真实云端已验证。
+需求、代码、本地验证、真实云端/真机验收、签名和发布分别记录。详细产品文档当前以简体中文维护。
 
 ## 许可证
 
-项目尚未选定许可证，当前没有 `LICENSE` 文件。设计系统与图标资源的使用范围以其原始授权为准。
+项目尚未选定许可证，当前没有 `LICENSE` 文件。第三方组件与资源遵循各自授权。

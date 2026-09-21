@@ -42,7 +42,10 @@ export type AccountSignOutControl = {
   keepLocalDraftAndSignOut: () => Promise<void>;
 };
 
+export type AccountEntryMode = "login" | "signup" | "reset";
 type Props = {
+  appearance?: "panel" | "entry";
+  onModeChange?: (mode: AccountEntryMode) => void;
   storageMode?: "hybrid" | "cloud";
   onSessionChange: (user: CloudUser | null) => void;
   onClose: () => void;
@@ -69,6 +72,8 @@ function defaultSignOutMessage(state: AccountSignOutState) {
 }
 
 export default function AccountPanel({
+  appearance = "panel",
+  onModeChange,
   storageMode = "hybrid",
   onSessionChange,
   onClose,
@@ -76,7 +81,8 @@ export default function AccountPanel({
   signOutControl,
 }: Props) {
   const [user, setUser] = useState<CloudUser | null>(null);
-  const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
+  const [mode, setMode] = useState<AccountEntryMode>("login");
+  useEffect(() => onModeChange?.(mode), [mode, onModeChange]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -381,7 +387,7 @@ export default function AccountPanel({
   return (
     <section
       className="account-panel"
-      aria-labelledby="account-title"
+      aria-labelledby={appearance === "entry" ? "web-cloud-entry-title" : "account-title"}
       style={{
         width: "100%",
         maxWidth: 420,
@@ -391,28 +397,35 @@ export default function AccountPanel({
         borderRadius: 12,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 24,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {configured ? (
-            <Cloud size={22} color="#4B3FE3" />
-          ) : (
-            <HardDrive size={22} color="#4B3FE3" />
-          )}
-          <h2 id="account-title" style={{ margin: 0, fontSize: 20 }}>
-            {configured ? "账号与云端资料" : "本机工作区"}
-          </h2>
+      {appearance !== "entry" && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 24,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {configured ? (
+              <Cloud size={22} color="#4B3FE3" />
+            ) : (
+              <HardDrive size={22} color="#4B3FE3" />
+            )}
+            <h2 id="account-title" style={{ margin: 0, fontSize: 20 }}>
+              {configured ? "账号与云端资料" : "本机工作区"}
+            </h2>
+          </div>
+          <button
+            type="button"
+            className="btn icon-btn"
+            aria-label="关闭账号设置"
+            onClick={onClose}
+          >
+            <X size={18} />
+          </button>
         </div>
-        <button type="button" className="btn icon-btn" aria-label="关闭账号设置" onClick={onClose}>
-          <X size={18} />
-        </button>
-      </div>
+      )}
       {!configured ? (
         <div style={{ lineHeight: 1.8 }}>
           <p>当前使用本机工作区。资料仅保存在这个浏览器中。</p>
@@ -654,13 +667,15 @@ export default function AccountPanel({
         </div>
       ) : (
         <form onSubmit={submit} style={{ display: "grid", gap: 16 }}>
-          <p style={{ margin: 0, color: "#737373", fontSize: 14 }}>
-            {mode === "signup"
-              ? "创建账号，保存你的学习资料。"
-              : mode === "reset"
-                ? "通过邮箱找回账号。"
-                : "登录后继续你的云端学习工作区。"}
-          </p>
+          {appearance !== "entry" && (
+            <p style={{ margin: 0, color: "#737373", fontSize: 14 }}>
+              {mode === "signup"
+                ? "创建账号，保存你的学习资料。"
+                : mode === "reset"
+                  ? "通过邮箱找回账号。"
+                  : "登录后继续你的云端学习工作区。"}
+            </p>
+          )}
           <label style={{ display: "grid", gap: 7, fontSize: 13 }}>
             邮箱
             <input

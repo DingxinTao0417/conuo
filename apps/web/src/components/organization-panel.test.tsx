@@ -110,7 +110,7 @@ describe("OrganizationPanel source selection layout", () => {
     });
 
     expect(host.textContent).toContain("后台整理等待部署");
-    expect(host.textContent).toContain("不能承诺 source／knowledge 任务在关闭页面后继续");
+    expect(host.textContent).toContain("当前请保持页面打开，资料分析和知识页生成尚不能在后台继续");
     const analyze = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
       (button) => button.textContent?.replace(/\s+/g, "") === "分析这份资料",
     )!;

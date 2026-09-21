@@ -134,8 +134,9 @@
     z-index: 32;
     width: auto;
     max-width: none;
-    height: min(64dvh, 590px);
-    min-height: min(360px, 100%);
+    height: calc(100% - 12px);
+    max-height: calc(100dvh - env(safe-area-inset-top) - 56px);
+    min-height: 0;
     flex: 0 0 auto;
     border: 1px solid #e4e2ec;
     border-bottom: 0;

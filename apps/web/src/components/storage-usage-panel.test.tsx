@@ -87,7 +87,7 @@ describe("StorageUsagePanel", () => {
     expect(host.textContent).toContain("当前资料1 份原件20 MiB");
     expect(host.textContent).toContain("历史版本1 份原件5 MiB");
     expect(host.textContent).toContain("回收站1 份原件3 MiB");
-    expect(host.textContent).toContain("不代表浏览器、Supabase 或未来套餐的实际容量");
+    expect(host.textContent).toContain("不代表云端服务的总容量");
 
     const progress = host.querySelector('[role="progressbar"]');
     expect(progress?.getAttribute("aria-valuenow")).toBe(String(28 * MEBIBYTE));

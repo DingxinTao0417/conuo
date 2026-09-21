@@ -457,9 +457,34 @@
   .modal {
     max-height: calc(100dvh - 24px);
   }
+  .modal-actions {
+    flex-wrap: wrap;
+  }
+  .modal button,
+  .modal .btn,
+  .modal .text-button,
+  .modal .tabs button {
+    min-height: 44px;
+    font-size: 14px;
+  }
   .modal-actions .btn {
-    font-size: 11px;
-    padding: 6px 9px;
+    padding: 8px 12px;
+    white-space: normal;
+  }
+  .modal .icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .modal input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  .modal textarea,
+  .modal textarea.field,
+  .modal select,
+  .modal select.field {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .modal-body label {
+    font-size: 13px;
   }
   .toast {
     bottom: calc(68px + env(safe-area-inset-bottom));

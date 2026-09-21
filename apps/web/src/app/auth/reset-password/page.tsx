@@ -55,12 +55,26 @@ export default function ResetPasswordPage() {
   }
   return (
     <main style={{ maxWidth: 420, margin: "12vh auto", padding: 24 }}>
-      <Link href="/" style={{ color: "#4B3FE3" }}>
+      <Link
+        href="/"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          minHeight: 44,
+          padding: "0 14px",
+          borderRadius: 8,
+          background: "var(--brand-soft)",
+          color: "var(--brand)",
+          fontWeight: 500,
+        }}
+      >
         ← 返回 Conuo
       </Link>
-      <h1 style={{ fontSize: 24, marginTop: 30 }}>设置新密码</h1>
+      <h1 style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.45, marginTop: 24 }}>设置新密码</h1>
       {!isCloudConfigured() ? (
-        <p>当前尚未连接云端账号服务。</p>
+        <p style={{ marginTop: 16, lineHeight: 1.8, color: "var(--text-secondary)" }}>
+          当前尚未连接云端账号服务。
+        </p>
       ) : done ? (
         <p role="status">密码已更新，可以返回工作区继续学习。</p>
       ) : (
@@ -75,7 +89,15 @@ export default function ResetPasswordPage() {
               required
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              style={{ padding: 12, border: "1px solid #E5E5E5", borderRadius: 8 }}
+              style={{
+                width: "100%",
+                minWidth: 0,
+                minHeight: 48,
+                fontSize: 16,
+                padding: 12,
+                border: "1px solid var(--border-neutral-l2)",
+                borderRadius: 8,
+              }}
             />
           </label>
           <label style={{ display: "grid", gap: 8 }}>
@@ -88,15 +110,24 @@ export default function ResetPasswordPage() {
               required
               value={confirmation}
               onChange={(event) => setConfirmation(event.target.value)}
-              style={{ padding: 12, border: "1px solid #E5E5E5", borderRadius: 8 }}
+              style={{
+                width: "100%",
+                minWidth: 0,
+                minHeight: 48,
+                fontSize: 16,
+                padding: 12,
+                border: "1px solid var(--border-neutral-l2)",
+                borderRadius: 8,
+              }}
             />
           </label>
-          <p style={{ color: "#737373", fontSize: 13 }}>至少 10 个字符。</p>
+          <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>至少 10 个字符。</p>
           <button
             type="submit"
             disabled={!expectedUserId || busy}
             style={{
-              background: "#4B3FE3",
+              minHeight: 48,
+              background: "var(--brand)",
               color: "white",
               border: 0,
               borderRadius: 8,
@@ -108,7 +139,7 @@ export default function ResetPasswordPage() {
         </form>
       )}
       {error && (
-        <p role="alert" style={{ color: "#C1342C", lineHeight: 1.7 }}>
+        <p role="alert" style={{ color: "#C1342C", lineHeight: 1.7, marginTop: 16 }}>
           {error}
         </p>
       )}

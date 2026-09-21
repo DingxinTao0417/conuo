@@ -265,13 +265,10 @@ describe("WebImportForm request and save boundaries", () => {
     expect(onImport.mock.calls[0][0]).toMatchObject({ aiAllowed: true, spaceIds: ["space-one"] });
   });
 
-  it.each([
-    ["account", { cloudUserId: "account-two" }],
-    ["destination", { targetSpaceId: "space-two" }],
-  ] as const)("discards a pending response when the %s changes", async (_name, changed) => {
+  it("discards a pending response when the account changes", async () => {
     await render();
     const request = await begin();
-    await render(changed);
+    await render({ cloudUserId: "account-two" });
     expect(request.init.signal?.aborted).toBe(true);
     expect(field("网页地址").value).toBe("");
     await respond(request);
@@ -281,6 +278,74 @@ describe("WebImportForm request and save boundaries", () => {
     expect(onSaved).not.toHaveBeenCalled();
     expect(onBusyChange).toHaveBeenLastCalledWith(false);
     expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "GET")).toHaveLength(2);
+  });
+
+  it("preserves manual input across destination and permission changes and saves the current choices", async () => {
+    await render({ aiAllowed: true });
+    await type("网页地址", firstUrl);
+    await click("手动粘贴");
+    await type("标题", "尚未保存的文章");
+    await type("手动粘贴的正文", "仔细核对后粘贴的正文。");
+    await render({ targetSpaceId: "space-two", aiAllowed: false });
+    expect(field("网页地址").value).toBe(firstUrl);
+    expect(field("标题").value).toBe("尚未保存的文章");
+    expect(field("手动粘贴的正文").value).toBe("仔细核对后粘贴的正文。");
+    await click("保存粘贴正文");
+    expect(onImport.mock.calls[0][0]).toMatchObject({
+      title: "尚未保存的文章",
+      text: "仔细核对后粘贴的正文。",
+      spaceIds: ["space-two"],
+      aiAllowed: false,
+    });
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "GET")).toHaveLength(1);
+  });
+
+  it("keeps same-account URL evidence while a destination changes without granting old AI permission", async () => {
+    await render({ aiAllowed: true });
+    const request = await begin();
+    await render({ targetSpaceId: "space-two", aiAllowed: false });
+    expect(request.init.signal?.aborted).toBe(false);
+    await respond(request);
+    expect(displayedPreview()?.value).toBe(makePreview().text);
+    await click("保存提取正文");
+    expect(onImport.mock.calls[0][0]).toMatchObject({ spaceIds: ["space-two"], aiAllowed: false });
+  });
+
+  it("clears manual text after switching identities and never restores it when switching back", async () => {
+    await render();
+    await type("网页地址", firstUrl);
+    await click("手动粘贴");
+    await type("手动粘贴的正文", "只属于第一个账号的文字");
+    await render({ cloudUserId: "account-two" });
+    await click("手动粘贴");
+    expect(field("手动粘贴的正文").value).toBe("");
+    await render({ cloudUserId: "account-one" });
+    await click("手动粘贴");
+    expect(field("手动粘贴的正文").value).toBe("");
+    expect(onImport).not.toHaveBeenCalled();
+  });
+
+  it("reports pending saves and keeps the draft protected until the submitted result is known", async () => {
+    const onDraftStateChange = vi.fn();
+    const pending = deferred<void>();
+    onImport.mockImplementation(() => pending.promise);
+    await render({ onDraftStateChange });
+    await type("网页地址", firstUrl);
+    await click("手动粘贴");
+    await type("手动粘贴的正文", "等待结果的正文");
+    const before = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(before);
+    expect(before.defaultPrevented).toBe(true);
+    await click("保存粘贴正文");
+    expect(onDraftStateChange).toHaveBeenLastCalledWith({ dirty: true, saving: true });
+    expect(container.querySelector<HTMLFieldSetElement>("fieldset.web-import-form")?.disabled).toBe(
+      true,
+    );
+    await act(async () => pending.resolve());
+    expect(onDraftStateChange).toHaveBeenLastCalledWith({ dirty: false, saving: false });
+    const after = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(after);
+    expect(after.defaultPrevented).toBe(false);
   });
 
   it("aborts and ignores a response after unmount", async () => {

@@ -30,6 +30,7 @@ export interface WebImportFormProps {
   onImport: (source: Source) => void | Promise<void>;
   onSaved: (source: Source) => void;
   onBusyChange?: (busy: boolean) => void;
+  onDraftStateChange?: (state: { dirty: boolean; saving: boolean }) => void;
 }
 
 type Capability = { state: "loading" | "available" | "unavailable"; reason: string };
@@ -71,13 +72,12 @@ function selectedOriginalText(text: string, start: number, end: number) {
   return text.slice(offset(start), offset(end));
 }
 
-/** Account and destination changes destroy the previous session and abort its requests. */
+/** Only identity/version changes destroy drafts. A destination is a save-time choice. */
 export function WebImportForm(props: WebImportFormProps) {
   return (
     <WebImportSession
       key={JSON.stringify([
         props.cloudUserId ?? null,
-        props.targetSpaceId,
         props.refreshSource?.id ?? null,
         props.refreshSource?.versionId ?? null,
         props.refreshSource?.webSnapshot?.originalUrl ?? props.refreshSource?.url ?? null,
@@ -96,6 +96,7 @@ function WebImportSession({
   onImport,
   onSaved,
   onBusyChange,
+  onDraftStateChange,
 }: WebImportFormProps) {
   const formId = useId();
   const [mode, setMode] = useState<"capture" | "manual">("capture");
@@ -123,6 +124,26 @@ function WebImportSession({
   } | null>(null);
   const savePending = useRef(false);
   const busyCallback = useRef(onBusyChange);
+  const dirty = Boolean(
+    url !== refreshUrl ||
+    title !== (refreshSource?.title ?? "") ||
+    manualText ||
+    preview ||
+    selection,
+  );
+
+  useEffect(() => {
+    onDraftStateChange?.({ dirty, saving });
+  }, [dirty, saving, onDraftStateChange]);
+  useEffect(() => {
+    if (!dirty && !saving) return;
+    const protectDraft = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", protectDraft);
+    return () => window.removeEventListener("beforeunload", protectDraft);
+  }, [dirty, saving]);
 
   useEffect(() => {
     busyCallback.current = onBusyChange;
@@ -367,7 +388,11 @@ function WebImportSession({
         ? "没有提取到正文，可仅保存链接或手动粘贴。"
         : "";
   return (
-    <div className="web-import-form">
+    <fieldset
+      className="web-import-form"
+      disabled={saving}
+      style={{ margin: 0, padding: 0, border: 0 }}
+    >
       {refreshSource && (
         <div className="web-import-refresh-note" role="status">
           <Info size={15} />
@@ -795,7 +820,7 @@ function WebImportSession({
           )}
         </>
       )}
-    </div>
+    </fieldset>
   );
 }
 

@@ -699,3 +699,86 @@ final result: passed（品牌名移除与界面复核范围）。
 - 本轮只操作仓库版本，不新增运行服务、云资源或数据库迁移；配置文件及本地设计目录保持忽略。
 
 final result: passed（提交前统一回归范围）。
+
+## 全端 UI／UX Goal 优化阶段验收（2026-09-21，进行中）
+
+本节追加记录本轮本地工作，保留此前各阶段结论。**Goal 仍在进行，本节不是全站、全部异常状态或原生平台的最终通过声明。** 完整问题、处理状态与未完成矩阵见 [UI／UX 优化台账](docs/UX_OPTIMIZATION_LOG.md)。
+
+### 验证对象
+
+- 移动为正式 React Native 组件的 Expo Web 示例导出，入口 `http://127.0.0.1:8082/`；资料、问答和保存操作均明确标识为示例，未连接云端或模型。
+- Web 为正式 Workspace 与真实页面组件的隔离内存适配，入口 `http://127.0.0.1:3101/`；不读取 `.env`，后端／账号动作受限，不能证明真实云端保存、登录或并发。预览顶部的 28px 提示条属于 QA 夹具，不是产品顶部栏。
+- 桌面为正式宿主 HTML／CSS／JS 的隔离桥接页面，入口 `http://127.0.0.1:8083/`；不执行原生菜单、系统文件操作或云请求。隐藏 Electron 自动检查另外记录，二者都不等于 macOS 或 Apple 真机验收。
+- 截图保留在忽略目录 `work/ux-goal-20260921/`。`01-before-mobile-login.png` 和 `12-mobile-login-390.png` 未正确应用所标称的手机视口，不作为手机尺寸证据。
+
+### 主要改动前后对比与交互证据
+
+| 对象                 | 修改前                                                                                                                         | 修改后及观察                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 移动学习概览         | [首页](work/ux-goal-20260921/02-before-mobile-home.png)                                                                        | [390px 首页](work/ux-goal-20260921/13-after-mobile-home-390.png)：收集入口、继续学习、知识库与紧凑最近资料按任务排列，减少重复内容                                                                                                                                                                                                                                                                                                                                 |
+| 移动资料库           | [资料库](work/ux-goal-20260921/03-before-mobile-library.png)                                                                   | [390px 资料库](work/ux-goal-20260921/14-after-mobile-library-390.png)：添加入口收敛；实际筛选“学习如何学习”、搜索“主动”、打开原文再返回，范围与查询保留                                                                                                                                                                                                                                                                                                            |
+| 移动阅读／问答／笔记 | [阅读](work/ux-goal-20260921/04-before-mobile-reader.png)、[问答](work/ux-goal-20260921/05-before-mobile-question.png)         | [阅读](work/ux-goal-20260921/15-after-mobile-reader-390.png)、[回答](work/ux-goal-20260921/16-after-mobile-answer-390.png)、[引用](work/ux-goal-20260921/17-after-mobile-citation-390.png)、[已保存示例笔记](work/ux-goal-20260921/18-after-mobile-saved-note-390.png)：实际输入问题、引用定位、新建笔记及返回阅读                                                                                                                                                 |
+| 移动导入             | [导入表单](work/ux-goal-20260921/06-before-mobile-import.png)                                                                  | [320px](work/ux-goal-20260921/23-after-mobile-import-320.png)、[360px](work/ux-goal-20260921/24-after-mobile-import-360.png)：显式字段标签，长预览与固定保存区分离；输入、示例提取和关闭草稿确认已操作                                                                                                                                                                                                                                                             |
+| iPad 布局与窄窗      | 既有同工程响应式布局                                                                                                           | [834×1194 双栏](work/ux-goal-20260921/19-after-ipad-reader-portrait.png)、[1194×834 三栏](work/ux-goal-20260921/20-after-ipad-reader-landscape.png)、[600×834 单面板](work/ux-goal-20260921/21-after-mobile-split-600.png)：已完成回答与输入上下文仍保留；均为浏览器，不是系统分屏验收                                                                                                                                                                             |
+| Web 首页续读         | [原始摘要暴露 Markdown 标记](work/ux-goal-20260921/25-before-web-home-wide.png)                                                | [纯文本摘要](work/ux-goal-20260921/43-after-web-home-wide.png)：已有可见文本投影去掉标题／链接等呈现标记；普通井号、C# 和纯文本符号由回归验证保留                                                                                                                                                                                                                                                                                                                  |
+| Web 手机问答         | [390×844 回答区域被挤压](work/ux-goal-20260921/30-before-web-ai-390.png)                                                       | [390×844](work/ux-goal-20260921/44-after-web-ai-390.png)：同范围下回答可用空间明显改善；[320×700](work/ux-goal-20260921/45-after-web-ai-320.png)：短视口操作可达，关闭与重开保留输入草稿                                                                                                                                                                                                                                                                           |
+| 桌面下载与异常       | [下载页](work/ux-goal-20260921/10-before-desktop-downloads.png)、[连接失败](work/ux-goal-20260921/11-before-desktop-error.png) | [1200px 下载](work/ux-goal-20260921/47-after-desktop-downloads-1200.png)、[操作失败](work/ux-goal-20260921/48-after-desktop-operation-error.png)、[880px 下载](work/ux-goal-20260921/49-after-desktop-downloads-880.png)、[连接页](work/ux-goal-20260921/50-after-desktop-connection-880.png)、[离线](work/ux-goal-20260921/51-after-desktop-offline-880.png)、[空下载](work/ux-goal-20260921/52-after-desktop-download-empty-880.png)：统一宿主样式与可见恢复反馈 |
+
+Web 还已查看资料库、资料列表、阅读器、笔记编辑器、已接受与待审核知识页、整理、任务、回收站及五组账号设置，分别保留截图 `26` 至 `42`。查看页面不代表每个危险操作或后端链路都已执行。实际核对“学习方法知识库 → 库内概览 → 全局学习概览”返回 `#home` 和全局标题；没有沿用旧知识库范围。
+
+### 检查结果与未完成项
+
+- Web 续读／阅读器 6 文件、48 项相关测试通过；整理／存储说明文案 2 文件、7 项测试通过。Web 类型检查、目标格式及差异检查通过；完整 ESLint 0 错误，保留既有 `_result` 警告。没有将此前全量 Web 测试数字作为本轮重跑结果。
+- 移动核心 50 项及类型检查通过，包含同账号仍可见资料在版本／状态／许可变化后保留未发送文字、清除旧证据的边界。真实 Auth 401 的输入恢复方案仍在审查，不能据此写成登录失效全流程已完成。
+- 桌面 15 项 Node 测试和 52 项隐藏 Electron 断言通过，覆盖本轮下载焦点与失败反馈增量；可见原生菜单、系统保存窗口、Windows 系统缩放及 macOS 仍需要独立平台证据。
+- 压力夹具运行修复、长列表／长回答、更多异常 UI 和部分焦点／表单路径仍在继续。已有 `53-mobile-scenario-load-error.png` 只记录当时压力场景载入问题，不作为该场景通过证据。
+- 本轮没有调用真实模型、创建云账号、改动生产数据、安装本地 PostgreSQL 或干预自然 Cron。三个本机预览入口暂时保留供后续验收；未提交、未推送、未部署，旧便携包不等于本轮源码重新打包。
+
+final result: in progress（已完成上述阶段改动与局部验收，完整 Goal 尚未完成）。
+
+### 同轮后续增量：长内容、表单和异常界面
+
+以下为本轮后续源码、自动检查与已保存截图的对照，保留上节较早阶段的测试数字。证据截至截图 `101` 及认证恢复竞态修复；最终统一导出后的浏览器核验尚待补录。移动均为 **React Native 浏览器导出**，Web 均为 **正式组件的隔离内存／故障适配**，没有以模拟成功替代云端结果。
+
+| 对象                   | 已保存证据与能支持的结论                                                                                                                                                                                                                                                                                                                                                                                                      | 仍不能由这些证据证明                                                                                          |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 移动长列表返回         | [进入前](work/ux-goal-20260921/61-mobile-list-before-return-fixed-390.png)、[返回后](work/ux-goal-20260921/62-mobile-list-after-return-fixed-390.png)；根任务记录 390×844 中部位置 `3117 → QA040 → 3117`，筛选／查询与位置保持                                                                                                                                                                                                | 原生系统键盘与应用挂起后的恢复；截图 `56` 属于问题阶段，不能作为修复通过证据                                  |
+| 移动回答宽表           | [修改前](work/ux-goal-20260921/63-mobile-table-before-390.png)、[可读列宽](work/ux-goal-20260921/65-mobile-table-readable-390.png)、[横向滚动](work/ux-goal-20260921/66-mobile-table-horizontal-390.png)、[320px 长回答](work/ux-goal-20260921/67-mobile-long-answer-320.png)、[834px](work/ux-goal-20260921/68-ipad-long-answer-834.png)；表格独立横向滑动，未把整页撑宽                                                     | 原生大字体、VoiceOver 与所有表格形状                                                                          |
+| Markdown 原文／字号    | [格式化正文](work/ux-goal-20260921/78-ipad-markdown-reader-834.png)、[第 30 节定位终点](work/ux-goal-20260921/81-ipad-section-30-settled.png)、[字号 23](work/ux-goal-20260921/82-ipad-section-30-font-23.png)；原文结构清晰，目录及字号接续仍围绕同段落                                                                                                                                                                      | `79` 是滚动动画中间帧，不作为定位终点；非 Markdown 正文、原件 PDF 与真实系统分屏不可外推                      |
+| 移动空库／笔记         | [360px 空库](work/ux-goal-20260921/83-mobile-empty-home-360.png)、[笔记弹层](work/ux-goal-20260921/84-mobile-note-editor-360.png)、[示例笔记结果](work/ux-goal-20260921/85-mobile-empty-to-note-saved-360.png)；首次建库后可写笔记，结果明确标示仅本次预览                                                                                                                                                                    | 软件键盘遮挡、真机保存、最终认证改动后的重导出                                                                |
+| 移动认证恢复提示       | [360px 提示](work/ux-goal-20260921/86-mobile-recovery-gate-360.png)、[360px 失败](work/ux-goal-20260921/87-mobile-recovery-failed-360.png)、[320px 失败](work/ux-goal-20260921/88-mobile-recovery-failed-320.png)；核对、放弃与退出入口可见，失败保留提示且无假成功                                                                                                                                                           | 拍摄早于最终身份适配／问题输入／竞态修复；不代表真实 Auth、Keychain 或同账号恢复全链路已经视觉验收            |
+| Web 可读搜索           | [结果摘要](work/ux-goal-20260921/71-web-readable-search-results.png)；Markdown 装饰标记不再作为摘要主体，原始定位由行为回归保护                                                                                                                                                                                                                                                                                               | 云端搜索调用；`72` 是视口切换未稳定一帧，不作为手机验收，知识页以 `73` 为准                                   |
+| Web 导入保留           | [改目标前](work/ux-goal-20260921/69-web-import-before-target-change.png)、[原问题](work/ux-goal-20260921/70-web-import-input-lost.png)、[保留输入](work/ux-goal-20260921/74-web-import-input-preserved-390.png)、[44px 确认操作](work/ux-goal-20260921/76-web-import-confirm-touch-targets-390.png)、[320px 字段](work/ux-goal-20260921/77-web-import-fields-320.png)；目标、标签、关闭及 Escape 路径由实际操作与定向测试核对 | 真实文件上传、网页提取、批量混合终态和云端保存                                                                |
+| Web 保存未知／位置冲突 | [未确认保存](work/ux-goal-20260921/89-web-save-unknown-320.png)、[位置选择](work/ux-goal-20260921/91-web-reading-conflict-320.png)、[模拟失败](work/ux-goal-20260921/92-web-reading-conflict-failure-320.png)；页面明确保留修改，位置选择在失败后仍可见，没有伪造已保存                                                                                                                                                       | 云端读回、真实 CAS 或双设备冲突；夹具仅返回受控失败                                                           |
+| Web 登录表单           | [登录](work/ux-goal-20260921/95-web-login-refined-320.png)、[注册](work/ux-goal-20260921/96-web-signup-320.png)、[必填校验](work/ux-goal-20260921/98-web-reset-required-320.png)；单层卡片、模式标题、显式字段与浏览器原生必填反馈可见                                                                                                                                                                                        | 实际注册／登录、邮件投递、新密码页面、失效邮件回调                                                            |
+| Web 笔记冲突           | [原 HTML 源码展示](work/ux-goal-20260921/90-web-note-conflict-320.png)、[可读富文本](work/ux-goal-20260921/99-web-readable-note-conflict-320.png)、[合并失败仍保留正文](work/ux-goal-20260921/100-web-conflict-rich-merge-failure-320.png)、[放弃确认](work/ux-goal-20260921/101-web-conflict-discard-protection-320.png)；候选与手动输入可读，模拟失败未清空输入，离开需确认                                                 | 截图 `100/101` 支持失败与离开确认的当前状态；切换选择、链接表单和完整焦点路径仍以测试及主任务最终交互记录为准 |
+
+实现增量包括：导入草稿按账号／资料身份隔离，同账号更换目标保留；保存中与读回核对分开呈现；列表恢复等待有效布局、离开前记录真实位置；Markdown 表格在自身容器滚动；Web 搜索只投影展示文本；笔记冲突复用清洗后的富文本和正式编辑器，打开而未编辑不改原始候选。
+
+认证恢复已接入正式 App 与导入表单：仅进程内封存本人文字／链接／未发送或未获回答的问题，恢复必须经当前 generation、会话封锁、线上身份及工作区门禁并由用户选择；不保存服务器正文、自动标题、答案、引用或凭据，不自动发问、提取或提交。主动退出、423、确认异账号清空；临时会话取得失败不再误当成账号切换。未知保存依照原身份和摘要核对，不覆盖差异或复活删除内容。最后修复了“放弃孤立问题后迟到回答重新写回旧输入”的竞态。
+
+自动验证口径：移动完整 86 项通过；后续两项新增边界已包含在独立 Auth／API／fence／学习会话复核 55/55 中，移动类型检查通过；Web 导入 4 文件／46 项，搜索展示 2 文件／19 项，导航控件及相邻导航 46 项，冲突相关 5 文件／21 项由本轮增量报告记录。这些数量存在不同运行范围，不能相加写成一次全量验收，也不能替代最新构建与浏览器复核。
+
+上述是阶段性证据。其后已完成最终导出、恢复失败/未知导入/普通收集链路、合并输入保护、独立认证页与代表性键盘路径；收尾记录如下。真实认证成功、封锁或切换账号的云端链路仍需原生环境，当前依据为核心行为回归与正式接线审查。真实云请求、物理双设备、Apple 软件键盘／Keychain／系统分屏、Windows 可见系统菜单与文件窗口、macOS 仍属于对应环境验收。`8082/8083/8084/3101` 均为 loopback，最终运行或停止状态另行交接；未提交、未推送、未部署，未改生产数据或自然 Cron。
+
+该阶段之后的最终导出与浏览器核对见下面的收尾记录；这里的历史测试数量不与后续数量相加。
+
+### 本轮本地收尾（2026-09-21）
+
+- 移动正式示例完成收集→选择库/许可→保存→阅读→提问→引用定位→写笔记→返回原问答；[导入后阅读](work/ux-goal-20260921/114-mobile-import-to-reader-390.png)、[原文高亮](work/ux-goal-20260921/115-mobile-import-citation-location-390.png)、[精确打开新笔记](work/ux-goal-20260921/116-mobile-import-to-note-390.png)、[1194×834分栏](work/ux-goal-20260921/117-ipad-final-reader-ai-landscape.png)。无真实网址提取、模型或云保存。
+- [恢复失败320px](work/ux-goal-20260921/110-mobile-recovery-final-failure-320.png)：核对中禁用，503后重试，未解锁输入未出现，显式放弃完成。未知导入与重复资料用真实WebImportSheet接受控内存适配，[待核对](work/ux-goal-20260921/106-mobile-import-unknown-360.png)、[重复提示](work/ux-goal-20260921/109-mobile-import-duplicate-stable-360.png)，没有冒充云成功。
+- Web 手动合并在切换、失败、取消及Escape后保留或确认放弃；[最终320px布局](work/ux-goal-20260921/102-web-conflict-editor-fit-320.png)无内部宽度溢出。[正文输入](work/ux-goal-20260921/104-web-import-textarea-320.png)实测16px。
+- [笔记弹层键盘焦点](work/ux-goal-20260921/118-mobile-note-keyboard-focus-390.png)可见；7次Tab依次经过库选择、标题、正文、关闭并循环，全部位于dialog内；Escape关闭空表单后回到“阅读时写笔记”。
+- 正式独立认证页的隔离无会话/服务不可用/链接失效状态已查看。[重设密码](work/ux-goal-20260921/121-web-reset-final-320.png)输入16px、高50px；[失效链接页焦点](work/ux-goal-20260921/122-web-auth-error-final-focus-320.png)返回目标44px、2px品牌描边。未输入密码，更新操作禁用，未发送邮件或变更凭据。
+- 移动完整88项、最终类型/Web静态/iOS Hermes导出通过；Web集成282项、最后冲突增量14项（范围重叠）、类型/lint/格式/生产构建通过；桌面15项Node、52项隐藏Electron断言通过。最后两张认证页纯样式更新后的Web生产构建也通过。
+- `61/80/97/108`不作为它们文件名暗示的有效终态证据，分别以真实滚动读数/`62`、`81/82`、`98`、`109`为准；`100`仍有中间修复的窄屏裁切，以`102`为修复后结果。
+
+前后对照集中在[本地审阅图集](work/ux-goal-20260921/REVIEW.md)，完整问题与能力边界见[优化台账](docs/UX_OPTIMIZATION_LOG.md)。这些是本地实现与明确范围的验收，未提交、推送、部署，不代表iOS/iPadOS/macOS原生全功能交付。
+
+- 减少动态效果运行核对：390px正式移动组件接受控平台偏好，hook为true，目录与笔记dialog及祖先的计算动画/过渡为none/0s；选择第31段后立即到26149px，第30节高亮，关闭笔记后位置和入口焦点保留。[定位终点](work/ux-goal-20260921/123-reduced-motion-reader-target-390.png)、[笔记弹层](work/ux-goal-20260921/124-reduced-motion-note-modal-390.png)、[运行记录](work/ux-goal-20260921/reduced-motion-runtime.md)。不是iOS系统设置切换实测。
+- 共用Web弹窗补齐标题关联与关闭焦点恢复：[有名称的导入弹窗，1280px](work/ux-goal-20260921/125-web-modal-accessible-name-1280.png)、[两层关闭返回入口](work/ux-goal-20260921/128-web-modal-focus-return-1280.png)。普通关闭、嵌套继续、Escape、明确放弃均实际操作；最终5文件31项、类型/定向静态检查及生产构建通过。截图125不是390px，焦点结果以实际DOM读数为证，不凭截图推测。
+- 图集补入相同390×844尺寸的[导入表单](work/ux-goal-20260921/126-mobile-import-final-390.png)和[相同未发送问题状态](work/ux-goal-20260921/127-mobile-question-final-390.png)，避免把iPad横屏或已回答状态当成手机的同状态视觉对比。
+
+- 最终移动七个Modal增加与标题一致的名称后，类型、Web静态/iOS Hermes和压力夹具重新导出通过。实际按名称定位导入、段落目录、笔记dialog，[最终笔记弹层](work/ux-goal-20260921/129-mobile-dialog-named-final-390.png)；关闭动画结束后焦点回到“阅读时写笔记”，网页导入关闭回“添加网页资料”，document宽390px。原生RN当前不转发此Modal属性，不计为VoiceOver通过。
+
+本轮现有功能的本地UI/UX优化与验收完成，按[最终覆盖与交接](docs/UX_OPTIMIZATION_LOG.md#最终交接2026-09-21)结束。`8082/3101/8083`保留供查看；`8084`压力服务已停止，夹具和证据保留。临时视口恢复，QA标签关闭。全部为本地未提交改动，未推送或部署；无真实数据或Cron变更。真机/云端待验及PRD规划能力保持明确区分。

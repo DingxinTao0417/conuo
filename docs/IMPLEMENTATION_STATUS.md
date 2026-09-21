@@ -1,10 +1,24 @@
 # Conuo Web 开发状态
 
-更新日期：2026-09-21。范围：Web 开发增量及独立 staging 部署。
+更新日期：2026-09-21。范围：Web 开发增量及独立 staging 部署。Windows/macOS 与 iOS/iPadOS 已开始本地开发，实际实现、测试与尚未完成范围见[客户端开发记录](CLIENT_IMPLEMENTATION.md)；下文历史 staging 推送记录不代表本轮客户端改动已部署。
 
 本项目已有可运行的 Web 工作台，支持导入、阅读与版本历史、笔记与知识审核、普通搜索、原始资料问答、PDF 区域截图学习及个人 ZIP 备份恢复。当前已使用自编 QA 资料完成真实 DeepSeek 问答、回答另存笔记、截图解读／提问／出题、资料分析、跨资料主题生成与人工接受，并确认相关笔记和知识正文的云端保存及刷新恢复；知识页也已基于固定原始依据收到流式问答成功终态，知识页正文本身不充当证据。2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级资料整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、六条主要业务冲突接口，以及孤立上传、带数据历史版本、资料、Storage 和账号 Auth 删除主链路均已通过；一次性 signup/recovery token 的确认与密码更新、真实等待后的过期 signup token、受控邮箱的真实注册确认邮件及同浏览器 PKCE、Chrome／Edge 跨一小时持久会话自动刷新也已通过。三条清理 Cron 已在未手工调用 cleanup API 的情况下达到主自然调度预期终态；被遗弃租约和可重试故障的韧性阶段仍待下一次自然调度。项目所有者于 `2026-09-21` 确认物理双设备同步矩阵及真实找回密码邮件的同浏览器完整链路均无异常；跨浏览器邮件点击仍待验收。原生产数据库未升级，生产网页代码与 schema 仍可能不一致。本轮已提交并推送 `staging`；可变域名的当前版本由 `/api/health` 返回 Vercel 环境、Git 分支和完整 SHA，首次探针验证为 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。 **完整 M0 仍未验收。**
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
+
+## iOS / iPadOS 网页收集与阅读增量（2026-09-21，本地）
+
+移动 `0.1.0` 新增公开网页正文预览／仅收藏链接、收件箱与知识库选择、重复链接独立另存确认及正文 AI 显式授权。沿用工作区 revision CAS，资料与版本身份在未知保存结果的核对、重试间保持稳定；不自动覆盖或重复提交。阅读器新增段落目录、15–25 号字号、按资料版本保留的会话位置；至少 760px 可并排阅读与 AI，阅读宽度低于 1100px 时收起主导航，宽屏可手动折叠。全局导航重置知识库筛选。
+
+本轮移动核心测试 37/37、Web 网页导入合同 5/5、移动／Web 类型检查及定向 Web ESLint 通过，iOS Hermes 与 Web 导出通过。浏览器实际核对 390×844 阅读／问答／引用／目录、834×1194 双栏、1194×834 三栏，以及 320×700 链接收藏／重复提醒／草稿保护／打开已有资料。没有重跑此前全量 Web 或桌面验收；未生成 IPA、未完成原生真机或本轮真实云端联调。原生 Bearer 适配仍待单独部署，阅读位置仍不回写云端，Pencil、原件 PDF、原生文件收集等仍未实现。
+
+本轮未新建账号、调用真实模型、提交、推送或部署；保留本机 `http://127.0.0.1:8082` 静态示例，示例网页正文为内置内容，不访问输入的网址。完整边界与后续项见[客户端开发记录](CLIENT_IMPLEMENTATION.md)。
+
+## 桌面标题栏增量（2026-09-21，本地）
+
+桌面 `0.1.2` 将原生标题栏、传统菜单栏与独立工具条合并为 40px 浅灰标题栏，底色与 Conuo 辅助面一致。Windows 保留原生窗口按钮，菜单通过本地白名单调用原生弹出层；远程工作区继续无 Node/preload 权限。15 条 Node 测试、31 项隐藏 Electron 断言通过，并检查宽窗口及 880px 窄窗口的渲染截图。原生拖拽、菜单、系统缩放与 macOS 仍待实机验证。源码与验证边界见[客户端开发记录](CLIENT_IMPLEMENTATION.md)，本轮未提交、推送或部署。
+
+当前 `0.1.4` 将顶部最左侧 Logo 换成主侧栏显示/隐藏开关，保留“文件”菜单及其快捷键，纠正 `0.1.3` 对用户意图的误解。侧栏支持 `Ctrl+\`，同一进程内导航、刷新保留状态。15 条 Node 测试、40 项隐藏 Electron 断言通过，包含实际按钮到 IPC、主内容扩展、草稿与内部阅读工具保留、快速连点和缩放进入手机断点的覆盖。仅新增桌面固定样式适配，不改 Web 云端部署或业务数据。
 
 ## 首次独立 staging 部署（2026-09-20）
 

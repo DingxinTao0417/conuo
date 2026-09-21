@@ -73,6 +73,8 @@
 .web-cloud-login .account-panel input {
   width: 100%;
   min-width: 0;
+  min-height: 44px;
+  font-size: 16px;
 }
 .web-cloud-login .account-panel button {
   min-height: 44px;

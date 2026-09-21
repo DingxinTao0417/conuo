@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Conuo Preview</title>
+    <link rel="stylesheet" href="shell.css" />
+    <script src="shell.js" defer></script>
+  </head>
+  <body>
+    <header class="toolbar">
+      <button
+        class="icon-button sidebar-toggle"
+        id="sidebar-toggle"
+        data-action="toggle-sidebar"
+        aria-label="隐藏侧边栏"
+        aria-expanded="true"
+        title="隐藏侧边栏 · Ctrl+\"
+      >
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <rect x="3" y="4" width="14" height="12" rx="2" />
+          <path d="M8 4v12" />
+        </svg>
+      </button>
+      <nav class="history-nav" aria-label="页面导航">
+        <button
+          class="icon-button"
+          data-action="back"
+          id="back"
+          aria-label="后退"
+          title="后退 · Alt+←"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="m9 4-6 6 6 6M3 10h14" />
+          </svg>
+        </button>
+        <button
+          class="icon-button"
+          data-action="forward"
+          id="forward"
+          aria-label="前进"
+          title="前进 · Alt+→"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="m11 4 6 6-6 6M17 10H3" />
+          </svg>
+        </button>
+      </nav>
+      <nav class="app-menu" role="menubar" aria-label="应用菜单">
+        <button
+          role="menuitem"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          data-action="menu"
+          data-id="file"
+          tabindex="0"
+        >
+          文件
+        </button>
+        <button
+          role="menuitem"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          data-action="menu"
+          data-id="edit"
+          tabindex="-1"
+        >
+          编辑
+        </button>
+        <button
+          role="menuitem"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          data-action="menu"
+          data-id="view"
+          tabindex="-1"
+        >
+          视图
+        </button>
+        <button
+          role="menuitem"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          data-action="menu"
+          data-id="help"
+          tabindex="-1"
+        >
+          帮助
+        </button>
+      </nav>
+      <div class="title-drag-space" aria-hidden="true"></div>
+      <span class="environment" id="environment">预发布</span>
+      <nav class="utility-nav" aria-label="桌面工具">
+        <button
+          class="icon-button status-button"
+          data-action="connection"
+          aria-label="连接状态"
+          id="connection-button"
+          title="连接状态"
+        >
+          <span
+            class="connection-label loading"
+            id="connection-label"
+            role="status"
+            ><span class="sr-only">正在连接</span></span
+          >
+        </button>
+        <button
+          class="icon-button"
+          data-action="reload"
+          aria-label="重新加载"
+          title="重新加载 · Ctrl+R"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M16.5 7a7 7 0 1 0 .3 5M16.5 3v4h-4" />
+          </svg>
+        </button>
+        <button
+          class="icon-button download-button"
+          data-action="downloads"
+          id="downloads-button"
+          aria-label="下载"
+          title="下载 · Ctrl+J"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path
+              d="M10 3v9m-4-4 4 4 4-4M4 13v3a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3"
+            /></svg
+          ><span class="download-count" id="download-count" hidden></span>
+        </button>
+        <button
+          class="icon-button"
+          data-action="connection"
+          aria-label="连接与版本"
+          title="连接与版本"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <circle cx="4" cy="10" r=".8" />
+            <circle cx="10" cy="10" r=".8" />
+            <circle cx="16" cy="10" r=".8" />
+          </svg>
+        </button>
+      </nav>
+    </header>
+    <aside class="action-error" id="action-error" hidden aria-label="操作提醒">
+      <p id="action-error-message" role="alert"></p>
+      <div>
+        <button id="retry-action" type="button">重试此操作</button>
+        <button id="dismiss-error" type="button" aria-label="关闭操作提醒">
+          关闭
+        </button>
+      </div>
+    </aside>
+    <main>
+      <section class="center-panel" id="connection-state">
+        <div class="app-mark"><img src="icon.png" alt="" /></div>
+        <p class="eyebrow">你的知识，随处接续</p>
+        <h1 id="state-title" tabindex="-1">正在连接 Conuo</h1>
+        <p class="description" id="state-description">
+          正在载入云端工作区，请稍候。
+        </p>
+        <div class="actions" id="recovery-actions" hidden>
+          <button class="primary" data-action="reload">重新连接</button>
+          <button data-action="browser">在浏览器中打开</button>
+        </div>
+        <p class="footnote">此预览版使用云端资料，离线工作区尚未开放。</p>
+      </section>
+      <section class="content-panel" id="connection-panel" hidden>
+        <div class="heading">
+          <div>
+            <p class="eyebrow">CONUO DESKTOP</p>
+            <h1 id="connection-title" tabindex="-1">连接与版本</h1>
+          </div>
+          <button data-action="workspace">返回工作区</button>
+        </div>
+        <div class="card">
+          <div class="detail-row">
+            <span>当前环境</span><strong id="detail-environment"></strong>
+          </div>
+          <div class="detail-row">
+            <span>云端地址</span><code id="detail-origin"></code>
+          </div>
+          <div class="detail-row">
+            <span>桌面版本</span><strong id="detail-version"></strong>
+          </div>
+          <div class="detail-row">
+            <span>连接状态</span><strong id="detail-status"></strong>
+          </div>
+        </div>
+        <div class="note">
+          <h2>与网页一致的云端工作区</h2>
+          <p>
+            资料、笔记、AI
+            问答与学习进度使用当前云端账号。桌面端登录会话与系统浏览器独立。
+          </p>
+        </div>
+        <div class="actions">
+          <button class="primary" data-action="workspace">继续学习</button
+          ><button data-action="browser">打开网页版</button>
+        </div>
+        <details class="preview-details">
+          <summary>关于此预览版</summary>
+          <p>
+            本地资料库、离线编辑与同步队列尚在开发中。下载文件是你保存的副本，不会自动同步。
+          </p>
+          <p>
+            此版本尚未签名，客户端更新需手动重新安装。原生登录回跳和自动更新尚未开放。
+          </p>
+        </details>
+      </section>
+      <section class="content-panel" id="downloads-panel" hidden>
+        <div class="heading">
+          <div>
+            <p class="eyebrow">保存在这台电脑上</p>
+            <h1 id="downloads-title" tabindex="-1">下载</h1>
+          </div>
+          <button data-action="workspace">返回工作区</button>
+        </div>
+        <p class="description left">
+          从资料阅读器下载原文件，或在账号设置中导出备份。每次保存都由你选择位置。
+        </p>
+        <p class="download-summary" id="download-summary"></p>
+        <div id="download-list" role="list" aria-label="本次下载"></div>
+        <p
+          class="sr-only"
+          id="download-announcement"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        ></p>
+        <p class="footnote left">
+          仅显示本次运行的下载记录。退出客户端不会删除已保存文件。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

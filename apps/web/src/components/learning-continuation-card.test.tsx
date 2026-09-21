@@ -86,4 +86,56 @@ describe("LearningContinuationCard", () => {
     expect(host.textContent).toContain("继续阅读");
     expect(host.textContent).not.toContain("最近留下的问题");
   });
+
+  it.each(["markdown", "web"] as const)(
+    "previews %s as readable words while retaining literal hashes and code",
+    async (kind) => {
+      const data = createDemoWorkspace();
+      await act(async () => {
+        root.render(
+          createElement(LearningContinuationCard, {
+            continuation: {
+              source: {
+                ...data.sources[0]!,
+                kind,
+                text: "# 学习 C#\n\n## 第一步\n\n使用 **概念**、[原文](https://example.test) 与 `#define`。\n\n> 保留 #标签 和 \\# 字符。",
+              },
+              spaceId: "inbox",
+              spaceName: "收件箱",
+            },
+            icon: null,
+            onContinue: vi.fn(),
+          }),
+        );
+      });
+      expect(host.querySelector(".learning-continuation-summary")?.textContent).toBe(
+        "学习 C# 第一步 使用 概念、原文 与 #define。 保留 #标签 和 # 字符。",
+      );
+      expect(host.querySelector(".learning-continuation-summary a")).toBeNull();
+    },
+  );
+
+  it("keeps plain source punctuation instead of interpreting it as markup", async () => {
+    const data = createDemoWorkspace();
+    await act(async () => {
+      root.render(
+        createElement(LearningContinuationCard, {
+          continuation: {
+            source: {
+              ...data.sources[0]!,
+              kind: "text",
+              text: "# 这是原始文本\n1 < 2 > 0；C# 与 **符号**。",
+            },
+            spaceId: "inbox",
+            spaceName: "收件箱",
+          },
+          icon: null,
+          onContinue: vi.fn(),
+        }),
+      );
+    });
+    expect(host.querySelector(".learning-continuation-summary")?.textContent).toBe(
+      "# 这是原始文本 1 < 2 > 0；C# 与 **符号**。",
+    );
+  });
 });
