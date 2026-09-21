@@ -28,9 +28,10 @@
 - Vercel staging Production 已配置 16 个变量：staging Supabase 公钥与服务端 secret、现有模型配置、独立 processor/cleanup 密钥及发布开关。服务端 secret 不进入浏览器。
 - `NEXT_PUBLIC_CONUO_ORGANIZATION_PROCESSOR_ENABLED=true`，`NEXT_PUBLIC_CONUO_LOCAL_ORGANIZATION_RUNNER_ENABLED=false`；在确认调度端点实际返回 200 后重新构建。
 - 模型配置沿用现有 DeepSeek，每账号每日生成额度为 10。没有配置独立 Embedding 模型；本次不证明语义索引可用，也没有部署 Python 索引处理器。
-- Auth Site URL 为测试站；精确回调包括测试站、`localhost:3000` 和 `127.0.0.1:3000` 的 `/auth/callback` 及 `/auth/callback?next=/auth/reset-password`。Admin 生成的一次性 signup/recovery token 已通过真实确认与密码更新路由；另一个 signup token 在真实等待超过配置有效期后进入安全错误页。受控邮箱的真实注册确认邮件与同浏览器 PKCE 回调也已通过。Chrome／Edge 的一小时持久会话已在浏览器重启后自动轮换 Cookie、推进到期时间并保持工作区 200。`2026-09-20T17:08:51Z` 又向受控账号发起真实找回请求，Auth 返回 200，并于 `17:08:52Z` 更新服务端 `recovery_sent_at`。该请求由无浏览器脚本发起，没有正式 Web 客户端的 PKCE verifier，只能观察 Auth 接受和真实邮箱投递；它不证明链接点击、应用回调或密码更新，后半链路仍待验收。
+- Auth Site URL 为测试站；精确回调包括测试站、`localhost:3000` 和 `127.0.0.1:3000` 的 `/auth/callback` 及 `/auth/callback?next=/auth/reset-password`。Admin 生成的一次性 signup/recovery token 已通过真实确认与密码更新路由；另一个 signup token 在真实等待超过配置有效期后进入安全错误页。受控邮箱的真实注册确认邮件与同浏览器 PKCE 回调也已通过。Chrome／Edge 的一小时持久会话已在浏览器重启后自动轮换 Cookie、推进到期时间并保持工作区 200。`2026-09-20T17:08:51Z` 又向受控账号发起真实找回请求，Auth 返回 200，并于 `17:08:52Z` 更新服务端 `recovery_sent_at`。该请求由无浏览器脚本发起，没有正式 Web 客户端的 PKCE verifier，因此当时只能证明 Auth 接受并进入邮件生成流程；同浏览器完整链路已由项目所有者在后续人工验收中确认通过，见下方记录。
 - `apps/web/.env.local` 已切至 staging。切换前的完整文件备份在 Git 忽略的 `work/staging-release/.env.production-before-staging.local`。现有生产账号／资料不会自动复制到 staging；本地需使用 staging 账号重新登录。完成时未运行本地 3000 服务。
 - `originals` 是私有桶；核对时面向业务的 public 表未启用 RLS 的数量为 0。QA 用 A/B 两个独立账号，仅含本轮自行编写的验收资料。
+- 项目所有者于 `2026-09-21` 确认已使用两台真实设备完成同步矩阵，并从 Conuo 登录页发起真实找回密码邮件、在同一浏览器完成回调和密码重置，两项均无异常。这两项依据用户验收记录，不保存设备标识、邮件、密码、token 或完整网络日志；跨浏览器邮件点击仍未验收。
 
 凭据与 QA 密码只保存在被 Git 忽略的本机配置及相应云平台，不写入本文。`work/staging-release` 含配置、登录测试文件和部署快照，不应整体分享或提交。
 
@@ -83,13 +84,13 @@ Vercel 以 `CRON_SECRET` 发送 Bearer；本环境 `CONUO_CLEANUP_SECRET` 与其
 3. **其余业务冲突超时。** 第 27 份 [迁移](../supabase/migrations/20260920000300_business_conflict_response.sql) 审计并改写 `public` 与 `conuo_private` 中 49 个显式业务 `40001`；迁移后旧码为 0，函数 OID、签名及授权保持不变，真正的 PostgreSQL serialization failure 语义不受影响。真实 staging 使用陈旧 revision 验证整理取消、资料彻底删除、历史版本清理、解析完成、解析取消和解析重试，均在 10 秒界限内快速返回对应 409；最新部署复验的三条解析路径耗时 274—303ms。请求前后 revision 与内容核对证明没有误写。
 4. **Cron 配置位置。** Vercel Root Directory 为 `apps/web`，配置已移到 [apps/web/vercel.json](../apps/web/vercel.json)，这次实际注册了三个清理任务。
 
-仓库与 staging 的显式业务冲突已统一为 `PT409`；Web 在滚动迁移期间仍兼容旧 `40001`。本轮真实接口覆盖上述六条用户可见主路径，数据库完整迁移链另保证 49 个旧业务码全部归零。真双设备中的解析租约竞争、网络中断和迟到结果仍属于下一轮行为验收，不能由陈旧 revision 探针替代。
+仓库与 staging 的显式业务冲突已统一为 `PT409`；Web 在滚动迁移期间仍兼容旧 `40001`。本轮真实接口覆盖上述六条用户可见主路径，数据库完整迁移链另保证 49 个旧业务码全部归零。项目所有者随后确认两台真实设备同步矩阵无异常；解析租约竞争和迟到解析结果仍由独立云端验收覆盖，不能由陈旧 revision 探针或用户同步验收替代。
 
 ## 下一轮验收与生产门槛
 
-- 同一主机上的独立 Chrome／Edge 已覆盖同时保存、断网重连、提交后响应丢失、旧页面删除防复活、笔记冲突合并和阅读位置选择／回切。仍需按[物理双设备验收](PHYSICAL_DEVICE_ACCEPTANCE.md)使用两台设备复核这些场景，并补解析租约、迟到解析结果及真实设备网络切换；同主机浏览器不能替代这一门槛。
+- 同一主机上的独立 Chrome／Edge 已覆盖同时保存、断网重连、提交后响应丢失、旧页面删除防复活、笔记冲突合并和阅读位置选择／回切；项目所有者于 `2026-09-21` 确认两台真实设备同步矩阵同样无异常。解析租约与迟到解析结果仍需由独立任务证据覆盖。
 - 覆盖额度耗尽、重复请求、缓存过期、任务超时恢复及清理任务崩溃／重试；仅使用明确可丢弃的 QA 数据。
-- 真实找回请求已由 Auth 接受并记录发送时间；继续从受控邮箱核对实际收件，并在另一浏览器完成链接点击、回调和密码更新。真实等待后的过期 signup token、注册确认邮件、同浏览器 PKCE 和 Chrome／Edge 持久会话自动刷新已通过。staging 未启用自定义 SMTP，默认确认模板仍使用 `{{ .ConfirmationURL }}`，Supabase 控制台要求先配置自定义 SMTP 才能编辑模板，因此跨浏览器 token-hash 模板当前尚未配置。若要开启语义检索，另配 Embedding 并部署索引处理器。
+- 项目所有者于 `2026-09-21` 确认已从 Conuo 登录页发起真实找回密码邮件，并在同一浏览器完成链接点击、回调和密码重置。跨浏览器 token-hash 模板仍未配置或验收；staging 未启用自定义 SMTP，默认模板仍使用 `{{ .ConfirmationURL }}`。真实等待后的过期 signup token、注册确认邮件、同浏览器 PKCE 和 Chrome／Edge 持久会话自动刷新也已通过。若要开启语义检索，另配 Embedding 并部署索引处理器。
 - 本轮代码已提交并推送 `staging`；生产发布仍是独立阶段，必须以已验收提交为来源，不能直接复用旧部署快照。
 - 生产前先实时核对原项目迁移历史、做好并验证数据库及原件备份，再审查增量迁移、环境变量、Auth 回调和独立调度。验收通过后再授权生产升级；本轮未执行这一步。
 

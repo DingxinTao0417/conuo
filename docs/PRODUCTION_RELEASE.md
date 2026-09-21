@@ -106,12 +106,13 @@ Preview Branch 默认不复制数据，即使选择包含生产数据也属于�
 - [x] 生产 Vercel 不再跟随 staging 的 `main` 自动漂移；staging 使用 `staging`，原生产使用 `main`，生产 Preview 自动部署已关闭。
 - [x] Git 自动部署和精确 SHA 探针已通过；完整验收基线部署 `dpl_9GAVHE5U2b3jq5WLTK8TpDQgQdhq` 对应 SHA `5f6b50ff99ae558cf2738a053dea79fb2fcfe77a`，`/api/health` 首次上线验证对应 SHA `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。
 - [x] 同一主机的独立 Chrome／Edge 已完成同时编辑、断网重连、提交后响应丢失、旧页面删除防复活、笔记冲突手工合并和阅读位置选择／回切。
-- [ ] 按[物理双设备验收](PHYSICAL_DEVICE_ACCEPTANCE.md)用两台设备复核上述同步矩阵，并补解析租约、迟到解析结果和真实设备网络切换。
+- [x] 项目所有者于 `2026-09-21` 确认已按[物理双设备验收](PHYSICAL_DEVICE_ACCEPTANCE.md)使用两台真实设备完成同步矩阵，结果正常；该项依据用户验收记录，未保存设备标识、网络日志或账号信息。
 - [x] Admin 生成的一次性 signup/recovery token 已通过真实确认、重置、密码更新、重复使用和无效 token 路由；测试账号已删除。
 - [x] 受控邮箱的真实注册确认邮件及同浏览器 PKCE 回调已通过。
 - [x] Chrome 与 Edge 的独立持久会话在等待超过一小时并重启浏览器后，均自动轮换 Cookie、推进到期时间并保持工作区 200；专用账号与 Profile 已删除。
 - [x] signup token 在真实等待超过配置有效期后进入 `/auth/error`，没有建立会话；专用账号已删除。
-- [ ] 真实找回密码邮件与跨浏览器邮件点击通过；staging Auth 已接受无浏览器找回请求并更新 `recovery_sent_at`，但该请求没有正式客户端 PKCE verifier，只能观察投递，不能证明应用回调或密码更新。跨浏览器 token-hash 模板还受未配置自定义 SMTP 限制。
+- [x] 项目所有者于 `2026-09-21` 确认已从 Conuo 登录页发起真实找回密码邮件，并在同一浏览器完成邮件点击、应用回调和密码重置；该项依据用户验收记录，不保存邮件、密码或 token。
+- [ ] 跨浏览器邮件点击仍待自定义 SMTP 与 token-hash 模板配置后验收；同浏览器 PKCE 通过不能替代这一项。
 - [x] 三条 Vercel Cron 已在未手工调用 cleanup API 的情况下达到自然调度预期终态；核对时间为 `2026-09-21T05:06:34Z`，当时 staging 域名运行提交 `86bf9ba298bb8a2f5bcd7787987e871a2216122d`。
 - [ ] 完成清理器崩溃后的过期租约重领和可重试 Storage 故障韧性验收；独立样本已经建立，仍须等待下一次自然调度。
 - [ ] staging 备份在新隔离项目恢复成功，并从零跑完 27 份迁移。
