@@ -10,6 +10,8 @@
 
 `2026-09-21T05:06:34Z` 只读核对主自然 Cron 样本：资料清理和过期上传预留的 Storage 对象均已消失，观察账号保留；账号注销样本的 Storage 对象与 Auth 用户均已消失。期间没有手工调用 cleanup API；可变域名运行提交为 `86bf9ba298bb8a2f5bcd7787987e871a2216122d`。主样本通过后已建立独立韧性样本，等待验证被遗弃租约与可重试故障能否由下一次自然调度恢复；该阶段当前未通过。
 
+韧性样本于 `2026-09-21T06:08:11.768Z` 完成 `reserved → staged`：预留自然过期后，仅通过 staging RPC 留置一个 30 秒租约并记录另一份样本的可重试失败，没有调用 cleanup API。阶段完成后测试站探针核对到提交 `cc381e51b83aa13b4b806e46ed330a4a157312de`。两份样本保留，最早于 `2026-09-22T04:30:00Z` 只读核对下一次自然 Cron 的终态；状态准备成功不能视为重领和重试恢复已经通过。
+
 孤立上传使用另一专用可丢弃账号，分别在 Storage 上传后停留于 `reserved`（未调用完成确认）和 `uploaded`（完成确认但未提交工作区）两种状态。预留按正式 15 分钟期限自然过期后，`/api/internal/original-upload-cleanup` 一次领取 2 个、完成 2 个，重试和失败均为 0；两条 Storage 路径均确认物理不存在，专用 Auth 账号随后删除。测试前空队列检查为 0，结果不混入 A/B 资料或其他历史任务。
 
 Auth token 验收使用 Supabase Admin 为专用可丢弃账号生成一次性 signup 与 recovery token，不经邮箱传递。真实 `/auth/confirm` 使用 signup token 后建立会话，空工作区读取返回 200；同一 token 再次使用进入 `/auth/error`。recovery token 打开 `/auth/reset-password`，页面成功更新密码，旧密码随后被拒、新密码可登录；重复 recovery token 和无效 token 也进入安全错误页。测试账号最终删除。该结果验证 token 消费与应用路由，不替代真实邮件投递或跨浏览器 PKCE 邮件点击。

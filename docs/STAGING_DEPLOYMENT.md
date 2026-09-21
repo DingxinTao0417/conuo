@@ -48,6 +48,8 @@ Vercel Hobby 的 daily Cron 有一小时调度窗口。三条清理任务已验�
 
 `2026-09-21T05:06:34Z` 在未手工调用任何 cleanup API 的前提下完成自然调度终态核对。资料原件和过期上传预留的 Storage 对象均已消失，两个保留用于观察的普通 QA 账号仍存在；账号注销样本的 Storage 对象和 Auth 用户均已消失。核对时可变域名 `/api/health` 返回 `production`、`staging` 和提交 `86bf9ba298bb8a2f5bcd7787987e871a2216122d`。这证明三条 daily Cron 在 Hobby 调度窗口内达到预期终态；崩溃后的过期租约重领与可重试故障仍在独立韧性阶段等待自然调度，不能提前写成通过。
 
+`2026-09-21T06:08:11.768Z`，独立韧性样本在预留自然过期后完成 `reserved → staged`：仅通过 staging RPC 留置一个 30 秒租约，并将另一份样本记录为可重试失败，未调用 cleanup API。阶段完成后 `/api/health` 核对到 `staging` 提交 `cc381e51b83aa13b4b806e46ed330a4a157312de`。最早终态核对时间为 `2026-09-22T04:30:00Z`；两份样本保留等待下一次自然 Cron。此次仅确认故障状态准备成功，过期租约重领与失败重试恢复尚未通过。
+
 Vercel 以 `CRON_SECRET` 发送 Bearer；本环境 `CONUO_CLEANUP_SECRET` 与其相同。整理 processor 使用另一把 `CONUO_PROCESSOR_SECRET`，存于 Supabase Vault 的 `conuo_staging_processor_secret`。运维 SQL 在 [staging-organization-cron.sql](../supabase/operations/staging-organization-cron.sql)，不是 schema migration，不能随迁移复制到生产。
 
 分钟调度每次最多领取 1 个任务，租约 120 秒，HTTP 超时 65 秒。成功的 cron SQL 仅代表 HTTP 已排队，应同时查看 `net._http_response` 和任务状态。暂停时先核实 job 名称／ID，再使用脚本注释中的 `cron.alter_job`；恢复时重新确认端点和凭据。三条 Vercel Cron 可在 staging 的 Cron Jobs 设置暂停。本轮为后续验收保留这些调度运行，没有启用付费套餐。
