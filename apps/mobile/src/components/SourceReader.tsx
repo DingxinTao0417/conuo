@@ -40,6 +40,8 @@ export type SourceReaderProps = {
   visible: boolean;
   wide: boolean;
   onOpenOriginal?: () => void;
+  /** Reports the physical page of the current reading position for cloud progress. */
+  onReadingMove?: (page: number | undefined) => void;
   session?: ReaderSession;
 };
 
@@ -64,6 +66,7 @@ function ReaderDocument({
   visible,
   wide,
   onOpenOriginal,
+  onReadingMove,
   session,
 }: SourceReaderProps & { session: ReaderSession }) {
   const key = readerKey(source);
@@ -265,6 +268,9 @@ function ReaderDocument({
           bookmark.current = next;
           session.positions.set(key, next);
           setPosition(maximum > 0 ? Math.round((offset / maximum) * 100) : 0);
+          const page =
+            next.block >= 0 ? model.blocks[next.block]?.page : undefined;
+          onReadingMove?.(page);
         }}
       >
         <View style={r.documentHeader}>

@@ -1,10 +1,137 @@
 import {
   answerScope,
   type Answer,
+  type Conversation,
+  type ConversationMessage,
   type Source,
   type Workspace,
 } from "./contracts.ts";
 import type { QuestionDraftInput } from "./draft-recovery.ts";
+
+/** A deterministic conversation identity per source keeps one document thread stable across saves. */
+export function documentConversationId(sourceId: string) {
+  return `doc-${sourceId.slice(0, 80)}`.slice(0, 100);
+}
+
+/** Keep workspace history small: 20 rounds means 40 messages, far below the server's 1000 ceiling. */
+const MAX_CONVERSATION_ROUNDS = 20;
+
+/**
+ * Record one completed answer as user + assistant messages on the source's
+ * document conversation. Appending is idempotent per request id and never
+ * rewrites or deduplicates another device's newer messages.
+ */
+export function appendAnswerConversation(
+  workspace: Workspace,
+  input: {
+    source: Source;
+    question: string;
+    answer: Answer;
+    spaceId: string;
+    requestId: string;
+    questionMessageId: string;
+    /** The frozen answer scope exactly as sent, without the volatile requestId/question. */
+    scopeSnapshot: Record<string, unknown>;
+    now: string;
+  },
+): Workspace {
+  const { source, question, answer, spaceId, requestId, now } = input;
+  const existing = workspace.conversations.find(
+    (conversation) =>
+      conversation.scope === "document" &&
+      conversation.sourceId === source.id,
+  );
+  if (
+    existing?.messages.some(
+      (message) =>
+        message.role === "assistant" &&
+        message.attempt &&
+        typeof message.attempt === "object" &&
+        (message.attempt as { id?: unknown }).id === requestId,
+    )
+  )
+    return workspace;
+  const userMessage: ConversationMessage = {
+    id: input.questionMessageId,
+    role: "user",
+    content: question,
+    citations: [],
+    createdAt: now,
+  };
+  const assistantMessage: ConversationMessage = {
+    id: requestId,
+    role: "assistant",
+    content: answer.content,
+    citations: answer.citations,
+    createdAt: now,
+    mode: answer.mode,
+    attempt: {
+      id: requestId,
+      questionMessageId: input.questionMessageId,
+      scopeSnapshot: input.scopeSnapshot,
+      status: "completed",
+    },
+  };
+  const incoming: Conversation = {
+    id: existing?.id ?? documentConversationId(source.id),
+    spaceId: existing?.spaceId ?? spaceId,
+    sourceId: source.id,
+    title: existing?.title ?? (question.trim().slice(0, 40) || source.title.slice(0, 40)),
+    scope: "document",
+    sourceIds: [source.id],
+    resolved: existing?.resolved ?? false,
+    updatedAt: now,
+    messages: existing
+      ? trimConversationMessages([...existing.messages, userMessage, assistantMessage])
+      : [userMessage, assistantMessage],
+  };
+  return existing
+    ? {
+        ...workspace,
+        conversations: workspace.conversations.map((item) =>
+          item.id === incoming.id ? incoming : item,
+        ),
+      }
+    : { ...workspace, conversations: [incoming, ...workspace.conversations] };
+}
+
+function trimConversationMessages(messages: ConversationMessage[]) {
+  return messages.length <= MAX_CONVERSATION_ROUNDS * 2
+    ? messages
+    : messages.slice(messages.length - MAX_CONVERSATION_ROUNDS * 2);
+}
+
+/** The most recent document conversation for a source, if the client has loaded one. */
+export function sourceConversation(
+  workspace: Workspace,
+  sourceId: string,
+): Conversation | undefined {
+  return workspace.conversations.find(
+    (conversation) =>
+      conversation.scope === "document" && conversation.sourceId === sourceId,
+  );
+}
+
+/** Merge the current semantic reading position back into the cloud snapshot. */
+export function applyReadingProgress(
+  workspace: Workspace,
+  sourceId: string,
+  patch: { readPage?: number; lastReadAt: string },
+): Workspace {
+  const source = workspace.sources.find((item) => item.id === sourceId);
+  if (!source || source.deletedAt) return workspace;
+  if (
+    (patch.readPage === undefined || patch.readPage === source.readPage) &&
+    patch.lastReadAt === source.lastReadAt
+  )
+    return workspace;
+  return {
+    ...workspace,
+    sources: workspace.sources.map((item) =>
+      item.id === sourceId ? { ...item, ...patch } : item,
+    ),
+  };
+}
 
 export type LearningTab = "home" | "library" | "knowledge" | "account";
 export type LearningLocation = {

@@ -50,6 +50,7 @@ import {
   blankWorkspace,
   createTextNote,
   notePreview,
+  answerScope,
   readingBlocks,
   readingSource,
   type Answer,
@@ -79,6 +80,8 @@ import HomeOverview from "./components/HomeOverview";
 import { useReducedMotion } from "./components/useReducedMotion";
 import { useRestoredScroll } from "./components/useRestoredScroll";
 import {
+  appendAnswerConversation,
+  applyReadingProgress,
   discussionFor,
   filterLibrarySources,
   listLocationKey,
@@ -86,6 +89,7 @@ import {
   prepareDiscussionQuestion,
   completeQuestionRequest,
   recoverableQuestions,
+  sourceConversation,
   sourceStatusLabel,
   updateDiscussion,
   type Discussions,
@@ -691,6 +695,13 @@ function WorkspaceScreen({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions(),
     wide = width >= 760;
+  const flushProgressRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    const listener = AppState.addEventListener("change", (state) => {
+      if (state !== "active") flushProgressRef.current();
+    });
+    return () => listener.remove();
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [importing, setImporting] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
@@ -764,6 +775,16 @@ function WorkspaceScreen({
     activeSources = workspace.sources.filter((item) => !item.deletedAt);
   const activeNotes = workspace.notes.filter((item) => !item.deletedAt);
   const note = activeNotes.find((item) => item.id === noteId);
+  // Async callbacks run outside the render cycle, so keep the newest snapshot
+  // and workspace visible to them without a stale closure.
+  const latest = useRef({ snapshot, workspace });
+  latest.current = { snapshot, workspace };
+  const readingDirty = useRef<{ readPage?: number; lastReadAt: string } | null>(
+    null,
+  );
+  const readingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readingBusy = useRef(false);
+  const historyBusy = useRef(false);
   const canShowSidebar = wide && (!source || width >= 1100);
   const sidebarVisible = canShowSidebar && !sidebarCollapsed;
   pruneDiscussions(discussions.current, workspace);
@@ -771,6 +792,9 @@ function WorkspaceScreen({
     ? discussionFor(discussions.current, workspace, source)
     : null;
   const sourceScopeKey = discussion?.scopeKey ?? "";
+  const historyRounds = source
+    ? sourceConversation(workspace, source.id)
+    : undefined;
   const question = discussion?.question ?? "";
   const answer = discussion?.answer ?? null;
   const askError = discussion?.error ?? "";
@@ -844,6 +868,136 @@ function WorkspaceScreen({
   function hideAI() {
     answerRestore.capture();
     setShowAI(false);
+  }
+  function markReadingMove(page: number | undefined) {
+    if (demo || !source) return;
+    readingDirty.current = {
+      readPage: page,
+      lastReadAt: new Date().toISOString(),
+    };
+    if (readingTimer.current) clearTimeout(readingTimer.current);
+    readingTimer.current = setTimeout(() => {
+      void flushReadingProgress();
+    }, 15_000);
+  }
+  async function flushReadingProgress() {
+    if (demo || !api || !session || !source) return;
+    if (readingTimer.current) clearTimeout(readingTimer.current);
+    try {
+      await commitReadingProgress();
+    } catch (cause) {
+      if (authInterruptionReason(cause)) {
+        if (alive.current) onAuthError(cause);
+        return;
+      }
+      // The attempt outcome is unknown or conflicted: re-read the authoritative
+      // cloud snapshot, merge the same semantic move once, and retry once. A
+      // second failure keeps the dirty state for the next flush, never a lie.
+      try {
+        const fresh = await api.load(session.id);
+        if (!alive.current || !fresh.data) return;
+        const patched = applyReadingProgress(
+          fresh.data,
+          source!.id,
+          readingDirty.current ?? {
+            readPage: undefined,
+            lastReadAt: new Date().toISOString(),
+          },
+        );
+        if (patched === fresh.data) return;
+        const saved = await api.save(session.id, fresh, patched);
+        readingDirty.current = null;
+        if (alive.current)
+          setSnapshot((previous) => adoptSnapshot(previous, saved));
+      } catch (retryCause) {
+        if (alive.current && authInterruptionReason(retryCause))
+          onAuthError(retryCause);
+      }
+    }
+  }
+  async function commitReadingProgress() {
+    if (readingBusy.current) return;
+    const dirty = readingDirty.current;
+    if (!dirty) return;
+    const current = latest.current;
+    if (current.snapshot === null) return;
+    const sourceTarget = readingSource(current.workspace, source!.id);
+    if (!sourceTarget) return;
+    const data = applyReadingProgress(current.workspace, sourceTarget.id, dirty);
+    if (data === current.workspace) return;
+    readingBusy.current = true;
+    try {
+      const saved = await api!.save(session!.id, current.snapshot, data);
+      readingDirty.current = null;
+      if (alive.current) setSnapshot((previous) => adoptSnapshot(previous, saved));
+    } finally {
+      readingBusy.current = false;
+    }
+  }
+  flushProgressRef.current = flushReadingProgress;
+  /** Persist a completed answer as the source's cloud document conversation. */
+  async function persistAnswerHistory(
+    payload: ReturnType<typeof answerScope>,
+    result: Answer,
+  ) {
+    if (demo || !api || !session || historyBusy.current) return;
+    historyBusy.current = true;
+    const requestId = payload.requestId;
+    try {
+      const current = latest.current;
+      if (current.snapshot === null) return;
+      const scopeSnapshot: Record<string, unknown> = { ...payload };
+      delete scopeSnapshot.requestId;
+      delete scopeSnapshot.question;
+      const data = appendAnswerConversation(current.workspace, {
+        source: readingSource(current.workspace, payload.sourceId!)!,
+        question: payload.question,
+        answer: result,
+        spaceId: payload.spaceId,
+        requestId,
+        questionMessageId: Crypto.randomUUID(),
+        scopeSnapshot,
+        now: new Date().toISOString(),
+      });
+      if (data === current.workspace) return;
+      const saved = await api.save(session.id, current.snapshot, data);
+      if (alive.current)
+        setSnapshot((previous) => adoptSnapshot(previous, saved));
+    } catch (cause) {
+      if (authInterruptionReason(cause)) {
+        if (alive.current) onAuthError(cause);
+        return;
+      }
+      // Unknown or conflicted outcome: check the authoritative cloud state
+      // before deciding. The in-memory answer always stays visible.
+      try {
+        const fresh = await api.load(session.id);
+        if (!alive.current || !fresh.data) return;
+        const scopeSnapshot: Record<string, unknown> = { ...payload };
+        delete scopeSnapshot.requestId;
+        delete scopeSnapshot.question;
+        const target = readingSource(fresh.data, payload.sourceId!)!;
+        const data = appendAnswerConversation(fresh.data, {
+          source: target,
+          question: payload.question,
+          answer: result,
+          spaceId: payload.spaceId,
+          requestId,
+          questionMessageId: Crypto.randomUUID(),
+          scopeSnapshot,
+          now: new Date().toISOString(),
+        });
+        if (data === fresh.data) return;
+        const saved = await api.save(session.id, fresh, data);
+        if (alive.current)
+          setSnapshot((previous) => adoptSnapshot(previous, saved));
+      } catch {
+        if (alive.current)
+          setNotice("回答已显示；云端问答历史暂未保存，将随下次操作重试。");
+      }
+    } finally {
+      historyBusy.current = false;
+    }
   }
   const api = useMemo(
     () =>
@@ -988,6 +1142,7 @@ function WorkspaceScreen({
     answerRestore.capture();
     askController.current?.abort();
     setAsking(false);
+    void flushReadingProgress();
     setSourceId(null);
     setShowAI(false);
   }
@@ -1060,6 +1215,7 @@ function WorkspaceScreen({
         );
         captureQuestions();
         renderDiscussion((value) => value + 1);
+        void persistAnswerHistory(payload, result);
       }
     } catch (cause) {
       if (alive.current && !controller.signal.aborted) {
@@ -1632,6 +1788,41 @@ function WorkspaceScreen({
         onScroll={answerRestore.onScroll}
         onScrollBeginDrag={answerRestore.onScrollBeginDrag}
       >
+        {!!historyRounds &&
+          historyRounds.messages.filter((item) => item.role === "assistant")
+            .length > 0 && (
+            <View style={[s.card, { padding: 14, backgroundColor: c.canvas }]}>
+              <View style={[s.row, { justifyContent: "space-between" }]}>
+                <Text style={s.caption}>
+                  云端问答历史（{historyRounds.messages.filter((item) => item.role === "assistant").length} 条回答）
+                </Text>
+              </View>
+              {historyRounds.messages
+                .filter((item) => item.role === "assistant")
+                .slice(-3)
+                .map((item) => {
+                  const attempt = item.attempt as
+                    | { questionMessageId?: string }
+                    | undefined;
+                  const pair = historyRounds.messages.find(
+                    (candidate) => candidate.id === attempt?.questionMessageId,
+                  );
+                  return (
+                    <View key={item.id} style={{ marginTop: 10 }}>
+                      <Text numberOfLines={1} style={s.caption}>
+                        {pair?.content ?? "（历史问题）"}
+                      </Text>
+                      <Text numberOfLines={2} style={[s.secondary, { marginTop: 2 }]}>
+                        {item.content.replace(/\s+/g, " ").slice(0, 120)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              <Text style={[s.caption, { marginTop: 8, color: c.muted }]}>
+                已同步的问答可在网页版继续查看；本页仅用于核对云端记录。
+              </Text>
+            </View>
+          )}
         {!!discussion?.contextNotice && (
           <View style={[s.card, { padding: 14, backgroundColor: c.blue }]}>
             <Text accessibilityLiveRegion="polite" style={s.secondary}>
@@ -1846,6 +2037,7 @@ function WorkspaceScreen({
                   highlightRequest={highlightRequest}
                   visible={!showAI || wide}
                   wide={wide}
+                  onReadingMove={markReadingMove}
                   onOpenOriginal={
                     demo
                       ? undefined

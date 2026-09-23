@@ -7,13 +7,17 @@ import {
   type Workspace,
 } from "./contracts.ts";
 import {
+  appendAnswerConversation,
+  applyReadingProgress,
   discussionFor,
+  documentConversationId,
   filterLibrarySources,
   listLocationKey,
   pruneDiscussions,
   prepareDiscussionQuestion,
   completeQuestionRequest,
   recoverableQuestions,
+  sourceConversation,
   sourceStatusLabel,
   unsentQuestionCount,
   updateDiscussion,
@@ -597,4 +601,137 @@ test("an explicitly reedited identical question remains a draft, while deletion 
   data.sources[0].deletedAt = null;
   assert.equal(discussionFor(store, data, data.sources[0]).question, "");
   assert.equal(discussionFor(new Map(), data, data.sources[0]).question, "");
+});
+
+function completedAnswer() {
+  return {
+    mode: "extractive" as const,
+    content: "回答正文",
+    citations: [
+      {
+        sourceId: "library",
+        versionId: "library-v1",
+        chunkId: "library-chunk",
+        title: "library 主动回忆",
+        quote: "正文",
+        section: "正文",
+      },
+    ],
+  };
+}
+const scopeSnapshot = {
+  scope: "document",
+  spaceId: "learning",
+  sourceId: "library",
+  sourceIds: ["library"],
+  sourceVersions: [{ sourceId: "library", versionId: "library-v1" }],
+};
+
+test("a completed answer appends a server-valid document conversation and is idempotent per request", () => {
+  const first = appendAnswerConversation(workspace(), {
+    source: workspace().sources[0],
+    question: " 第一个问题 ",
+    answer: completedAnswer(),
+    spaceId: "learning",
+    requestId: "attempt-1",
+    questionMessageId: "user-1",
+    scopeSnapshot,
+    now: date,
+  });
+  assert.equal(first.conversations.length, 1);
+  const record = first.conversations[0];
+  assert.equal(record.scope, "document");
+  assert.equal(record.sourceId, "library");
+  assert.deepEqual(record.sourceIds, ["library"]);
+  assert.equal(record.resolved, false);
+  assert.equal(record.updatedAt, date);
+  assert.equal(record.messages.length, 2);
+  assert.equal(record.messages[0].role, "user");
+  assert.equal(record.messages[0].content, " 第一个问题 ");
+  assert.equal(record.messages[0].citations.length, 0);
+  assert.equal(record.messages[1].role, "assistant");
+  assert.equal(record.messages[1].content, "回答正文");
+  assert.equal(record.messages[1].citations.length, 1);
+  assert.equal(record.messages[1].mode, "extractive");
+  assert.deepEqual(record.messages[1].attempt, {
+    id: "attempt-1",
+    questionMessageId: "user-1",
+    scopeSnapshot,
+    status: "completed",
+  });
+  const duplicate = appendAnswerConversation(first, {
+    source: first.sources[0],
+    question: "晚到的重复响应",
+    answer: completedAnswer(),
+    spaceId: "learning",
+    requestId: "attempt-1",
+    questionMessageId: "user-1",
+    scopeSnapshot,
+    now: date,
+  });
+  assert.equal(duplicate.conversations[0].messages.length, 2);
+  const next = appendAnswerConversation(duplicate, {
+    source: duplicate.sources[0],
+    question: "第二个问题",
+    answer: completedAnswer(),
+    spaceId: "learning",
+    requestId: "attempt-2",
+    questionMessageId: "user-2",
+    scopeSnapshot,
+    now: date,
+  });
+  assert.equal(next.conversations.length, 1);
+  assert.equal(next.conversations[0].messages.length, 4);
+  assert.equal(next.conversations[0].title, " 第一个问题 ".trim().slice(0, 40));
+  assert.equal(sourceConversation(next, "library"), next.conversations[0]);
+  assert.equal(sourceConversation(next, "missing"), undefined);
+});
+
+test("a server-valid structure stays within the conversation size ceiling", () => {
+  let data = workspace();
+  for (let round = 1; round <= 25; round++) {
+    data = appendAnswerConversation(data, {
+      source: data.sources[0],
+      question: `第 ${round} 个问题`,
+      answer: completedAnswer(),
+      spaceId: "learning",
+      requestId: `attempt-${round}`,
+      questionMessageId: `user-${round}`,
+      scopeSnapshot,
+      now: date,
+    });
+  }
+  const record = data.conversations[0];
+  // Retains the most recent 20 rounds of messages.
+  assert.equal(record.messages.length, 40);
+  assert.equal(record.messages[0].content, "第 6 个问题");
+  // The latest round keeps the newest user question paired with its answer.
+  assert.equal(record.messages[record.messages.length - 2].content, "第 25 个问题");
+  assert.equal(record.messages[record.messages.length - 1].role, "assistant");
+});
+
+test("reading progress merges only real moves and never touches a deleted source", () => {
+  const data = workspace();
+  const unchanged = applyReadingProgress(data, "library", {
+    readPage: 2,
+    lastReadAt: date,
+  });
+  assert.notEqual(unchanged, data);
+  assert.equal(unchanged.sources[0].readPage, 2);
+  assert.equal(unchanged.sources[0].lastReadAt, date);
+  // The same patch is a no-op and returns the same object reference.
+  assert.equal(
+    applyReadingProgress(unchanged, "library", { readPage: 2, lastReadAt: date }),
+    unchanged,
+  );
+  // Deleting the source blocks future progress writes.
+  data.sources[0].deletedAt = date;
+  assert.equal(applyReadingProgress(data, "library", { readPage: 3, lastReadAt: date }), data);
+  assert.equal(documentConversationId("library").length <= 100, true);
+});
+
+test("the conversation id never exceeds the server id maximum", () => {
+  const longId = "x".repeat(200);
+  assert.equal(documentConversationId(longId), longId ? `doc-${"x".repeat(80)}` : "");
+  assert.equal(documentConversationId(longId).length, 84);
 });

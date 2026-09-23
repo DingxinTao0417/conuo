@@ -38,6 +38,35 @@ export const sourceSchema = z.looseObject({
     }),
   ),
 });
+export const conversationMessageSchema = z.looseObject({
+  id,
+  role: z.enum(["user", "assistant"]),
+  content: z.string(),
+  citations: z.array(citationSchema),
+  createdAt: z.string(),
+  mode: z.enum(["extractive", "model"]).optional(),
+  error: z.string().optional(),
+  noteEvidence: z.array(z.unknown()).optional(),
+  attempt: z.unknown().optional(),
+});
+export const conversationSchema = z.looseObject({
+  id,
+  spaceId: id,
+  sourceId: id.optional(),
+  title: z.string(),
+  scope: z.enum([
+    "selection",
+    "document",
+    "document-notes",
+    "sources",
+    "space",
+    "cross-library-sources",
+  ]),
+  sourceIds: z.array(id),
+  messages: z.array(conversationMessageSchema),
+  resolved: z.boolean(),
+  updatedAt: z.string(),
+});
 export const noteSchema = z.looseObject({
   id,
   spaceId: id,
@@ -67,7 +96,7 @@ export const workspaceSchema = z.looseObject({
   sources: z.array(sourceSchema),
   notes: z.array(noteSchema),
   annotations: z.array(z.unknown()),
-  conversations: z.array(z.unknown()),
+  conversations: z.array(conversationSchema),
   aiEnabled: z.boolean(),
 });
 export const snapshotSchema = z
@@ -90,6 +119,8 @@ export type Source = z.infer<typeof sourceSchema>;
 export type Note = z.infer<typeof noteSchema>;
 export type Citation = z.infer<typeof citationSchema>;
 export type Answer = z.infer<typeof answerSchema>;
+export type Conversation = z.infer<typeof conversationSchema>;
+export type ConversationMessage = z.infer<typeof conversationMessageSchema>;
 
 export function blankWorkspace(): Workspace {
   return {
