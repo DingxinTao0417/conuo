@@ -2,6 +2,6 @@
 // and on native platforms to ConuoPdfInkModule.ts
 export { default } from './src/ConuoPdfInkModule';
 export { extractPdfText, extractPdfPageThumbnails } from './src/ConuoPdfInkModule';
-export type { PdfPageThumbnails, PdfTextExtraction } from './src/ConuoPdfInkModule';
+export type { PdfPageThumb, PdfPageThumbnails, PdfTextExtraction } from './src/ConuoPdfInkModule';
 export { default as ConuoPdfInkView } from './src/ConuoPdfInkView';
 export * from './src/ConuoPdfInk.types';

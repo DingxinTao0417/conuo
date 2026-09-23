@@ -8,9 +8,9 @@ class ConuoPdfInkModule extends NativeModule<{}> {
 
   async extractPdfPageThumbnails(): Promise<{
     pageCount: number;
-    thumbnails: string[];
+    pages: { jpeg: string; aspectRatio: number }[];
   }> {
-    return { pageCount: 0, thumbnails: [] };
+    return { pageCount: 0, pages: [] };
   }
 }
 
@@ -21,9 +21,14 @@ export type PdfTextExtraction = {
   pages: string[];
 };
 
+export type PdfPageThumb = {
+  jpeg: string;
+  aspectRatio: number;
+};
+
 export type PdfPageThumbnails = {
   pageCount: number;
-  thumbnails: string[];
+  pages: PdfPageThumb[];
 };
 
 export async function extractPdfText() {
@@ -31,5 +36,5 @@ export async function extractPdfText() {
 }
 
 export async function extractPdfPageThumbnails(): Promise<PdfPageThumbnails> {
-  return { pageCount: 0, thumbnails: [] };
+  return { pageCount: 0, pages: [] };
 }

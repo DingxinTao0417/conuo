@@ -5,10 +5,16 @@ export type PdfTextExtraction = {
   pages: string[];
 };
 
+export type PdfPageThumb = {
+  /** Base64 JPEG without the data: prefix. */
+  jpeg: string;
+  /** cropBox width / height — landscape pages stay landscape in the rail. */
+  aspectRatio: number;
+};
+
 export type PdfPageThumbnails = {
   pageCount: number;
-  /** Base64 JPEG per page (1-based order); empty string when a page failed. */
-  thumbnails: string[];
+  pages: PdfPageThumb[];
 };
 
 type ConuoPdfInkModuleType = NativeModule<{}> & {

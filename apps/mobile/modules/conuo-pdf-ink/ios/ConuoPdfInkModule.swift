@@ -22,24 +22,22 @@ public class ConuoPdfInkModule: Module {
           )
         }
         let width = max(48, min(maxWidth.isFinite ? maxWidth : 120, 320))
-        var thumbs: [String] = []
-        thumbs.reserveCapacity(document.pageCount)
+        var pagesOut: [[String: Any]] = []
+        pagesOut.reserveCapacity(document.pageCount)
         for index in 0..<document.pageCount {
           guard let page = document.page(at: index) else {
-            thumbs.append("")
+            pagesOut.append(["jpeg": "", "aspectRatio": 0.72])
             continue
           }
           let box = page.bounds(for: .cropBox)
-          let ratio = box.height > 0 ? box.width / box.height : 0.7
-          let size = CGSize(width: width, height: width / max(ratio, 0.2))
+          // Keep the page's own orientation so landscape PDFs preview landscape.
+          let ratio = box.height > 0 ? box.width / box.height : 0.72
+          let size = CGSize(width: width, height: width / max(ratio, 0.15))
           let image = page.thumbnail(of: size, for: .cropBox)
-          if let data = image.jpegData(compressionQuality: 0.72) {
-            thumbs.append(data.base64EncodedString())
-          } else {
-            thumbs.append("")
-          }
+          let jpeg = image.jpegData(compressionQuality: 0.72)?.base64EncodedString() ?? ""
+          pagesOut.append(["jpeg": jpeg, "aspectRatio": Double(ratio)])
         }
-        promise.resolve(["pageCount": document.pageCount, "thumbnails": thumbs])
+        promise.resolve(["pageCount": document.pageCount, "pages": pagesOut])
       } catch {
         promise.reject(error)
       }

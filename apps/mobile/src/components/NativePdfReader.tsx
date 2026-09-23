@@ -6,14 +6,14 @@ import {
   Text,
   View,
 } from "react-native";
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
+
 import {
   ConuoPdfInkView,
   type LocalSnapshotEvent,
 } from "../../modules/conuo-pdf-ink";
 import type { PdfInkToolsState } from "./PdfInkToolbar";
 import PdfPagesPanel from "./PdfPagesPanel";
-import { extractPdfPageThumbnails } from "../../modules/conuo-pdf-ink";
+import { extractPdfPageThumbnails, type PdfPageThumb } from "../../modules/conuo-pdf-ink";
 import { File } from "expo-file-system";
 import * as Crypto from "expo-crypto";
 import type { Source } from "../core/contracts";
@@ -55,7 +55,7 @@ export default function NativePdfReader({
   const [error, setError] = useState("");
   const [page, setPage] = useState(source.readPage ?? 1);
   const [pageCount, setPageCount] = useState(source.pageCount ?? 0);
-  const [thumbnails, setThumbnails] = useState<string[]>([]);
+  const [thumbs, setThumbs] = useState<PdfPageThumb[]>([]);
   const [strokeCounts, setStrokeCounts] = useState<Record<number, number>>({});
   const [localProtected, setLocalProtected] = useState(false);
   const [cloudConfirmed, setCloudConfirmed] = useState(false);
@@ -86,10 +86,10 @@ export default function NativePdfReader({
         setLoadedKey(key);
         setUri(next);
         try {
-          const thumbs = await extractPdfPageThumbnails(next, 120);
+          const result = await extractPdfPageThumbnails(next, 120);
           if (!cancelled) {
-            setThumbnails(thumbs.thumbnails);
-            if (thumbs.pageCount > 0) setPageCount(thumbs.pageCount);
+            setThumbs(result.pages);
+            if (result.pageCount > 0) setPageCount(result.pageCount);
           }
         } catch {
           // thumbnails are optional; the numbered rail still works
@@ -244,10 +244,6 @@ export default function NativePdfReader({
     }
   }
 
-  const movePage = (delta: number) => {
-    setPage((current) => Math.max(1, Math.min(pageCount || Number.MAX_SAFE_INTEGER, current + delta)));
-  };
-
   return (
     <View style={[p.root, !visible && p.hidden]}>
       <View style={p.body}>
@@ -256,37 +252,14 @@ export default function NativePdfReader({
             visible
             pageCount={pageCount}
             currentPage={page}
-            thumbnails={thumbnails}
-            onSelectPage={(next) => setPage(next)}
+            pages={thumbs}
+            onSelectPage={(next) =>
+              setPage(Math.max(1, Math.min(pageCount || next, next)))
+            }
             onClose={() => onTogglePagesPanel?.()}
           />
         )}
         <View style={p.main}>
-          <View style={p.header}>
-            <View style={p.pageControls}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="上一页"
-                disabled={page <= 1}
-                onPress={() => movePage(-1)}
-                style={[p.icon, page <= 1 && p.disabled]}
-              >
-                <ChevronLeft size={18} color={c.secondary} />
-              </Pressable>
-              <Text style={p.pageLabel}>
-                {pageCount ? `${page} / ${pageCount}` : `${page}`}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="下一页"
-                disabled={pageCount > 0 && page >= pageCount}
-                onPress={() => movePage(1)}
-                style={[p.icon, pageCount > 0 && page >= pageCount && p.disabled]}
-              >
-                <ChevronRight size={18} color={c.secondary} />
-              </Pressable>
-            </View>
-          </View>
       {error ? (
         <View style={p.message}>
           <Text style={p.error}>{error}</Text>
@@ -349,22 +322,6 @@ const p = StyleSheet.create({
   hidden: { display: "none" },
   body: { flex: 1, flexDirection: "row", minWidth: 0 },
   main: { flex: 1, minWidth: 0 },
-  header: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    borderBottomWidth: 1,
-    borderBottomColor: c.line,
-    backgroundColor: "#fcfcfd",
-    gap: 10,
-  },
-  pageControls: { flexDirection: "row", alignItems: "center", gap: 2 },
-  pageLabel: { minWidth: 52, textAlign: "center", color: c.secondary, fontSize: 12 },
-  icon: { width: 36, height: 36, justifyContent: "center", alignItems: "center", borderRadius: 8 },
-  disabled: { opacity: 0.3 },
   pdf: { flex: 1 },
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
   loadingText: { color: c.secondary, fontSize: 14 },

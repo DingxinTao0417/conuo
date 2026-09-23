@@ -8,36 +8,42 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { colors as c } from "../theme";
+import type { PdfPageThumb } from "../../modules/conuo-pdf-ink";
 
 export type PdfPagesPanelProps = {
   visible: boolean;
   pageCount: number;
   currentPage: number;
-  /** Base64 JPEG per 1-based page; empty string draws a blank page card. */
-  thumbnails: string[];
+  pages: PdfPageThumb[];
   onSelectPage: (page: number) => void;
   onClose: () => void;
 };
 
-/** Left page overview rail (GoodNotes-style “所有页面”, placed on the left). */
+/** Left page overview rail: page jump, current/total, spaced landscape-aware thumbs. */
 export default function PdfPagesPanel({
   visible,
   pageCount,
   currentPage,
-  thumbnails,
+  pages: thumbs,
   onSelectPage,
   onClose,
 }: PdfPagesPanelProps) {
-  const [query, setQuery] = useState("");
-  const pages = useMemo(() => {
-    const all = Array.from({ length: Math.max(0, pageCount) }, (_, index) => index + 1);
-    const needle = query.trim();
-    if (!needle) return all;
-    return all.filter((page) => String(page).includes(needle));
-  }, [pageCount, query]);
+  const [jump, setJump] = useState("");
+  const items = useMemo(
+    () => Array.from({ length: Math.max(0, pageCount) }, (_, index) => index + 1),
+    [pageCount],
+  );
 
   if (!visible) return null;
+
+  const commitJump = () => {
+    const parsed = Number.parseInt(jump.trim(), 10);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > pageCount) return;
+    onSelectPage(parsed);
+    setJump("");
+  };
 
   return (
     <View style={g.panel}>
@@ -52,26 +58,53 @@ export default function PdfPagesPanel({
           <Text style={g.closeText}>×</Text>
         </Pressable>
       </View>
-      <TextInput
-        accessibilityLabel="搜索页码"
-        value={query}
-        onChangeText={setQuery}
-        placeholder="搜索"
-        placeholderTextColor={c.muted}
-        style={g.search}
-        keyboardType="number-pad"
-        clearButtonMode="while-editing"
-      />
+      <View style={g.jumpRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="上一页"
+          disabled={currentPage <= 1}
+          onPress={() => onSelectPage(currentPage - 1)}
+          style={[g.step, currentPage <= 1 && g.stepOff]}
+        >
+          <ChevronLeft size={16} color={c.secondary} />
+        </Pressable>
+        <TextInput
+          accessibilityLabel="跳至页码"
+          value={jump}
+          onChangeText={setJump}
+          onSubmitEditing={commitJump}
+          onBlur={commitJump}
+          placeholder={String(currentPage)}
+          placeholderTextColor={c.muted}
+          keyboardType="number-pad"
+          returnKeyType="go"
+          selectTextOnFocus
+          style={g.jumpInput}
+        />
+        <Text style={g.pageCount}>/ {pageCount || "—"}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="下一页"
+          disabled={pageCount > 0 && currentPage >= pageCount}
+          onPress={() => onSelectPage(currentPage + 1)}
+          style={[g.step, pageCount > 0 && currentPage >= pageCount && g.stepOff]}
+        >
+          <ChevronRight size={16} color={c.secondary} />
+        </Pressable>
+      </View>
       <FlatList
-        data={pages}
+        data={items}
         keyExtractor={(page) => String(page)}
         contentContainerStyle={g.list}
         style={g.listClip}
-        initialNumToRender={8}
+        initialNumToRender={6}
         windowSize={7}
+        ItemSeparatorComponent={() => <View style={g.gap} />}
         renderItem={({ item: page }) => {
           const active = page === currentPage;
-          const thumb = thumbnails[page - 1];
+          const thumb = thumbs[page - 1];
+          const ratio =
+            thumb && thumb.aspectRatio > 0.15 ? thumb.aspectRatio : 0.72;
           return (
             <Pressable
               accessibilityRole="button"
@@ -80,14 +113,25 @@ export default function PdfPagesPanel({
               onPress={() => onSelectPage(page)}
               style={g.card}
             >
-              {thumb ? (
+              {thumb?.jpeg ? (
                 <Image
-                  source={{ uri: `data:image/jpeg;base64,${thumb}` }}
-                  style={[g.thumb, active && g.thumbActive]}
+                  source={{ uri: `data:image/jpeg;base64,${thumb.jpeg}` }}
+                  style={[
+                    { aspectRatio: ratio },
+                    g.thumb,
+                    active && g.thumbActive,
+                  ]}
                   resizeMode="cover"
                 />
               ) : (
-                <View style={[g.thumb, g.thumbBlank, active && g.thumbActive]} />
+                <View
+                  style={[
+                    { aspectRatio: ratio },
+                    g.thumb,
+                    g.thumbBlank,
+                    active && g.thumbActive,
+                  ]}
+                />
               )}
               <Text style={[g.page, active && g.pageActive]}>{page}</Text>
             </Pressable>
@@ -108,7 +152,7 @@ const g = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 12,
-    paddingBottom: 8,
+    paddingBottom: 6,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -122,27 +166,48 @@ const g = StyleSheet.create({
     borderRadius: 8,
   },
   closeText: { fontSize: 20, color: c.muted, lineHeight: 22 },
-  search: {
-    marginHorizontal: 10,
-    marginBottom: 8,
-    paddingHorizontal: 10,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: c.canvas,
+  jumpRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    marginBottom: 10,
+  },
+  step: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepOff: { opacity: 0.3 },
+  jumpInput: {
+    width: 48,
+    height: 30,
+    paddingHorizontal: 6,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: c.line,
+    backgroundColor: c.canvas,
     fontSize: 13,
     color: c.ink,
+    textAlign: "center",
+  },
+  pageCount: {
+    flex: 1,
+    fontSize: 12,
+    color: c.secondary,
+    fontVariant: ["tabular-nums"],
   },
   listClip: { flex: 1 },
-  list: { paddingHorizontal: 10, paddingBottom: 16, gap: 12 },
+  list: { paddingHorizontal: 10, paddingBottom: 16 },
+  gap: { height: 10 },
   card: {
     alignItems: "center",
     gap: 4,
   },
   thumb: {
     width: "100%",
-    aspectRatio: 0.72,
     borderRadius: 8,
     borderWidth: 2,
     borderColor: "transparent",
