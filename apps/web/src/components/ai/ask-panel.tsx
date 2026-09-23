@@ -5,7 +5,6 @@ import {
   ArrowUp,
   BookOpen,
   Check,
-  FileText,
   History,
   LoaderCircle,
   MessageSquare,
@@ -230,36 +229,6 @@ export default function AskPanel({
         </div>
         {surface.description ? <p>{surface.description}</p> : null}
         {surface.extra}
-        {singleScope ? (
-          <p className="reader-scope reader-scope-fixed">
-            <span>提问范围</span>
-            <strong>{askScopeLabels[scope.active]}</strong>
-          </p>
-        ) : (
-          <label className="reader-scope">
-            <span>提问范围</span>
-            <select
-              value={scope.active}
-              disabled={scope.locked}
-              onChange={(event) => scope.onChange(event.target.value as AskScope)}
-            >
-              {scope.options.map((key) => (
-                <option value={key} key={key}>
-                  {askScopeLabels[key]}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {scope.detail}
-        {blocked ? (
-          <p id={eligibilityId} className="reader-scope-warning" role="status">
-            {blocked}
-          </p>
-        ) : (
-          scope.notice
-        )}
-        {scope.footer}
       </header>
       {historyOpen && conversation.history && (
         <div className="reader-history">
@@ -720,6 +689,15 @@ export default function AskPanel({
             {error}
           </p>
         )}
+        {scope.detail}
+        {blocked ? (
+          <p id={eligibilityId} className="reader-scope-warning" role="status">
+            {blocked}
+          </p>
+        ) : (
+          scope.notice
+        )}
+        {scope.footer}
         <div className="reader-input-box">
           <textarea
             ref={questionInput}
@@ -739,10 +717,27 @@ export default function AskPanel({
             }}
           />
           <div className="reader-input-footer">
-            <span>
-              <FileText size={12} />
-              {composer.scopeSummary ?? askScopeLabels[scope.active]}
-            </span>
+            {singleScope ? (
+              <p className="reader-scope reader-scope-fixed reader-scope-composer">
+                <span>提问范围</span>
+                <strong>{askScopeLabels[scope.active]}</strong>
+              </p>
+            ) : (
+              <label className="reader-scope reader-scope-composer">
+                <span>提问范围</span>
+                <select
+                  value={scope.active}
+                  disabled={scope.locked || composerDisabled}
+                  onChange={(event) => scope.onChange(event.target.value as AskScope)}
+                >
+                  {scope.options.map((key) => (
+                    <option value={key} key={key}>
+                      {askScopeLabels[key]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {busy ? (
               <button
                 type="button"
