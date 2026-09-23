@@ -8,6 +8,7 @@ import {
   ListChecks,
   Loader2,
   Menu,
+  PanelLeft,
   Search,
 } from "lucide-react";
 import type { Note, Source, Space } from "@/lib/types";
@@ -30,6 +31,8 @@ export type WorkspaceTopbarProps = {
   /** Import and AI-organization work still running, shown as a task badge. */
   activeTaskCount: number;
   setSidebar: (open: boolean) => void;
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
   openCollectionHome: () => void;
   openAllSourcesSearch: () => void;
   navigate: (section: "tasks") => void;
@@ -51,6 +54,8 @@ export default function WorkspaceTopbar({
   currentNote,
   activeTaskCount,
   setSidebar,
+  sidebarCollapsed,
+  onToggleSidebar,
   openCollectionHome,
   openAllSourcesSearch,
   navigate,
@@ -64,6 +69,16 @@ export default function WorkspaceTopbar({
         onClick={() => setSidebar(true)}
       >
         <Menu size={19} />
+      </button>
+      <button
+        type="button"
+        className="icon-btn sidebar-toggle"
+        aria-label={sidebarCollapsed ? "展开侧栏" : "收起侧栏"}
+        title={sidebarCollapsed ? "展开侧栏（Ctrl+\\）" : "收起侧栏（Ctrl+\\）"}
+        aria-pressed={sidebarCollapsed}
+        onClick={onToggleSidebar}
+      >
+        <PanelLeft size={18} />
       </button>
       {isLibraryWorkspace ? (
         <>

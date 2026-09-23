@@ -184,6 +184,21 @@ describe("Workspace global and space navigation boundaries", () => {
     expectGlobalHome();
   });
 
+  it("collapses and restores the desktop sidebar", async () => {
+    const collapse = host.querySelector<HTMLButtonElement>('[aria-label="收起侧栏"]');
+    expect(collapse).toBeTruthy();
+    expect(host.querySelector(".app-shell")?.className).not.toContain("sidebar-collapsed");
+    await act(async () => {
+      collapse!.click();
+    });
+    expect(host.querySelector(".app-shell")?.className).toContain("sidebar-collapsed");
+    expect(host.querySelector('[aria-label="展开侧栏"]')).toBeTruthy();
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[aria-label="展开侧栏"]')!.click();
+    });
+    expect(host.querySelector(".app-shell")?.className).not.toContain("sidebar-collapsed");
+  });
+
   it("opens the global learning overview from the brand while a space overview is active", async () => {
     await openHash("#home?space=space-a");
     expect(host.querySelector(".page-heading h1")?.textContent).toBe("我的学习空间");

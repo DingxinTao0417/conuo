@@ -316,6 +316,36 @@ export default function Workspace({
   );
   const [notePanel, setNotePanel] = useState<NotePanel>(null);
   const [sidebar, setSidebar] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      // Hydration-safe: read the saved desktop rail preference after mount.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (window.localStorage.getItem("conuo.sidebarCollapsed") === "1") setSidebarCollapsed(true);
+    } catch {
+      // private mode or blocked storage keeps the default expanded sidebar
+    }
+  }, []);
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed((value) => {
+      const next = !value;
+      try {
+        window.localStorage.setItem("conuo.sidebarCollapsed", next ? "1" : "0");
+      } catch {
+        // ignore storage failures
+      }
+      return next;
+    });
+  }, []);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key !== "\\") return;
+      event.preventDefault();
+      toggleSidebarCollapsed();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [toggleSidebarCollapsed]);
   const [modal, setModal] = useState<WorkspaceModal>(null);
   const [readingPositionResolutionEpoch, setReadingPositionResolutionEpoch] = useState(0);
   const [readingConflictPlanSnapshot, setReadingConflictPlanSnapshot] =
@@ -2290,7 +2320,7 @@ export default function Workspace({
 
   return (
     <div
-      className={`app-shell${isLibraryWorkspace ? " library-workspace" : ""}${isReadingWorkspace ? " reader-shell" : ""}${comparisonRoute ? " comparison-shell" : ""}${isCollectionHome ? " collection-home" : ""}`}
+      className={`app-shell${sidebarCollapsed ? " sidebar-collapsed" : ""}${isLibraryWorkspace ? " library-workspace" : ""}${isReadingWorkspace ? " reader-shell" : ""}${comparisonRoute ? " comparison-shell" : ""}${isCollectionHome ? " collection-home" : ""}`}
     >
       <WorkspaceSidebar
         data={data}
@@ -2328,6 +2358,8 @@ export default function Workspace({
             currentNote={currentNote}
             activeTaskCount={activeTaskCount}
             setSidebar={setSidebar}
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleSidebar={toggleSidebarCollapsed}
             openCollectionHome={openCollectionHome}
             openAllSourcesSearch={openAllSourcesSearch}
             navigate={navigate}
@@ -2873,6 +2905,8 @@ export default function Workspace({
                   : undefined
             }
             onBack={returnFromReader}
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleSidebar={toggleSidebarCollapsed}
             onOpenSettings={() => navigate("settings")}
             getSourceBlob={store.sourceBlob}
             initialCitation={pendingNoteCitation}

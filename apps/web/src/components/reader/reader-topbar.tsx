@@ -11,6 +11,7 @@ import {
   LoaderCircle,
   MapPin,
   MoreHorizontal,
+  PanelLeft,
   RotateCcw,
   Search,
   Sparkles,
@@ -46,6 +47,8 @@ export type ReaderTopbarProps = {
   sourceActions: RefObject<HTMLDivElement | null>;
   sourceActionsToggle: RefObject<HTMLButtonElement | null>;
   onBack: () => void;
+  sidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
   onStartComparison: ReaderProps["onStartComparison"];
   onRefreshWeb: ReaderProps["onRefreshWeb"];
   onReplaceFile: ReaderProps["onReplaceFile"];
@@ -78,6 +81,8 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
     mobileReadingStatus,
     mobileTab,
     onBack,
+    onToggleSidebar,
+    sidebarCollapsed,
     openAiPanel,
     panels,
     searchOpen,
@@ -96,6 +101,18 @@ export default function ReaderTopbar(props: ReaderTopbarProps) {
   const aiVisible = compact ? mobileTab === "ai" : aiOpen;
   return (
     <header className="reader-topbar">
+      {onToggleSidebar && (
+        <button
+          type="button"
+          className="icon-btn sidebar-toggle"
+          aria-label={sidebarCollapsed ? "展开侧栏" : "收起侧栏"}
+          title={sidebarCollapsed ? "展开侧栏（Ctrl+\\）" : "收起侧栏（Ctrl+\\）"}
+          aria-pressed={Boolean(sidebarCollapsed)}
+          onClick={onToggleSidebar}
+        >
+          <PanelLeft size={18} aria-hidden="true" />
+        </button>
+      )}
       <button
         className={`icon-btn reader-back-button${
           contextualBackLabel ? " reader-back-button-context" : ""

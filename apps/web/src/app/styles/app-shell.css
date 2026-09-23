@@ -373,6 +373,18 @@
 .mobile-menu {
   display: none !important;
 }
+.sidebar-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+.app-shell.sidebar-collapsed > .sidebar {
+  display: none;
+}
+@media (max-width: 620px) {
+  .sidebar-toggle {
+    display: none !important;
+  }
+}
 .space-context-bar {
   display: flex;
   align-items: center;

@@ -88,6 +88,8 @@ export interface ReaderProps {
   onPreviewRemoveVersion?: (versionId: string) => Promise<SourceVersionPurgePreview>;
   onRemoveVersion?: (versionId: string, preview: SourceVersionPurgePreview) => Promise<void>;
   onBack: () => void;
+  sidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
   /** Names the temporary destination when the reader was opened to review source evidence. */
   backLabel?: string;
   /** Opens the learner's account and settings from the phone bottom navigation. */

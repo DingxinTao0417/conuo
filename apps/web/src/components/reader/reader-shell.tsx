@@ -2093,6 +2093,8 @@ export default function Reader(props: ReaderProps) {
         sourceActions={sourceActions}
         sourceActionsToggle={sourceActionsToggle}
         onBack={onBack}
+        sidebarCollapsed={props.sidebarCollapsed}
+        onToggleSidebar={props.onToggleSidebar}
         onStartComparison={props.onStartComparison}
         onRefreshWeb={props.onRefreshWeb}
         onReplaceFile={props.onReplaceFile}
