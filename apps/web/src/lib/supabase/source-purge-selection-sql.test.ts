@@ -313,7 +313,9 @@ beforeAll(async () => {
       CREATE TABLE storage.objects(bucket_id text,name text,metadata jsonb not null default '{}'::jsonb); ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
       CREATE FUNCTION storage.foldername(text) RETURNS text[] LANGUAGE sql IMMUTABLE AS $$ SELECT string_to_array($1,'/') $$;
       GRANT USAGE ON SCHEMA storage TO anon,authenticated,service_role; GRANT SELECT,INSERT,DELETE ON storage.objects TO authenticated;`);
-    for (const name of (await readdir(migrations)).filter((name) => name.endsWith(".sql")).sort())
+    for (const name of (await readdir(migrations))
+      .filter((name) => name.endsWith(".sql") && !name.startsWith("._"))
+      .sort())
       await db.exec(await readFile(new URL(name, migrations), "utf8"));
     await db.exec("GRANT SELECT,UPDATE ON public.workspaces TO service_role;");
   } catch (error) {

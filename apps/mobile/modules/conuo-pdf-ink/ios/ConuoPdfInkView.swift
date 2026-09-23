@@ -17,7 +17,7 @@ final class ConuoPdfInkView: ExpoView {
   private var overlayProvider: ConuoPageOverlayProvider!
   private var documentUri: String?
   private var snapshotNamespace = "default"
-  private var snapshotWorkItem: DispatchWorkItem?
+  private var snapshotWorkItems: [Int: DispatchWorkItem] = [:]
   private var pageChangedObserver: NSObjectProtocol?
   private var scaleChangedObserver: NSObjectProtocol?
   private var allowsFingerDrawing = false
@@ -62,7 +62,9 @@ final class ConuoPdfInkView: ExpoView {
   }
 
   deinit {
-    snapshotWorkItem?.cancel()
+    for item in snapshotWorkItems.values {
+      item.cancel()
+    }
     if let pageChangedObserver {
       NotificationCenter.default.removeObserver(pageChangedObserver)
     }
@@ -151,7 +153,7 @@ final class ConuoPdfInkView: ExpoView {
     overlayProvider.activeCanvas?.undoManager?.redo()
   }
 
-  fileprivate func emitDrawingChanged(for canvas: PKCanvasView) {
+  fileprivate func emitDrawingChanged(for canvas: PKCanvasView, scheduleSnapshot: Bool = true) {
     let pageIndex = overlayProvider.pageIndex(for: canvas) ?? currentPageIndex
     onDrawingChanged([
       "page": pageIndex,
@@ -160,16 +162,63 @@ final class ConuoPdfInkView: ExpoView {
       "canUndo": canvas.undoManager?.canUndo ?? false,
       "canRedo": canvas.undoManager?.canRedo ?? false,
     ])
-    scheduleSnapshot(for: canvas, pageIndex: pageIndex)
+    if scheduleSnapshot {
+      self.scheduleSnapshot(for: canvas, pageIndex: pageIndex)
+    }
+  }
+
+  fileprivate func emitExistingLocalSnapshot(forPageIndex pageIndex: Int) {
+    guard pageIndex > 0, let payload = existingSnapshotPayload(forPageIndex: pageIndex) else { return }
+    onLocalSnapshot(payload)
+  }
+
+  /// Restore can run while the React view is still attaching listeners; defer
+  /// so stroke counts and retry uploads are not dropped.
+  fileprivate func scheduleRestoreReport(strokeCount: Int, pageIndex: Int, canvas: PKCanvasView) {
+    DispatchQueue.main.async { [weak self, weak canvas] in
+      guard let self, let canvas else { return }
+      self.onDrawingChanged([
+        "page": pageIndex,
+        "strokeCount": strokeCount,
+        "isEmpty": strokeCount == 0,
+        "canUndo": canvas.undoManager?.canUndo ?? false,
+        "canRedo": canvas.undoManager?.canRedo ?? false,
+      ])
+      if strokeCount > 0 {
+        self.emitExistingLocalSnapshot(forPageIndex: pageIndex)
+      }
+    }
+  }
+
+  private func existingSnapshotPayload(forPageIndex pageIndex: Int) -> [String: Any]? {
+    let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("ConuoInk", isDirectory: true)
+      .appendingPathComponent(snapshotNamespace, isDirectory: true)
+    let drawingURL = base.appendingPathComponent("page-\(pageIndex).drawing")
+    let previewURL = base.appendingPathComponent("page-\(pageIndex).png")
+    guard let drawingData = try? Data(contentsOf: drawingURL),
+          let previewData = try? Data(contentsOf: previewURL),
+          !drawingData.isEmpty, !previewData.isEmpty else { return nil }
+    return [
+      "page": pageIndex,
+      "drawingFileUri": drawingURL.absoluteString,
+      "drawingBytes": drawingData.count,
+      "drawingSha256": Self.sha256(drawingData),
+      "previewFileUri": previewURL.absoluteString,
+      "previewBytes": previewData.count,
+      "previewSha256": Self.sha256(previewData),
+      "coordinateSpace": ["version": 1, "space": "pdf-crop-box"],
+    ]
   }
 
   private func scheduleSnapshot(for canvas: PKCanvasView, pageIndex: Int) {
-    snapshotWorkItem?.cancel()
+    snapshotWorkItems[pageIndex]?.cancel()
     let item = DispatchWorkItem { [weak self, weak canvas] in
       guard let self, let canvas else { return }
       self.snapshot(canvas: canvas, pageIndex: pageIndex)
+      self.snapshotWorkItems[pageIndex] = nil
     }
-    snapshotWorkItem = item
+    snapshotWorkItems[pageIndex] = item
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: item)
   }
 
@@ -177,7 +226,12 @@ final class ConuoPdfInkView: ExpoView {
     let page = pageIndex
     guard page > 0 else { return }
     let drawingData = canvas.drawing.dataRepresentation()
-    let preview = canvas.drawing.image(from: canvas.bounds, scale: UIScreen.main.scale)
+    let renderSize = canvas.bounds.size == .zero ? canvas.drawing.bounds.size : canvas.bounds.size
+    guard renderSize.width > 1, renderSize.height > 1 else { return }
+    let preview = canvas.drawing.image(
+      from: CGRect(origin: .zero, size: renderSize),
+      scale: min(2, UIScreen.main.scale)
+    )
     guard let previewData = preview.pngData() else { return }
     let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
       .appendingPathComponent("ConuoInk", isDirectory: true)
@@ -375,6 +429,11 @@ private final class ConuoPageOverlayProvider: NSObject, PDFPageOverlayViewProvid
       let pageIndex = document.index(for: page) + 1
       pageIndices[ObjectIdentifier(canvas)] = pageIndex
       canvas.drawing = owner.loadDrawing(for: page) ?? PKDrawing()
+      owner.scheduleRestoreReport(
+        strokeCount: canvas.drawing.strokes.count,
+        pageIndex: pageIndex,
+        canvas: canvas
+      )
     }
     canvases.add(canvas)
     return canvas
@@ -387,6 +446,14 @@ private final class ConuoPageOverlayProvider: NSObject, PDFPageOverlayViewProvid
     canvas.tool = makeSelectedTool()
     if canvas.drawing.strokes.isEmpty, let owner {
       canvas.drawing = owner.loadDrawing(for: page) ?? PKDrawing()
+    }
+    if let owner {
+      let pageIndex = pageIndices[ObjectIdentifier(canvas)] ?? 0
+      owner.scheduleRestoreReport(
+        strokeCount: canvas.drawing.strokes.count,
+        pageIndex: pageIndex,
+        canvas: canvas
+      )
     }
     if pdfView.isInMarkupMode {
       canvas.becomeFirstResponder()
@@ -423,6 +490,11 @@ private final class ConuoPageOverlayProvider: NSObject, PDFPageOverlayViewProvid
       guard canvas.drawing.strokes.isEmpty,
             let pageIndex = pageIndices[ObjectIdentifier(canvas)] else { continue }
       canvas.drawing = owner.loadDrawing(forPageIndex: pageIndex) ?? PKDrawing()
+      owner.scheduleRestoreReport(
+        strokeCount: canvas.drawing.strokes.count,
+        pageIndex: pageIndex,
+        canvas: canvas
+      )
     }
   }
 

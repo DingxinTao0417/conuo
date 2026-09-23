@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createApi, type ClientError } from "./api";
+import { createApi, type ClientError } from "./api.ts";
 
 const revisionId = z.string().uuid();
 const coordinateSpace = z.object({ version: z.literal(1), space: z.literal("pdf-crop-box") }).strict();
@@ -87,4 +87,34 @@ export function inkErrorMessage(error: unknown) {
   if (cause?.code === "UNAUTHENTICATED" || cause?.code === "SESSION_CHANGED")
     return "登录已失效，当前笔迹仍保留在本机。";
   return "笔迹尚未同步到云端，当前笔迹仍保留在本机。";
+}
+
+/**
+ * Page-level upload identity. Generation changes when the client starts a new
+ * CAS attempt (new content or retry after rejection) so stale intents cannot
+ * block a later upload of the same bytes.
+ */
+export function buildInkOperationId(
+  pageIndex: number,
+  drawingSha256: string,
+  generation: number,
+) {
+  return `p${Math.max(0, pageIndex)}g${Math.max(1, generation)}-${drawingSha256}`.slice(0, 100);
+}
+
+/** Serializes ink commits for one page so concurrent snapshots cannot self-conflict. */
+export function createInkSyncQueue() {
+  const tails = new Map<number, Promise<void>>();
+  return function enqueue(pageIndex: number, task: () => Promise<void>) {
+    const previous = tails.get(pageIndex) ?? Promise.resolve();
+    const next = previous.then(task, task);
+    tails.set(
+      pageIndex,
+      next.then(
+        () => undefined,
+        () => undefined,
+      ),
+    );
+    return next;
+  };
 }

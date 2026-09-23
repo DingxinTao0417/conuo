@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -28,6 +28,8 @@ import { downloadPdfOriginal } from "../core/pdf-original";
 import { createApi } from "../core/api";
 import { apiUrl, getAuthClient } from "../session";
 import {
+  buildInkOperationId,
+  createInkSyncQueue,
   inkErrorMessage,
   parseInkCommit,
   parseInkManifest,
@@ -58,12 +60,17 @@ export default function NativePdfReader({
   const [zoomStep, setZoomStep] = useState(0);
   const [undoToken, setUndoToken] = useState(0);
   const [redoToken, setRedoToken] = useState(0);
-  const [strokeCount, setStrokeCount] = useState(0);
+  const [strokeCounts, setStrokeCounts] = useState<Record<number, number>>({});
   const [localProtected, setLocalProtected] = useState(false);
   const [cloudConfirmed, setCloudConfirmed] = useState(false);
   const [syncError, setSyncError] = useState("");
   const [loadedKey, setLoadedKey] = useState("");
   const snapshotNamespace = `${inkNamespace ?? "demo"}-${source.id}-${source.versionId}`;
+  const enqueueSync = useRef(createInkSyncQueue()).current;
+  const pageUploads = useRef(
+    new Map<number, { generation: number; syncedDrawingSha256: string | null }>(),
+  );
+  const strokeCount = strokeCounts[page] ?? 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -72,10 +79,11 @@ export default function NativePdfReader({
     setError("");
     setPage(source.readPage ?? 1);
     setPageCount(source.pageCount ?? 0);
-    setStrokeCount(0);
+    setStrokeCounts({});
     setLocalProtected(false);
     setCloudConfirmed(false);
     setSyncError("");
+    pageUploads.current.clear();
     void downloadPdfOriginal(source)
       .then((next) => {
         if (!cancelled) {
@@ -126,66 +134,109 @@ export default function NativePdfReader({
         (await hash(previewBytes)) !== event.previewSha256
       )
         throw new Error("INK_DIGEST_MISMATCH");
-      const manifest = parseInkManifest(
-        await api.loadInkManifest(owner, source.id, source.versionId),
-      );
-      const pageIndex = Math.max(0, event.page - 1);
-      const head = manifest.pages.find((item) => item.pageIndex === pageIndex);
-      const operationId = `p${pageIndex}-${source.id.slice(0, 24)}-${source.versionId.slice(0, 24)}-${event.drawingSha256}`.slice(
-        0,
-        100,
-      );
-      const reservation = parseInkReservation(
-        await api.reserveInkUpload(owner, source.id, source.versionId, {
-          operationId,
-          pageIndex,
-          baseRevisionId: head?.headRevisionId ?? null,
-          localGeneration: 1,
-          drawing: { sha256: event.drawingSha256, bytes: event.drawingBytes },
-          preview: {
-            sha256: event.previewSha256,
-            bytes: event.previewBytes,
-            mimeType: "image/png",
-          },
-          coordinateSpace: event.coordinateSpace,
-          pencilKitContentVersion: 1,
-        }),
-      );
-      if (reservation.status !== "committed") {
-        const toBuffer = (bytes: Uint8Array) =>
-          bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
-            ? (bytes.buffer as ArrayBuffer)
-            : (bytes.buffer.slice(
-                bytes.byteOffset,
-                bytes.byteOffset + bytes.byteLength,
-              ) as ArrayBuffer);
-        const drawingUpload = await auth.storage
-          .from("ink")
-          .upload(reservation.drawingStoragePath, toBuffer(drawingBytes), {
-            contentType: "application/octet-stream",
-            upsert: false,
-          });
-        if (drawingUpload.error && ![400, 409].includes(Number(drawingUpload.error.statusCode)))
-          throw drawingUpload.error;
-        const previewUpload = await auth.storage
-          .from("ink")
-          .upload(reservation.previewStoragePath, toBuffer(previewBytes), {
-            contentType: "image/png",
-            upsert: false,
-          });
-        if (previewUpload.error && ![400, 409].includes(Number(previewUpload.error.statusCode)))
-          throw previewUpload.error;
-        parseInkCommit(
-          await api.commitInkUpload(owner, source.id, source.versionId, {
-            operationId,
-            intentId: reservation.intentId,
-            reservationToken: reservation.reservationToken,
-          }),
-        );
+      // Empty PKDrawing payloads must not become a blank page head.
+      if (event.drawingBytes < 80) {
+        setLocalProtected(true);
+        setCloudConfirmed(true);
+        return;
       }
-      setCloudConfirmed(true);
+      const pageIndex = Math.max(0, event.page - 1);
+      const prior = pageUploads.current.get(pageIndex) ?? {
+        generation: 0,
+        syncedDrawingSha256: null,
+      };
+      if (prior.syncedDrawingSha256 === event.drawingSha256) {
+        setCloudConfirmed(true);
+        setLocalProtected(true);
+        setSyncError("");
+        return;
+      }
+      let lastError: unknown = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const fresh = parseInkManifest(
+            await api.loadInkManifest(owner, source.id, source.versionId),
+          );
+          const head = fresh.pages.find((item) => item.pageIndex === pageIndex);
+          const generation = prior.generation + 1 + attempt;
+          const operationId = buildInkOperationId(pageIndex, event.drawingSha256, generation);
+          const reservation = parseInkReservation(
+            await api.reserveInkUpload(owner, source.id, source.versionId, {
+              operationId,
+              pageIndex,
+              baseRevisionId: head?.headRevisionId ?? null,
+              localGeneration: generation,
+              drawing: { sha256: event.drawingSha256, bytes: event.drawingBytes },
+              preview: {
+                sha256: event.previewSha256,
+                bytes: event.previewBytes,
+                mimeType: "image/png",
+              },
+              coordinateSpace: event.coordinateSpace,
+              pencilKitContentVersion: 1,
+            }),
+          );
+          if (reservation.status !== "committed") {
+            const toBuffer = (bytes: Uint8Array) =>
+              bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
+                ? (bytes.buffer as ArrayBuffer)
+                : (bytes.buffer.slice(
+                    bytes.byteOffset,
+                    bytes.byteOffset + bytes.byteLength,
+                  ) as ArrayBuffer);
+            const drawingUpload = await auth.storage
+              .from("ink")
+              .upload(reservation.drawingStoragePath, toBuffer(drawingBytes), {
+                contentType: "application/octet-stream",
+                upsert: false,
+              });
+            if (drawingUpload.error && ![400, 409].includes(Number(drawingUpload.error.statusCode)))
+              throw drawingUpload.error;
+            const previewUpload = await auth.storage
+              .from("ink")
+              .upload(reservation.previewStoragePath, toBuffer(previewBytes), {
+                contentType: "image/png",
+                upsert: false,
+              });
+            if (previewUpload.error && ![400, 409].includes(Number(previewUpload.error.statusCode)))
+              throw previewUpload.error;
+            parseInkCommit(
+              await api.commitInkUpload(owner, source.id, source.versionId, {
+                operationId,
+                intentId: reservation.intentId,
+                reservationToken: reservation.reservationToken,
+              }),
+            );
+          }
+          pageUploads.current.set(pageIndex, {
+            generation,
+            syncedDrawingSha256: event.drawingSha256,
+          });
+          setCloudConfirmed(true);
+          return;
+        } catch (cause) {
+          lastError = cause;
+          const code = (cause as { code?: string } | null)?.code;
+          if (code !== "INK_PAGE_CONFLICT" || attempt === 1) throw cause;
+        }
+      }
+      throw lastError;
     } catch (cause) {
+      const pageIndex = Math.max(0, event.page - 1);
+      const prior = pageUploads.current.get(pageIndex);
+      pageUploads.current.set(pageIndex, {
+        generation: prior?.generation ?? 1,
+        syncedDrawingSha256: null,
+      });
       setSyncError(inkErrorMessage(cause));
+    }
+  }
+
+  async function syncSnapshotWithRetry(event: LocalSnapshotEvent) {
+    try {
+      await syncSnapshot(event);
+    } catch {
+      // syncSnapshot already reports UI state; keep queue alive.
     }
   }
 
@@ -301,11 +352,16 @@ export default function NativePdfReader({
             onReadingMove?.(nativeEvent.page);
           }}
           onDrawingChanged={({ nativeEvent }) => {
-            setStrokeCount(nativeEvent.strokeCount);
+            setStrokeCounts((prev) => ({
+              ...prev,
+              [nativeEvent.page]: nativeEvent.strokeCount,
+            }));
             setLocalProtected(false);
           }}
           onLocalSnapshot={({ nativeEvent }) => {
-            void syncSnapshot(nativeEvent);
+            void enqueueSync(nativeEvent.page, () =>
+              syncSnapshotWithRetry(nativeEvent),
+            );
           }}
         />
       )}

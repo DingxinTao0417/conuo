@@ -426,7 +426,13 @@ export default function PdfReader({
     }
     void fetch(
       `/api/v1/sources/${encodeURIComponent(source.id)}/versions/${encodeURIComponent(source.versionId)}/ink`,
-      { credentials: "include", headers: { Accept: "application/json" } },
+      {
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "X-Conuo-User": cloudUserId,
+        },
+      },
     )
       .then((response) => (response.ok ? response.json() : null))
       .then((payload: unknown) => {

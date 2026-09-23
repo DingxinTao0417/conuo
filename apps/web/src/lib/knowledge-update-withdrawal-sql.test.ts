@@ -218,7 +218,9 @@ beforeAll(async () => {
       GRANT USAGE ON SCHEMA storage TO anon,authenticated,service_role;
       GRANT SELECT,INSERT,DELETE ON storage.objects TO authenticated;
     `);
-    migrationNames = (await readdir(migrations)).filter((name) => name.endsWith(".sql")).sort();
+    migrationNames = (await readdir(migrations))
+      .filter((name) => name.endsWith(".sql") && !name.startsWith("._"))
+      .sort();
     for (const name of migrationNames)
       await db.exec(await readFile(new URL(name, migrations), "utf8"));
   } catch (error) {
@@ -239,7 +241,7 @@ afterAll(async () => {
 
 describe("withdrawal receipts through ordinary PostgreSQL workspace saves", () => {
   it("executes every migration and round-trips an applied review before withdrawal", async () => {
-    expect(migrationNames).toHaveLength(28);
+    expect(migrationNames).toHaveLength(29);
     const { applied } = fixture();
     const revision = await save(applied);
     const saved = await reload();

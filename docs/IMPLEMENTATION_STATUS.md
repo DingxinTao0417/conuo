@@ -34,6 +34,16 @@
 
 随后真机显示“读取原件字节失败”：React Native Blob 在当前运行时没有可用的 `arrayBuffer()`。已增加 `FileReader.readAsArrayBuffer` 回退；移动端 108/108 测试和类型检查通过，修复包已重新加载，原始 PDF 打开和 Pencil overlay 仍待真机复测。
 
+## iPadOS PDF 手写云端与 Web 预览增量（2026-09-23）
+
+真机验收发现三处缺陷并已修复：
+
+1. **恢复后显示 0 笔**：连续阅读时空白页 overlay 的 `onDrawingChanged` 覆盖当前页笔数；改为按页记录笔画数，状态只显示当前页。恢复事件改为下一 runloop 再发，避免 JS 监听未挂上时丢失。
+2. **云端幂等卡死**：`operationId` 只含内容哈希，head 变化后重试被判 “already differs”，rejected 后永久失败。改为带 CAS generation 的 operationId；新迁移 `20260923000200_pdf_ink_idempotent_reserve.sql` 允许同 operation + 同内容幂等续传（不再比较 base）；冲突时自动用新 generation 重试一次。空白 `PKDrawing` 不再上传成空页 head。
+3. **Web 始终无笔迹**：`pdf-reader` 拉取 `/ink` 时缺少 `X-Conuo-User`，服务端 `requireUser` 对身份头不一致返回 409 `SESSION_CHANGED`，预览 URL 永远为空。已补请求头。
+
+本地核对：Storage `ink` 预览 PNG 含真实笔迹；iPad 状态栏曾显示「2 笔 · 已保存到云端」。移动端 113/113，Web 251 文件 / 4235 项、`tsc`、ESLint 0 错误（保留既有 `_result` warning）通过；SQL 测试忽略 macOS AppleDouble `._*` 文件。同页双设备并发冲突矩阵（含版本对比三选一 UI）仍未测。生产资源未修改。
+
 ## iPadOS WP2 本机 PKDrawing 恢复（2026-09-23，本地）
 
 原生模块在绘制停止约 0.8 秒后，按页把 `PKDrawing.dataRepresentation()` 与透明 PNG 预览写入 Application Support；账号摘要、source/version 和页码组成隔离目录，原子替换避免半写文件。重建 `ConuoPdfInkView` 时，PDFKit overlay 从对应页恢复 `PKDrawing`。JS 只收到页级快照完成事件，不传 Pencil 点，也不改 `public.annotations`。快照完成后，移动端按页 head 读取独立 ink manifest，上传两个私有对象并提交 CAS；未部署或失败时界面仍显示本机保护，不把本机文件冒充云端成功。

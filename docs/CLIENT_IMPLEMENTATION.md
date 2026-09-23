@@ -63,6 +63,16 @@ PDF 资料页现在优先下载同一 `storagePath` 的私有原件到应用缓�
 
 随后真机又复现 `Cannot read property 'rest' of undefined`。该错误实际发生在原件上传的 Supabase RPC 预留调用：移动端抽取 `client.rpc` 后丢失了 client receiver，内部 `rest` 变为 `undefined`。已绑定 `client.rpc`，并把 `extractPdfText` 改为 SDK 推荐的 `Promise.resolve/reject` 形式；Xcode 27.0 真机构建通过（0 errors / 0 warnings）并重新安装。上传流程增加阶段前缀（读取文件、计算指纹、提取文字、上传原件、确认保存），108 项测试与类型检查通过。**修复后的真机重新选择 PDF 尚待确认**。
 
+## iPadOS PDF 手写同步与 Web 预览修复（2026-09-23）
+
+真机与 staging Storage 核对后修复：
+
+- 按页维护笔画数，避免空白页 overlay 把状态打成 `0 笔`；恢复回报延迟到 JS 监听就绪。
+- `buildInkOperationId(page, sha, generation)` + 同页串行 `createInkSyncQueue`；冲突自动重试一次；空 `PKDrawing` 不上传。`reserve_ink_upload` 幂等迁移已应用 staging（`20260923000200`）。
+- Web `PdfReader` 请求 `/ink` 时发送 `X-Conuo-User: cloudUserId`（缺省会 409 `SESSION_CHANGED`，预览永远为空）。
+
+验证：移动端 113/113 与 `tsc`；Web 251/4235、`tsc`、ESLint 0 errors；Xcode 真机构建通过。iPad 观察到「N 笔 · 已保存到云端」，Storage 预览 PNG 含笔迹。Web 端头修复需部署 staging 后强刷复核；双设备同页并发（含冲突三选一）未测。
+
 ## iPadOS WP2 本机 PKDrawing 恢复（2026-09-23，本地实现）
 
 `ConuoPdfInkView` 在 PencilKit 的页级绘制变更停止约 0.8 秒后，把原生 `PKDrawing.dataRepresentation()` 与透明 PNG 预览写入 Application Support。目录由账号摘要、source/version 身份和页码隔离，临时文件完成后原子替换；重新创建 PDF reader 时由 PDFKit overlay 按页恢复原始 `PKDrawing`。JS 只收到页级保存完成事件，不转发 Pencil 点，不写入 `public.annotations`。PNG 只作之后 Web 预览的只读候选，不能替代原始 `PKDrawing`。

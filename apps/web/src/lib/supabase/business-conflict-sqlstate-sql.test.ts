@@ -6,7 +6,10 @@ import { createEmptyWorkspace } from "../seed";
 
 const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const migrationName = "20260920000300_business_conflict_response.sql";
-const postConflictMigrationName = "20260923000100_pdf_ink_cloud.sql";
+const postConflictMigrationNames = new Set([
+  "20260923000100_pdf_ink_cloud.sql",
+  "20260923000200_pdf_ink_idempotent_reserve.sql",
+]);
 const migrations = new URL("../../../../../supabase/migrations/", import.meta.url);
 
 type FunctionRow = {
@@ -53,9 +56,11 @@ beforeAll(async () => {
       CREATE FUNCTION storage.foldername(text) RETURNS text[] LANGUAGE sql IMMUTABLE AS $$ SELECT string_to_array($1,'/') $$;
       GRANT USAGE ON SCHEMA storage TO anon,authenticated,service_role; GRANT SELECT,INSERT,DELETE ON storage.objects TO authenticated;
     `);
-    const names = (await readdir(migrations)).filter((name) => name.endsWith(".sql")).sort();
+    const names = (await readdir(migrations))
+      .filter((name) => name.endsWith(".sql") && !name.startsWith("._"))
+      .sort();
     for (const name of names) {
-      if (name === migrationName || name === postConflictMigrationName) continue;
+      if (name === migrationName || postConflictMigrationNames.has(name)) continue;
       await db.exec(await readFile(new URL(name, migrations), "utf8"));
     }
     before = await functions();
