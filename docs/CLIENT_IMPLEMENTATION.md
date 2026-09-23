@@ -43,7 +43,20 @@ Windows 已优先进入 D1 联调：当前本地版本 `0.1.4`，新增浅灰一
 | 移动端类型检查 | 通过 |
 | Web 全量测试 | 251 文件、4234 项通过（修复本机 rolldown 绑定后重跑） |
 | Web 检查 | `npx tsc --noEmit`、ESLint 0 错误、`next build` 通过 |
-| 限制 | 未推送、未部署 staging；Bearer 原生整链路与真机进度/对话回写仍待部署后联调 |
+| 限制 | 已推送并部署 staging（`5fa983f`，经 /api/health 核对）；真实云端闭环联调与真机验收仍待执行 |
+
+跨包合同证据：`apps/web/src/lib/supabase/mobile-workspace-contract.test.ts` 新增用例，使用移动端 `appendAnswerConversation` 生成的结构经 `saveRequestSchema` 与 `PUT /api/v1/workspace` 完整保存路径验证通过；回答已完成状态的 `attempt`（requestId + scopeSnapshot 固定版本）与服务端文档对话合同一致。
+
+### 真实云端闭环联调清单（待 QA 账号与真机）
+
+以下每项均需在 staging（已部署本轮 `5fa983f`）用真实账号执行，断言语义按项目惯例「云端确认是唯一已保存依据」，证据不得含 token/密码：
+
+1. 登录 → 读取：Bearer 登录后 `GET /api/v1/workspace` 返回 200 与 `revision > 0`；无效 `Authorization` 返回 401 且不回退 Cookie。
+2. 问答：对当前版本资料提问，回答完成后云端 `workspace.data.conversations` 新增一条 `scope: "document"` 记录，含 user/assistant 消息对、`attempt.status: "completed"`、`attempt.scopeSnapshot.sourceVersions` 与提问时版本一致。
+3. 进度回写：滚动阅读 15 秒后或离开阅读器，`workspace.data.sources[].readPage/lastReadAt` 更新且 `revision + 1`；换设备刷新后一致。
+4. 409 冲突：两会话基于同一旧 revision 保存，后提交返回 409；客户端读回云端合并（对话/进度再追加一次）成功，旧确认内容不丢。
+5. 异常：断网时保留草稿且不伪造保存；401 触发重新验证门禁；423 账号封锁立即停止访问并清除输入。
+6. 历史核对：重新进入阅读器打开 AI 面板，显示最近 3 轮云端问答历史。
 
 ## iOS / iPadOS 网页收集与阅读增量（2026-09-21，本地）
 
