@@ -29,6 +29,7 @@ import AnswerMarkdown from "./components/AnswerMarkdown";
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
   BookOpen,
   Check,
   ChevronRight,
@@ -41,6 +42,7 @@ import {
   RefreshCw,
   Search,
   Sparkles,
+  Square,
   UserRound,
   Upload,
   X,
@@ -2041,18 +2043,17 @@ function WorkspaceScreen({
       <View style={s.aiHeader}>
         <View style={s.spread}>
           <View style={s.row}>
-            <Sparkles size={20} color={c.brand} />
-            <Text style={s.section}>一起读懂</Text>
+            <View style={s.aiIcon}>
+              <Sparkles size={15} color={c.brand} />
+            </View>
+            <Text style={s.aiTitle}>问 AI</Text>
           </View>
           <IconButton label="收起 AI" icon={X} onPress={hideAI} />
         </View>
-        <Text numberOfLines={2} style={s.caption}>
-          仅依据：{source?.title}
-        </Text>
       </View>
       <ScrollView
         ref={answerRestore.ref}
-        contentContainerStyle={{ padding: 20, gap: 18 }}
+        contentContainerStyle={{ padding: 16, gap: 14 }}
         keyboardShouldPersistTaps="handled"
         scrollEventThrottle={32}
         onLayout={answerRestore.onLayout}
@@ -2063,12 +2064,7 @@ function WorkspaceScreen({
         {!!historyRounds &&
           historyRounds.messages.filter((item) => item.role === "assistant")
             .length > 0 && (
-            <View style={[s.card, { padding: 14, backgroundColor: c.canvas }]}>
-              <View style={[s.row, { justifyContent: "space-between" }]}>
-                <Text style={s.caption}>
-                  云端问答历史（{historyRounds.messages.filter((item) => item.role === "assistant").length} 条回答）
-                </Text>
-              </View>
+            <View style={s.aiHistory}>
               {historyRounds.messages
                 .filter((item) => item.role === "assistant")
                 .slice(-3)
@@ -2080,76 +2076,59 @@ function WorkspaceScreen({
                     (candidate) => candidate.id === attempt?.questionMessageId,
                   );
                   return (
-                    <View key={item.id} style={{ marginTop: 10 }}>
-                      <Text numberOfLines={1} style={s.caption}>
-                        {pair?.content ?? "（历史问题）"}
+                    <View key={item.id} style={s.aiHistoryItem}>
+                      <Text numberOfLines={1} style={s.aiHistoryQ}>
+                        {pair?.content ?? "…"}
                       </Text>
-                      <Text numberOfLines={2} style={[s.secondary, { marginTop: 2 }]}>
-                        {item.content.replace(/\s+/g, " ").slice(0, 120)}
+                      <Text numberOfLines={2} style={s.aiHistoryA}>
+                        {item.content.replace(/\s+/g, " ").slice(0, 100)}
                       </Text>
                     </View>
                   );
                 })}
-              <Text style={[s.caption, { marginTop: 8, color: c.muted }]}>
-                已同步的问答可在网页版继续查看；本页仅用于核对云端记录。
-              </Text>
             </View>
           )}
         {!!discussion?.contextNotice && (
-          <View style={[s.card, { padding: 14, backgroundColor: c.blue }]}>
-            <Text accessibilityLiveRegion="polite" style={s.secondary}>
+          <View style={s.aiNotice}>
+            <Text accessibilityLiveRegion="polite" style={s.aiNoticeText}>
               {discussion.contextNotice}
             </Text>
           </View>
         )}
         {!answer && !asking && (
-          <>
-            <Text style={s.section}>哪里想再深入一点？</Text>
-            <Text style={s.secondary}>
-              让 AI 解释概念、梳理要点，或换个角度理解这份资料。
-            </Text>
-            {["这份资料的核心观点是什么？", "用一个简单的例子解释这段内容"].map(
-              (text) => (
-                <Button
-                  key={text}
-                  title={text}
-                  soft
-                  onPress={() => setQuestion(text)}
-                />
-              ),
-            )}
-          </>
+          <View style={s.aiPrompts}>
+            {["核心观点是什么？", "解释最重要的概念", "举例说明"].map((text) => (
+              <Pressable
+                key={text}
+                accessibilityRole="button"
+                onPress={() => setQuestion(text)}
+                style={s.aiChip}
+              >
+                <Text style={s.aiChipText}>{text}</Text>
+              </Pressable>
+            ))}
+          </View>
         )}
         {asking && (
           <View style={s.row}>
-            <ActivityIndicator color={c.brand} />
-            <Text style={s.secondary}>正在结合资料整理回答…</Text>
+            <ActivityIndicator size="small" color={c.brand} />
+            <Text style={s.caption}>思考中…</Text>
           </View>
         )}
         <ErrorBox text={askError} />
         {answer && (
           <>
-            <View style={[s.card, { padding: 14, backgroundColor: c.canvas }]}>
-              <Text style={s.caption}>这条回答对应的问题</Text>
-              <Text selectable style={s.body}>
-                {discussion?.answerQuestion}
-              </Text>
-            </View>
-            {(asking || askError) && (
-              <Text style={s.caption}>
-                下方保留上一次已完成的回答；本次问题尚未生成新回答。
-              </Text>
+            {!!discussion?.answerQuestion && (
+              <View style={s.aiQuestion}>
+                <Text numberOfLines={3} style={s.aiQuestionText}>
+                  {discussion.answerQuestion}
+                </Text>
+              </View>
             )}
-            <View style={s.row}>
-              <Check size={15} color="#287b69" />
-              <Text style={s.caption}>
-                {answer.mode === "model"
-                  ? "回答已完成 · 请核对来源"
-                  : "原文摘录 · 未使用生成模型"}
-              </Text>
-            </View>
             <AnswerMarkdown>{answer.content}</AnswerMarkdown>
-            <Text style={s.section}>回答的依据</Text>
+            {answer.citations.length > 0 && (
+              <Text style={s.aiCiteTitle}>引用</Text>
+            )}
             {answer.citations.map((item, index) => (
               <Pressable
                 key={`${item.chunkId}-${index}`}
@@ -2157,64 +2136,66 @@ function WorkspaceScreen({
                 accessibilityLabel={`引用 ${index + 1}：${item.title}${item.page ? `，原文第 ${item.page} 页` : ""}`}
                 accessibilityHint="打开原文并定位到这条引用"
                 onPress={() => setCitation(item)}
-                style={[s.card, { padding: 14 }]}
+                style={s.aiCite}
               >
-                <Text style={[s.label, { color: c.brand }]}>
+                <Text style={s.aiCiteLabel}>
                   [{index + 1}] {item.title}
-                  {item.page ? ` · 第 ${item.page} 页` : ""}
+                  {item.page ? ` · ${item.page}` : ""}
                 </Text>
-                <Text numberOfLines={3} style={s.secondary}>
+                <Text numberOfLines={2} style={s.aiCiteQuote}>
                   {item.quote}
                 </Text>
               </Pressable>
             ))}
-            <Text style={s.caption}>
-              回答完成后会尝试写入云端文档对话历史；请以 AI 面板历史和保存提示核对结果。
-            </Text>
-            <Button
-              title="写下我的理解"
-              icon={Plus}
-              soft
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="写下我的理解"
               disabled={!spaces.length}
               onPress={startNote}
-            />
+              style={[s.aiChip, !spaces.length && { opacity: 0.45 }]}
+            >
+              <Text style={s.aiChipText}>写下我的理解</Text>
+            </Pressable>
           </>
         )}
       </ScrollView>
       <View style={s.composer}>
-        <TextInput
-          accessibilityLabel="向 AI 提问"
-          multiline
-          placeholder="问问这份资料…"
-          value={question}
-          onChangeText={setQuestion}
-          maxLength={2000}
-          style={[
-            s.input,
-            { maxHeight: 130, minHeight: 70, textAlignVertical: "top" },
-          ]}
-        />
-        {asking ? (
-          <Button
-            title="停止回答"
-            soft
-            onPress={() => {
-              askController.current?.abort();
-              setAsking(false);
-              patchDiscussion({
-                error:
-                  "已停止等待本次回答。问题仍保留，只有再次点击发送才会重新提交。",
-              });
-            }}
+        <View style={s.aiInputBox}>
+          <TextInput
+            accessibilityLabel="向 AI 提问"
+            multiline
+            placeholder="输入问题…"
+            placeholderTextColor={c.muted}
+            value={question}
+            onChangeText={setQuestion}
+            maxLength={2000}
+            style={s.aiInput}
           />
-        ) : (
-          <Button
-            title="发送问题"
-            icon={ArrowRight}
-            onPress={() => void ask()}
-            disabled={!question.trim()}
-          />
-        )}
+          {asking ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="停止回答"
+              onPress={() => {
+                askController.current?.abort();
+                setAsking(false);
+                patchDiscussion({ error: "已停止本次回答。" });
+              }}
+              style={s.aiSend}
+            >
+              <Square size={13} fill={c.white} color={c.white} />
+            </Pressable>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="发送问题"
+              disabled={!question.trim()}
+              onPress={() => void ask()}
+              style={[s.aiSend, !question.trim() && { backgroundColor: "#d6d1f7" }]}
+            >
+              <ArrowUp size={15} color={c.white} />
+            </Pressable>
+          )}
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
