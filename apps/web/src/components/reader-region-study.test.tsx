@@ -279,7 +279,9 @@ describe("Reader region study integration", () => {
     // The parsed-text switch is a pressed-state control in the tool strip now,
     // so it is addressed by the label the reader actually sees.
     const toggle = [
-      ...host.querySelectorAll<HTMLButtonElement>("[data-reader-document-tools] button"),
+      ...host.querySelectorAll<HTMLButtonElement>(
+        "[data-reader-desktop-bottom-controls] button",
+      ),
     ].find((button) => button.textContent?.trim() === "解析文本");
     expect(toggle).toBeTruthy();
     await click(toggle!);

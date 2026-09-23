@@ -170,12 +170,12 @@ describe("reader panel slot", () => {
   }
 
   function toolstrip() {
-    const strip = host.querySelector<HTMLElement>("[data-reader-document-tools]");
+    const strip = host.querySelector<HTMLElement>("[data-reader-desktop-bottom-controls]");
     expect(strip).toBeTruthy();
     return strip!;
   }
 
-  /** What the strip offers, in the order a learner reads it. */
+  /** What the bottom controls offer, in the order a learner reads it. */
   function toolstripControls() {
     return [...toolstrip().querySelectorAll<HTMLElement>("button, input")].map(
       (control) =>
@@ -200,28 +200,19 @@ describe("reader panel slot", () => {
     await render({ source: pdf, sources: [pdf] });
     expect(toolstripControls()).toEqual([
       "上一页",
-      "跳转页码",
       "下一页",
-      "PDF阅读工具",
-      "缩小",
-      "100%",
-      "放大",
+      "跳转页码",
       "解析文本",
       "框选区域交给 AI",
       "我的标注（0）",
+      "缩小",
+      "100%",
+      "放大",
     ]);
     expect(host.querySelectorAll('[aria-label="PDF 阅读模式"]')).toHaveLength(0);
-    const collapsedTools = toolstrip().querySelector("[data-reader-toolstrip-tools]")!;
-    for (const label of ["上一页", "跳转页码", "下一页"]) {
-      const pageControl = toolstrip().querySelector(`[aria-label="${label}"]`);
-      expect(pageControl, label).toBeTruthy();
-      expect(collapsedTools.contains(pageControl), `${label} stays outside collapsed tools`).toBe(
-        false,
-      );
-    }
+    expect(host.querySelector("[data-reader-document-tools]")).toBeNull();
 
-    // Text formats have neither pages nor a physical page to frame, so the
-    // strip must not leave their slots behind as empty controls.
+    // Text formats have neither pages nor a physical page to frame.
     for (const kind of ["docx", "markdown", "web"] as const) {
       const text: Source = {
         ...source,
@@ -233,18 +224,8 @@ describe("reader panel slot", () => {
         ...(kind === "web" ? { url: "https://example.com/a" } : {}),
       };
       await render({ source: text, sources: [text] });
-      expect(toolstripControls(), kind).toEqual([
-        "资料阅读工具",
-        "缩小",
-        "100%",
-        "放大",
-        "我的标注（0）",
-      ]);
-      expect(toolstrip().querySelector(".reader-format")?.textContent, kind).toBe(
-        kind === "web" ? "网页快照" : kind.toUpperCase(),
-      );
+      expect(toolstripControls(), kind).toEqual(["我的标注（0）", "缩小", "100%", "放大"]);
       expect(toolstrip().querySelector("[data-reader-region-trigger]"), kind).toBeNull();
-      expect(toolstrip().querySelector('[aria-label="PDF 阅读模式"]'), kind).toBeNull();
     }
 
     // Structure is a property of the document, not of its format.
@@ -252,31 +233,24 @@ describe("reader panel slot", () => {
     expect(toolstrip().querySelector("[data-reader-outline-trigger]")).toBeTruthy();
   });
 
-  it("collapses the format tools behind one phone control", async () => {
-    const toggle = trigger("[data-reader-toolstrip-toggle]");
-    const tools = toolstrip().querySelector<HTMLElement>("[data-reader-toolstrip-tools]");
-
-    expect(toggle.getAttribute("aria-controls")).toBe("reader-toolstrip-tools");
-    expect(tools?.id).toBe("reader-toolstrip-tools");
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    expect(toolstrip().dataset.toolsExpanded).toBe("false");
-    // Zoom joins the other reading settings, leaving room for PDF paging and
-    // the tool toggle in the compact phone row.
-    expect(tools?.querySelector('[aria-label="缩小"]')).toBeTruthy();
-    expect(tools?.querySelector('[title="恢复默认缩放"]')).toBeTruthy();
-    expect(tools?.querySelector('[aria-label="放大"]')).toBeTruthy();
-    expect(tools?.querySelector("[data-reader-annotation-trigger]")).toBeTruthy();
-
-    await click(toggle);
-    expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(toolstrip().dataset.toolsExpanded).toBe("true");
-
-    // Opening a document panel gives its content the space used by expanded
-    // settings; the visible toggle remains the focus fallback on phones.
-    await click(trigger("[data-reader-outline-trigger]"));
-    expect(host.querySelector("#reader-outline-panel")).toBeTruthy();
-    expect(toolstrip().dataset.toolsExpanded).toBe("false");
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  it("keeps format tools in the shared bottom controls without a phone expand toggle", async () => {
+    const pdf: Source = {
+      ...source,
+      id: "pdf-tools-source",
+      versionId: "pdf-tools-version",
+      kind: "pdf",
+      mime: "application/pdf",
+      filename: "机器学习入门.pdf",
+      pageCount: 12,
+      text: "",
+      chunks: [],
+    };
+    await render({ source: pdf, sources: [pdf] });
+    expect(host.querySelector("[data-reader-toolstrip-toggle]")).toBeNull();
+    expect(toolstrip().querySelector("[data-reader-annotation-trigger]")).toBeTruthy();
+    expect(toolstrip().querySelector("[data-reader-region-trigger]")).toBeTruthy();
+    expect(toolstrip().querySelector('[aria-label="缩小"]')).toBeTruthy();
+    expect(toolstrip().querySelector('[aria-label="放大"]')).toBeTruthy();
   });
 
   it("gives the document one panel at a time", async () => {

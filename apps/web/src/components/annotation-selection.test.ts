@@ -4,9 +4,29 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Annotation, Source } from "@/lib/types";
 import {
   annotationRangeResolver,
+  locateUniqueTextAnchor,
   readNativePdfSelectionPage,
   readPlainAnnotationSelection,
 } from "./annotation-selection";
+
+describe("locateUniqueTextAnchor", () => {
+  it("anchors an exact unique quote and refuses duplicates", () => {
+    const text = "前言。目标句在此。后记。";
+    expect(locateUniqueTextAnchor({ text }, "目标句在此。")).toEqual({
+      quote: "目标句在此。",
+      textAnchor: { start: 3, end: 9 },
+    });
+    expect(locateUniqueTextAnchor({ text: "重复段。重复段。" }, "重复段。")).toBeNull();
+  });
+
+  it("maps whitespace-insensitive unique matches back to raw source text", () => {
+    const text = "定义。  两个向量  正交。";
+    expect(locateUniqueTextAnchor({ text }, "定义。两个向量正交。")).toEqual({
+      quote: "定义。  两个向量  正交。",
+      textAnchor: { start: 0, end: text.length },
+    });
+  });
+});
 
 describe("owned PDF selections and annotations across mounted pages", () => {
   let host: HTMLDivElement;

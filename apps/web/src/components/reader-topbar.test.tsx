@@ -126,22 +126,16 @@ describe("reader document controls and source actions", () => {
     });
   }
 
-  it("places the document toolbar in the reading scroll region before the paper", () => {
+  it("keeps reading tools in the bottom bar instead of a floating document strip", () => {
     const scroll = host.querySelector<HTMLElement>(".reader-document-scroll");
-    const toolbar = host.querySelector<HTMLElement>("[data-reader-document-tools]");
-    const paper = host.querySelector<HTMLElement>(".reader-paper");
+    const bottom = host.querySelector<HTMLElement>("[data-reader-desktop-bottom-controls]");
 
     expect(scroll).toBeTruthy();
-    expect(toolbar).toBeTruthy();
-    expect(paper).toBeTruthy();
-    expect(scroll?.contains(toolbar!)).toBe(true);
-    expect(host.querySelector(".reader-document > [data-reader-document-tools]")).toBeNull();
-    expect([...scroll!.children].indexOf(toolbar!)).toBeLessThan(
-      [...scroll!.children].indexOf(paper!),
-    );
-    expect(toolbar?.querySelector('[aria-label^="我的标注"]')).toBeTruthy();
-    // Find is one of the four top bar controls, so the strip does not repeat it.
-    expect(toolbar?.querySelector('[aria-label="查找原文"]')).toBeNull();
+    expect(bottom).toBeTruthy();
+    expect(host.querySelector("[data-reader-document-tools]")).toBeNull();
+    expect(scroll?.contains(bottom!)).toBe(false);
+    expect(bottom?.querySelector('[aria-label^="我的标注"]')).toBeTruthy();
+    expect(bottom?.querySelector('[aria-label="查找原文"]')).toBeNull();
   });
 
   it("keeps the top bar and AI panel in separate desktop layout regions", async () => {
@@ -248,7 +242,7 @@ describe("reader document controls and source actions", () => {
     await render({ source, sources: [source] });
 
     const topbar = host.querySelector<HTMLElement>(".reader-topbar")!;
-    const strip = host.querySelector<HTMLElement>("[data-reader-document-tools]")!;
+    const strip = host.querySelector<HTMLElement>("[data-reader-desktop-bottom-controls]")!;
     const soleTool = (selector: string, owner: HTMLElement) => {
       const all = host.querySelectorAll<HTMLButtonElement>(selector);
       expect(all, selector).toHaveLength(1);
@@ -293,25 +287,18 @@ describe("reader document controls and source actions", () => {
     expect(document.activeElement).toBe(search);
   });
 
-  it("falls back to the tool strip control when a phone has collapsed the tools", async () => {
+  it("returns panel focus to the bottom tool when it is visible", async () => {
     const source = {
       ...props.source,
       text: "# 优化器基础\n\n## 学习率\n\n学习率决定每一步走多远。",
     };
     await render({ source, sources: [source] });
     const outline = host.querySelector<HTMLButtonElement>("[data-reader-outline-trigger]")!;
-    const stripToggle = host.querySelector<HTMLButtonElement>("[data-reader-toolstrip-toggle]")!;
-    // A collapsed strip hides its tools, so the outline trigger is no longer a
-    // place focus can land after the directory closes.
-    Object.defineProperty(outline, "getClientRects", { configurable: true, value: () => [] });
-    Object.defineProperty(stripToggle, "getClientRects", {
-      configurable: true,
-      value: () => [{}],
-    });
+    Object.defineProperty(outline, "getClientRects", { configurable: true, value: () => [{}] });
 
     await click(outline);
     await click(host.querySelector<HTMLButtonElement>('[aria-label="关闭资料目录"]')!);
-    expect(document.activeElement).toBe(stripToggle);
+    expect(document.activeElement).toBe(outline);
   });
 
   it("keeps desktop page and zoom controls in the bottom reader bar while preserving compact controls", async () => {
@@ -326,24 +313,17 @@ describe("reader document controls and source actions", () => {
     };
     await render({ source, sources: [source] });
 
-    const compactToolbar = host.querySelector<HTMLElement>("[data-reader-document-tools]");
+    expect(host.querySelector("[data-reader-document-tools]")).toBeNull();
     const bottomBar = host.querySelector<HTMLElement>("[data-reader-desktop-bottom-controls]");
 
-    expect(compactToolbar?.querySelector(".reader-document-page-controls")).toBeTruthy();
-    expect(compactToolbar?.querySelector(".reader-document-zoom-controls")).toBeTruthy();
-    // The reading tool strip owns the name "阅读工具条"; the desktop bottom bar
-    // carries only reading position and zoom, so it says what it holds.
-    expect(compactToolbar?.getAttribute("aria-label")).toBe("阅读工具条");
     expect(bottomBar).toBeTruthy();
-    expect(bottomBar?.getAttribute("role")).toBe("group");
-    expect(bottomBar?.getAttribute("aria-label")).toBe("页码与缩放");
     expect(bottomBar?.querySelector('[aria-label="上一页"]')).toBeTruthy();
     expect(bottomBar?.querySelector('[aria-label="下一页"]')).toBeTruthy();
     expect(bottomBar?.querySelector('[aria-label="跳转页码"]')).toBeTruthy();
     expect(bottomBar?.querySelector('[aria-label="缩小"]')).toBeTruthy();
     expect(bottomBar?.querySelector('[aria-label="放大"]')).toBeTruthy();
     expect(bottomBar?.querySelector('[aria-label="查找原文"]')).toBeNull();
-    expect(bottomBar?.querySelector('[aria-label^="我的标注"]')).toBeNull();
+    expect(bottomBar?.querySelector('[aria-label^="我的标注"]')).toBeTruthy();
 
     await click(bottomBar!.querySelector<HTMLButtonElement>('[aria-label="下一页"]')!);
     expect(bottomBar?.querySelector<HTMLInputElement>('[aria-label="跳转页码"]')?.value).toBe("13");

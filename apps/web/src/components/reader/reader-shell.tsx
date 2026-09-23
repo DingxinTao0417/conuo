@@ -19,11 +19,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  Crop,
   ExternalLink,
   FileText,
   FolderOpen,
   Highlighter,
   History,
+  List,
   MessageSquare,
   Minus,
   MapPin,
@@ -57,6 +59,7 @@ import {
   annotationRangeResolver,
   readNativePdfSelectionPage,
   readPlainAnnotationSelection,
+  locateUniqueTextAnchor,
 } from "../annotation-selection";
 import { markdownQuoteText, readMarkdownSelection } from "../markdown-selection";
 import {
@@ -110,7 +113,6 @@ import CitationPreviewPanel from "./panels/citation-preview-panel";
 import FindPanel from "./panels/find-panel";
 import MobileCitationPage from "./panels/mobile-citation-page";
 import OutlinePanel from "./panels/outline-panel";
-import ReaderToolstrip from "./reader-toolstrip";
 import ReaderTopbar from "./reader-topbar";
 import ReaderPageInput from "./reader-page-input";
 import {
@@ -1426,21 +1428,32 @@ export default function Reader(props: ReaderProps) {
 
   function highlightSelection() {
     if (historical || !selection) return;
-    const textAnchor = currentSelectionPresentation
-      ? { start: currentSelectionPresentation.rawStart, end: currentSelectionPresentation.rawEnd }
+    const presented = currentSelectionPresentation
+      ? {
+          quote: source.text.slice(
+            currentSelectionPresentation.rawStart,
+            currentSelectionPresentation.rawEnd,
+          ),
+          textAnchor: {
+            start: currentSelectionPresentation.rawStart,
+            end: currentSelectionPresentation.rawEnd,
+          },
+        }
       : plainSelectionAnchor?.sourceId === source.id &&
           plainSelectionAnchor.versionId === source.versionId &&
           plainSelectionAnchor.quote === selection
-        ? plainSelectionAnchor.textAnchor
-        : undefined;
-    if (!textAnchor) {
-      setNotice("当前选段暂时无法准确保存原文位置，请重新选段，或切换到解析文本后重试。");
+        ? { quote: selection, textAnchor: plainSelectionAnchor.textAnchor }
+        : locateUniqueTextAnchor(source, selection);
+    if (!presented) {
+      setNotice(
+        "无法唯一定位这段原文（可能跨片段、正文中有重复，或 PDF 文字层与提取文本不一致）。请改选一句完整原文，或切换到「解析文本」后再标注。",
+      );
       return;
     }
     setAnnotationDraft({
-      quote: selection,
+      quote: presented.quote,
       page: source.kind === "pdf" && !showText ? (nativeSelectionPage ?? page) : undefined,
-      textAnchor: { ...textAnchor },
+      textAnchor: { ...presented.textAnchor },
     });
     setAnnotationNote("");
     openPanel("annotations");
@@ -1811,9 +1824,7 @@ export default function Reader(props: ReaderProps) {
     const workspace = readerWorkspace.current;
     const candidates = workspace?.querySelectorAll<HTMLButtonElement>(selector) || [];
     const visible = [...candidates].find((button) => button.getClientRects().length > 0);
-    if (visible) return visible;
-    const strip = workspace?.querySelector<HTMLButtonElement>("[data-reader-toolstrip-toggle]");
-    return (strip?.getClientRects().length ? strip : null) || fallback;
+    return visible || fallback;
   }
 
   function closeDocumentSearch() {
@@ -2018,10 +2029,6 @@ export default function Reader(props: ReaderProps) {
     setNativeSelectionPage(undefined);
     setSelectionToolbar(null);
     setShowText(!showText);
-  }
-
-  function pdfReadingModeControls() {
-    return null;
   }
 
   function startRegionCapture() {
@@ -2341,25 +2348,7 @@ export default function Reader(props: ReaderProps) {
             ref={textContainer}
             onScroll={saveReadingPosition}
           >
-            <ReaderToolstrip
-              source={source}
-              showText={showText}
-              page={page}
-              pages={pages}
-              zoom={zoom}
-              outlineItems={outlineItems}
-              annotationCount={sourceAnnotations.length}
-              activePanel={activePanel}
-              regionCaptureActive={regionCaptureActive}
-              regionStudyBlockedMessage={regionStudyBlockedMessage}
-              pdfReadingModeControls={pdfReadingModeControls}
-              changePage={changePage}
-              setZoom={setZoom}
-              togglePdfText={togglePdfText}
-              toggleRegionCapture={toggleRegionCapture}
-              toggleOutline={toggleOutline}
-              toggleAnnotations={() => togglePanel("annotations")}
-            />
+
             {source.kind === "pdf" && !showText ? (
               <PdfReader
                 key={`${source.id}:${source.versionId}`}
@@ -2577,6 +2566,61 @@ export default function Reader(props: ReaderProps) {
                 <span className="reader-tool-divider" aria-hidden="true" />
               </>
             )}
+            {source.kind === "pdf" && (
+              <button
+                type="button"
+                className="reader-tool-text"
+                aria-pressed={showText}
+                onClick={togglePdfText}
+              >
+                <FileText size={15} aria-hidden="true" />
+                {showText ? "原始 PDF" : "解析文本"}
+              </button>
+            )}
+            {source.kind === "pdf" && !showText && (
+              <button
+                type="button"
+                className="reader-tool-text reader-region-trigger"
+                data-reader-region-trigger
+                aria-label={regionCaptureActive ? "取消区域框选" : "框选区域交给 AI"}
+                aria-pressed={regionCaptureActive}
+                title={regionStudyBlockedMessage || "区域视觉学习"}
+                disabled={Boolean(regionStudyBlockedMessage)}
+                onClick={toggleRegionCapture}
+              >
+                <Crop size={14} aria-hidden="true" />
+                <span>{regionCaptureActive ? "取消框选" : "区域学习"}</span>
+              </button>
+            )}
+            {outlineItems.length > 0 && (
+              <button
+                type="button"
+                className="reader-tool-text reader-outline-trigger"
+                data-reader-outline-trigger
+                aria-label={`打开资料目录（${outlineItems.length} 项）`}
+                aria-controls="reader-outline-panel"
+                aria-expanded={activePanel === "outline"}
+                onClick={(event) => toggleOutline(event.currentTarget)}
+              >
+                <List size={15} aria-hidden="true" />
+                目录
+              </button>
+            )}
+            <button
+              type="button"
+              className="reader-tool-text reader-annotation-trigger"
+              data-reader-annotation-trigger
+              aria-label={`我的标注（${sourceAnnotations.length}）`}
+              aria-controls="reader-annotations-panel"
+              aria-expanded={activePanel === "annotations"}
+              onClick={() => togglePanel("annotations")}
+            >
+              <Highlighter size={15} aria-hidden="true" />
+              标注
+              {sourceAnnotations.length > 0 && (
+                <span className="reader-tool-count">{sourceAnnotations.length}</span>
+              )}
+            </button>
             <div
               className="reader-tool-group reader-bottom-zoom-controls"
               role="group"

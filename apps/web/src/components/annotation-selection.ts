@@ -6,6 +6,12 @@ type TextAnchor = { start: number; end: number };
 type Unit = { rawStart: number; rawEnd: number };
 const compact = (text: string) => text.replace(/\s/gu, "");
 
+function splitsSurrogatePair(text: string, offset: number): boolean {
+  const before = text.charCodeAt(offset - 1);
+  const after = text.charCodeAt(offset);
+  return before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff;
+}
+
 /** Page identity needs retained, ordered page text; a first similar chunk proves nothing. */
 function pageRange(source: Source, page: number): TextAnchor | null {
   const expected = source.chunks.filter((chunk) => chunk.page === page);
@@ -137,6 +143,55 @@ function readOwnedSelection(source: Source, range: Range) {
 export function readPlainAnnotationSelection(source: Source, range: Range) {
   const selected = readOwnedSelection(source, range);
   return selected ? { quote: selected.quote, textAnchor: selected.textAnchor } : null;
+}
+
+/**
+ * Last-resort placement when the visible layer cannot prove a range:
+ * accept the quote only if it occurs once in the retained source text
+ * (whitespace-insensitive), never guess among duplicates.
+ */
+export function locateUniqueTextAnchor(
+  source: Pick<Source, "text">,
+  quote: string,
+): { quote: string; textAnchor: TextAnchor } | null {
+  if (!quote.trim()) return null;
+  const directStart = source.text.indexOf(quote);
+  if (directStart >= 0 && source.text.indexOf(quote, directStart + 1) < 0) {
+    const textAnchor = { start: directStart, end: directStart + quote.length };
+    return { quote: source.text.slice(textAnchor.start, textAnchor.end), textAnchor };
+  }
+  const compactQuote = compact(quote);
+  if (!compactQuote) return null;
+  const compactSource = compact(source.text);
+  const at = compactSource.indexOf(compactQuote);
+  if (at < 0 || compactSource.indexOf(compactQuote, at + 1) >= 0) return null;
+  const rawToCompact: number[] = [];
+  let compactIndex = 0;
+  for (let offset = 0; offset < source.text.length; ) {
+    const character = String.fromCodePoint(source.text.codePointAt(offset)!);
+    rawToCompact[offset] = compactIndex;
+    if (character.length === 2) rawToCompact[offset + 1] = compactIndex;
+    if (!/\s/u.test(character)) compactIndex += 1;
+    offset += character.length;
+  }
+  rawToCompact[source.text.length] = compactIndex;
+  let start = -1;
+  for (let offset = 0; offset <= source.text.length; offset++) {
+    if (rawToCompact[offset] === at && !splitsSurrogatePair(source.text, offset)) {
+      start = offset;
+      break;
+    }
+  }
+  const endCompact = at + compactQuote.length;
+  let end = -1;
+  for (let offset = source.text.length; offset >= 0; offset--) {
+    if (rawToCompact[offset] === endCompact && !splitsSurrogatePair(source.text, offset)) {
+      end = offset;
+      break;
+    }
+  }
+  if (start < 0 || end <= start) return null;
+  return { quote: source.text.slice(start, end), textAnchor: { start, end } };
 }
 
 /** A native PDF selection proves its physical page, independently of the visible page. */
