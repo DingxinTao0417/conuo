@@ -6,6 +6,12 @@ import type { Source } from "@/lib/types";
 import { AlertCircle, LoaderCircle } from "lucide-react";
 import PdfRegionSelector from "./pdf-region-selector";
 import type { PdfCaptureLimits, PdfCaptureResult, PdfCaptureSelection } from "./pdf-capture";
+import { startForegroundCloudUpdateChecks } from "@/lib/foreground-cloud-updates";
+import {
+  mergeInkPreviewPages,
+  parseInkPreviewPages,
+  type InkPreviewEntry,
+} from "@/lib/ink-preview";
 
 export type PdfReadingMode = "single" | "continuous";
 
@@ -387,11 +393,11 @@ export default function PdfReader({
   const [activePages, setActivePages] = useState<number[]>([page]);
   const [inkPreviewState, setInkPreviewState] = useState<{
     key: string;
-    urls: Record<number, string>;
-  }>({ key: "", urls: {} });
+    pages: Record<number, InkPreviewEntry>;
+  }>({ key: "", pages: {} });
   const inkPreviewKey = `${cloudUserId ?? ""}:${source.id}:${source.versionId}`;
-  const inkPreviewUrls =
-    inkPreviewState.key === inkPreviewKey ? inkPreviewState.urls : {};
+  const inkPreviewPages =
+    inkPreviewState.key === inkPreviewKey ? inkPreviewState.pages : {};
   const [layoutRevision, setLayoutRevision] = useState(0);
   const sizes = useRef(new Map<number, string>());
   const position = useRef({ page, fraction: 0 });
@@ -418,50 +424,38 @@ export default function PdfReader({
   const handleRetry = useCallback(() => setRetry((value) => value + 1), []);
 
   useEffect(() => {
+    if (!cloudUserId || source.kind !== "pdf") return;
     let disposed = false;
-    if (!cloudUserId || source.kind !== "pdf") {
-      return () => {
-        disposed = true;
-      };
-    }
-    void fetch(
-      `/api/v1/sources/${encodeURIComponent(source.id)}/versions/${encodeURIComponent(source.versionId)}/ink`,
-      {
-        credentials: "include",
-        headers: {
-          Accept: "application/json",
-          "X-Conuo-User": cloudUserId,
+    let lastUrlRefresh = 0;
+    const stop = startForegroundCloudUpdateChecks(async (signal) => {
+      const response = await fetch(
+        `/api/v1/sources/${encodeURIComponent(source.id)}/versions/${encodeURIComponent(source.versionId)}/ink`,
+        {
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+            "X-Conuo-User": cloudUserId,
+          },
+          signal,
         },
-      },
-    )
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload: unknown) => {
-        if (disposed || !payload || typeof payload !== "object") return;
-        const pages = (payload as { pages?: unknown }).pages;
-        if (!Array.isArray(pages)) return;
-        const next: Record<number, string> = {};
-        for (const page of pages) {
-          if (!page || typeof page !== "object") continue;
-          const item = page as {
-            pageIndex?: unknown;
-            previewDownloadUrl?: unknown;
-            deleted?: unknown;
-          };
-          if (
-            typeof item.pageIndex === "number" &&
-            Number.isInteger(item.pageIndex) &&
-            typeof item.previewDownloadUrl === "string" &&
-            item.deleted !== true
-          )
-            next[item.pageIndex + 1] = item.previewDownloadUrl;
-        }
-        setInkPreviewState({ key: inkPreviewKey, urls: next });
-      })
-      .catch(() => {
-        if (!disposed) setInkPreviewState({ key: inkPreviewKey, urls: {} });
+      );
+      if (disposed || !response.ok) return;
+      const payload: unknown = await response.json().catch(() => null);
+      if (disposed) return;
+      const next = parseInkPreviewPages(payload);
+      const refreshUrls = Date.now() - lastUrlRefresh > 8 * 60_000;
+      if (refreshUrls) lastUrlRefresh = Date.now();
+      setInkPreviewState((prev) => {
+        if (prev.key !== inkPreviewKey)
+          return { key: inkPreviewKey, pages: next };
+        const pages = mergeInkPreviewPages(prev.pages, next, { refreshUrls });
+        if (pages === prev.pages) return prev;
+        return { key: inkPreviewKey, pages };
       });
+    });
     return () => {
       disposed = true;
+      stop();
     };
   }, [cloudUserId, inkPreviewKey, source.id, source.kind, source.versionId]);
 
@@ -701,7 +695,7 @@ export default function PdfReader({
             onRetry={handleRetry}
             onPageNode={registerPageNode}
             onSize={handleSize}
-            inkPreviewUrl={inkPreviewUrls[number]}
+            inkPreviewUrl={inkPreviewPages[number]?.url}
           />
         ))}
       {!loading && pdf && (

@@ -42,7 +42,7 @@
 2. **云端幂等卡死**：`operationId` 只含内容哈希，head 变化后重试被判 “already differs”，rejected 后永久失败。改为带 CAS generation 的 operationId；新迁移 `20260923000200_pdf_ink_idempotent_reserve.sql` 允许同 operation + 同内容幂等续传（不再比较 base）；冲突时自动用新 generation 重试一次。空白 `PKDrawing` 不再上传成空页 head。
 3. **Web 始终无笔迹**：`pdf-reader` 拉取 `/ink` 时缺少 `X-Conuo-User`，服务端 `requireUser` 对身份头不一致返回 409 `SESSION_CHANGED`，预览 URL 永远为空。已补请求头。
 
-本地核对：Storage `ink` 预览 PNG 含真实笔迹；iPad 状态栏曾显示「2 笔 · 已保存到云端」。移动端 113/113，Web 251 文件 / 4235 项、`tsc`、ESLint 0 错误（保留既有 `_result` warning）通过；SQL 测试忽略 macOS AppleDouble `._*` 文件。同页双设备并发冲突矩阵（含版本对比三选一 UI）仍未测。生产资源未修改。
+本地核对：Storage `ink` 预览 PNG 含真实笔迹；iPad 状态栏曾显示「2 笔 · 已保存到云端」。移动端 113/113，Web 251 文件 / 4235 项、`tsc`、ESLint 0 错误（保留既有 `_result` warning）通过；SQL 测试忽略 macOS AppleDouble `._*` 文件。**2026-09-23 项目所有者确认**：部署 `bdac1d1` 后，staging Web 同一 PDF 已显示透明笔迹预览。同页双设备并发冲突矩阵（含版本对比三选一 UI）仍未测。生产资源未修改。
 
 ## iPadOS WP2 本机 PKDrawing 恢复（2026-09-23，本地）
 
