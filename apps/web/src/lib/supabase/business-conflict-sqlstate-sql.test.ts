@@ -9,6 +9,7 @@ const migrationName = "20260920000300_business_conflict_response.sql";
 const postConflictMigrationNames = new Set([
   "20260923000100_pdf_ink_cloud.sql",
   "20260923000200_pdf_ink_idempotent_reserve.sql",
+  "20260923000300_pdf_ink_realtime.sql",
 ]);
 const migrations = new URL("../../../../../supabase/migrations/", import.meta.url);
 

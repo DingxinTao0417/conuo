@@ -7,6 +7,7 @@ import { AlertCircle, LoaderCircle } from "lucide-react";
 import PdfRegionSelector from "./pdf-region-selector";
 import type { PdfCaptureLimits, PdfCaptureResult, PdfCaptureSelection } from "./pdf-capture";
 import { startForegroundCloudUpdateChecks } from "@/lib/foreground-cloud-updates";
+import { subscribeToInkPageHeads } from "@/lib/ink-live";
 import {
   mergeInkPreviewPages,
   parseInkPreviewPages,
@@ -427,35 +428,54 @@ export default function PdfReader({
     if (!cloudUserId || source.kind !== "pdf") return;
     let disposed = false;
     let lastUrlRefresh = 0;
-    const stop = startForegroundCloudUpdateChecks(async (signal) => {
-      const response = await fetch(
-        `/api/v1/sources/${encodeURIComponent(source.id)}/versions/${encodeURIComponent(source.versionId)}/ink`,
-        {
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-            "X-Conuo-User": cloudUserId,
-          },
-          signal,
-        },
-      );
-      if (disposed || !response.ok) return;
-      const payload: unknown = await response.json().catch(() => null);
-      if (disposed) return;
-      const next = parseInkPreviewPages(payload);
-      const refreshUrls = Date.now() - lastUrlRefresh > 8 * 60_000;
-      if (refreshUrls) lastUrlRefresh = Date.now();
-      setInkPreviewState((prev) => {
-        if (prev.key !== inkPreviewKey)
-          return { key: inkPreviewKey, pages: next };
-        const pages = mergeInkPreviewPages(prev.pages, next, { refreshUrls });
-        if (pages === prev.pages) return prev;
-        return { key: inkPreviewKey, pages };
-      });
+    let inFlight: Promise<void> | null = null;
+    const load = (signal?: AbortSignal) => {
+      if (disposed) return Promise.resolve();
+      if (inFlight) return inFlight;
+      inFlight = (async () => {
+        try {
+          const response = await fetch(
+            `/api/v1/sources/${encodeURIComponent(source.id)}/versions/${encodeURIComponent(source.versionId)}/ink`,
+            {
+              credentials: "include",
+              headers: {
+                Accept: "application/json",
+                "X-Conuo-User": cloudUserId,
+              },
+              signal,
+            },
+          );
+          if (disposed || !response.ok) return;
+          const payload: unknown = await response.json().catch(() => null);
+          if (disposed) return;
+          const next = parseInkPreviewPages(payload);
+          const refreshUrls = Date.now() - lastUrlRefresh > 8 * 60_000;
+          if (refreshUrls) lastUrlRefresh = Date.now();
+          setInkPreviewState((prev) => {
+            if (prev.key !== inkPreviewKey) return { key: inkPreviewKey, pages: next };
+            const pages = mergeInkPreviewPages(prev.pages, next, { refreshUrls });
+            if (pages === prev.pages) return prev;
+            return { key: inkPreviewKey, pages };
+          });
+        } finally {
+          inFlight = null;
+        }
+      })();
+      return inFlight;
+    };
+    const stopPolling = startForegroundCloudUpdateChecks(async (signal) => {
+      await load(signal);
+    });
+    const stopRealtime = subscribeToInkPageHeads({
+      ownerId: cloudUserId,
+      onChange: () => {
+        void load();
+      },
     });
     return () => {
       disposed = true;
-      stop();
+      stopRealtime();
+      stopPolling();
     };
   }, [cloudUserId, inkPreviewKey, source.id, source.kind, source.versionId]);
 

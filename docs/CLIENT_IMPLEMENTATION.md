@@ -70,6 +70,7 @@ PDF 资料页现在优先下载同一 `storagePath` 的私有原件到应用缓�
 - 按页维护笔画数，避免空白页 overlay 把状态打成 `0 笔`；恢复回报延迟到 JS 监听就绪。
 - `buildInkOperationId(page, sha, generation)` + 同页串行 `createInkSyncQueue`；冲突自动重试一次；空 `PKDrawing` 不上传。`reserve_ink_upload` 幂等迁移已应用 staging（`20260923000200`）。
 - Web `PdfReader` 请求 `/ink` 时发送 `X-Conuo-User: cloudUserId`（缺省会 409 `SESSION_CHANGED`，预览永远为空）。
+- 笔迹预览实时化：`ink_page_heads` 已加入 `supabase_realtime` publication（迁移 `20260923000300`）；浏览器订阅本人页 head 变更后立即重拉预览，并保留 4 秒前台轮询作回退与签名 URL 续期。
 
 验证：移动端 113/113 与 `tsc`；Web 251/4235、`tsc`、ESLint 0 errors；Xcode 真机构建通过。iPad 观察到「N 笔 · 已保存到云端」，Storage 预览 PNG 含笔迹。**项目所有者于 2026-09-23 确认 staging Web（`bdac1d1`）已显示同一 PDF 的透明笔迹预览**。双设备同页并发（含冲突三选一）未测。
 
