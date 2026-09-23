@@ -12,6 +12,8 @@ import {
   type LocalSnapshotEvent,
 } from "../../modules/conuo-pdf-ink";
 import type { PdfInkToolsState } from "./PdfInkToolbar";
+import PdfPagesPanel from "./PdfPagesPanel";
+import { extractPdfPageThumbnails } from "../../modules/conuo-pdf-ink";
 import { File } from "expo-file-system";
 import * as Crypto from "expo-crypto";
 import type { Source } from "../core/contracts";
@@ -34,6 +36,8 @@ export default function NativePdfReader({
   visible,
   wide,
   tools,
+  pagesPanelOpen,
+  onTogglePagesPanel,
   onReadingMove,
   onOpenOriginal,
 }: {
@@ -42,6 +46,8 @@ export default function NativePdfReader({
   visible: boolean;
   wide: boolean;
   tools: PdfInkToolsState;
+  pagesPanelOpen?: boolean;
+  onTogglePagesPanel?: () => void;
   onReadingMove?: (page: number | undefined) => void;
   onOpenOriginal?: () => void;
 }) {
@@ -49,6 +55,7 @@ export default function NativePdfReader({
   const [error, setError] = useState("");
   const [page, setPage] = useState(source.readPage ?? 1);
   const [pageCount, setPageCount] = useState(source.pageCount ?? 0);
+  const [thumbnails, setThumbnails] = useState<string[]>([]);
   const [strokeCounts, setStrokeCounts] = useState<Record<number, number>>({});
   const [localProtected, setLocalProtected] = useState(false);
   const [cloudConfirmed, setCloudConfirmed] = useState(false);
@@ -74,10 +81,18 @@ export default function NativePdfReader({
     setSyncError("");
     pageUploads.current.clear();
     void downloadPdfOriginal(source)
-      .then((next) => {
-        if (!cancelled) {
-          setLoadedKey(key);
-          setUri(next);
+      .then(async (next) => {
+        if (cancelled) return;
+        setLoadedKey(key);
+        setUri(next);
+        try {
+          const thumbs = await extractPdfPageThumbnails(next, 120);
+          if (!cancelled) {
+            setThumbnails(thumbs.thumbnails);
+            if (thumbs.pageCount > 0) setPageCount(thumbs.pageCount);
+          }
+        } catch {
+          // thumbnails are optional; the numbered rail still works
         }
       })
       .catch((cause) => {
@@ -235,31 +250,43 @@ export default function NativePdfReader({
 
   return (
     <View style={[p.root, !visible && p.hidden]}>
-      <View style={p.header}>
-        <View style={p.pageControls}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="上一页"
-            disabled={page <= 1}
-            onPress={() => movePage(-1)}
-            style={[p.icon, page <= 1 && p.disabled]}
-          >
-            <ChevronLeft size={18} color={c.secondary} />
-          </Pressable>
-          <Text style={p.pageLabel}>
-            {pageCount ? `${page} / ${pageCount}` : `${page}`}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="下一页"
-            disabled={pageCount > 0 && page >= pageCount}
-            onPress={() => movePage(1)}
-            style={[p.icon, pageCount > 0 && page >= pageCount && p.disabled]}
-          >
-            <ChevronRight size={18} color={c.secondary} />
-          </Pressable>
-        </View>
-      </View>
+      <View style={p.body}>
+        {Boolean(pagesPanelOpen) && (
+          <PdfPagesPanel
+            visible
+            pageCount={pageCount}
+            currentPage={page}
+            thumbnails={thumbnails}
+            onSelectPage={(next) => setPage(next)}
+            onClose={() => onTogglePagesPanel?.()}
+          />
+        )}
+        <View style={p.main}>
+          <View style={p.header}>
+            <View style={p.pageControls}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="上一页"
+                disabled={page <= 1}
+                onPress={() => movePage(-1)}
+                style={[p.icon, page <= 1 && p.disabled]}
+              >
+                <ChevronLeft size={18} color={c.secondary} />
+              </Pressable>
+              <Text style={p.pageLabel}>
+                {pageCount ? `${page} / ${pageCount}` : `${page}`}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="下一页"
+                disabled={pageCount > 0 && page >= pageCount}
+                onPress={() => movePage(1)}
+                style={[p.icon, pageCount > 0 && page >= pageCount && p.disabled]}
+              >
+                <ChevronRight size={18} color={c.secondary} />
+              </Pressable>
+            </View>
+          </View>
       {error ? (
         <View style={p.message}>
           <Text style={p.error}>{error}</Text>
@@ -311,6 +338,8 @@ export default function NativePdfReader({
           }}
         />
       )}
+        </View>
+      </View>
     </View>
   );
 }
@@ -318,6 +347,8 @@ export default function NativePdfReader({
 const p = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#e9e9ec" },
   hidden: { display: "none" },
+  body: { flex: 1, flexDirection: "row", minWidth: 0 },
+  main: { flex: 1, minWidth: 0 },
   header: {
     minHeight: 44,
     paddingHorizontal: 14,

@@ -856,8 +856,15 @@ function WorkspaceScreen({
   const pendingHistory = useRef<
     Array<{ payload: ReturnType<typeof answerScope>; result: Answer }>
   >([]);
-  const canShowSidebar = wide && (!source || width >= 1100);
+  const readingNativePdf =
+    Platform.OS !== "web" && !!source && source.kind === "pdf" && !!source.storagePath;
+  // Document mode never shows the global nav rail; the pages panel replaces it.
+  const canShowSidebar = wide && !source;
   const sidebarVisible = canShowSidebar && !sidebarCollapsed;
+  const [pagesPanelOpen, setPagesPanelOpen] = useState(false);
+  useEffect(() => {
+    if (!source) setPagesPanelOpen(false);
+  }, [source]);
   pruneDiscussions(discussions.current, workspace);
   const discussion = source
     ? discussionFor(discussions.current, workspace, source)
@@ -2254,7 +2261,7 @@ function WorkspaceScreen({
         </View>
       )}
       <View style={{ flex: 1, flexDirection: "row" }}>
-        {sidebarVisible && (
+        {sidebarVisible && !source && (
           <View style={s.sidebar}>
             <View style={{ marginBottom: 26 }}>
               <Brand />
@@ -2268,13 +2275,19 @@ function WorkspaceScreen({
           {source ? (
             <>
               <View style={s.pageHeader}>
-                {canShowSidebar && (
+                {readingNativePdf ? (
+                  <IconButton
+                    label={pagesPanelOpen ? "收起页面列表" : "打开页面列表"}
+                    icon={PanelLeft}
+                    onPress={() => setPagesPanelOpen((value) => !value)}
+                  />
+                ) : canShowSidebar ? (
                   <IconButton
                     label={sidebarVisible ? "收起导航侧栏" : "展开导航侧栏"}
                     icon={PanelLeft}
                     onPress={() => setSidebarCollapsed((value) => !value)}
                   />
-                )}
+                ) : null}
                 <IconButton
                   label={tab === "home" ? "返回学习概览" : "返回资料库"}
                   icon={ArrowLeft}
@@ -2309,6 +2322,8 @@ function WorkspaceScreen({
                   source={source}
                   inkNamespace={inkNamespace}
                   tools={pdfInkTools}
+                  pagesPanelOpen={pagesPanelOpen}
+                  onTogglePagesPanel={() => setPagesPanelOpen(false)}
                   session={readerSession.current}
                   highlight={highlight}
                   highlightRequest={highlightRequest}

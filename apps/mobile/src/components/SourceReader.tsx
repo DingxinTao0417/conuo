@@ -39,6 +39,8 @@ export type SourceReaderProps = {
   /** Account-isolated namespace used by the native PDF ink recovery layer. */
   inkNamespace?: string;
   tools?: import("./PdfInkToolbar").PdfInkToolsState;
+  pagesPanelOpen?: boolean;
+  onTogglePagesPanel?: () => void;
   highlight: string | null;
   /** Increments when the same citation is selected again. */
   highlightRequest?: number;
@@ -63,6 +65,8 @@ export function SourceReader(props: SourceReaderProps) {
         visible={props.visible}
         wide={props.wide}
         tools={props.tools!}
+        pagesPanelOpen={props.pagesPanelOpen}
+        onTogglePagesPanel={props.onTogglePagesPanel}
         onReadingMove={props.onReadingMove}
         onOpenOriginal={props.onOpenOriginal}
       />

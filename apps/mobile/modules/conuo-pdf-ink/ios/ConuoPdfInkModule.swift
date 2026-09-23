@@ -5,6 +5,46 @@ public class ConuoPdfInkModule: Module {
   public func definition() -> ModuleDefinition {
     Name("ConuoPdfInk")
 
+    AsyncFunction("extractPdfPageThumbnails") { (uri: String, maxWidth: Double, promise: Promise) in
+      do {
+        guard let url = URL(string: uri), url.isFileURL else {
+          throw NSError(
+            domain: "ConuoPdfInk",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "请选择可读取的本机 PDF 文件。"]
+          )
+        }
+        guard let document = PDFDocument(url: url), document.pageCount > 0 else {
+          throw NSError(
+            domain: "ConuoPdfInk",
+            code: 2,
+            userInfo: [NSLocalizedDescriptionKey: "无法读取这份 PDF。"]
+          )
+        }
+        let width = max(48, min(maxWidth.isFinite ? maxWidth : 120, 320))
+        var thumbs: [String] = []
+        thumbs.reserveCapacity(document.pageCount)
+        for index in 0..<document.pageCount {
+          guard let page = document.page(at: index) else {
+            thumbs.append("")
+            continue
+          }
+          let box = page.bounds(for: .cropBox)
+          let ratio = box.height > 0 ? box.width / box.height : 0.7
+          let size = CGSize(width: width, height: width / max(ratio, 0.2))
+          let image = page.thumbnail(of: size, for: .cropBox)
+          if let data = image.jpegData(compressionQuality: 0.72) {
+            thumbs.append(data.base64EncodedString())
+          } else {
+            thumbs.append("")
+          }
+        }
+        promise.resolve(["pageCount": document.pageCount, "thumbnails": thumbs])
+      } catch {
+        promise.reject(error)
+      }
+    }
+
     AsyncFunction("extractPdfText") { (uri: String, promise: Promise) in
       do {
         guard let url = URL(string: uri), url.isFileURL else {
