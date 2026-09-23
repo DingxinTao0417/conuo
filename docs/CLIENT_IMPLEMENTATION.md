@@ -15,7 +15,7 @@ Windows 已优先进入 D1 联调：当前本地版本 `0.1.4`，新增浅灰一
 | Windows | Electron 安全联网宿主；承载现有 Web 工作台；菜单、快捷键、导航隔离、下载进度/取消、连接恢复、关闭/重载保护；未签名便携预览包                                           | 真实云账号完整业务矩阵、本地资料库与离线同步、原生邮件回跳、签名和自动更新                    |
 | macOS   | 同一桌面源码、Cmd 菜单规则与 DMG 构建配置                                                                                                                              | macOS 构建、系统对话框与真机验证、签名及公证                                                  |
 | iOS     | Expo/React Native 工程；登录与 Keychain 会话管理；云端列表、筛选、网页正文／链接收集；PDF 原生选择、私有原件上传、PDFKit 页面文字提取；正文目录、字号、会话位置；单资料问答、Markdown、引用定位；新建文本笔记及首次空间；Bearer staging 闭环、阅读进度回写、云端文档对话历史 | DOCX / Markdown / TXT 原生导入、原件 PDF 页面阅读、完整编辑、系统分享及真实设备上传验收 |
-| iPadOS  | 与 iOS 共用数据合同；窄窗单栏、宽窗原文/AI 并排；按阅读宽度收起主侧栏，宽屏可手动折叠；PDF 原生导入、私有原件阅读、PDFKit/PencilKit overlay；按账号、资料版本和页码自动保存 `PKDrawing` 本机快照；本地代码已接入独立 ink intent、Storage、页 head CAS 和 Web PNG 预览；WP0 输入与坐标技术验证已在实体 iPad 通过 | P1 登录流程与 Keychain 生命周期、阅读进度/对话/引用/冲突/键盘等剩余真机矩阵；WP2 真机退出/重进恢复验收；新 ink migration/API 尚未部署 staging，云端同步和跨端预览仍待真实账号验收 |
+| iPadOS  | 与 iOS 共用数据合同；窄窗单栏、宽窗原文/AI 并排；按阅读宽度收起主侧栏，宽屏可手动折叠；PDF 原生导入、私有原件阅读、PDFKit/PencilKit overlay；按账号、资料版本和页码自动保存 `PKDrawing` 本机快照；独立 ink intent、Storage、页 head CAS 和 Web PNG 预览已部署 staging；WP0 输入与坐标技术验证已在实体 iPad 通过 | P1 登录流程与 Keychain 生命周期、阅读进度/对话/引用/冲突/键盘等剩余真机矩阵；WP2 真机退出/重进恢复验收；真实账号上传、跨设备同步和 Web 笔迹预览仍待验收 |
 
 桌面 D0 通过加载批准的云端 Web 入口，保持业务界面与网页版一致；这依赖联网，不能称为完整 D1 验收或 D2 本地离线工作区。iOS/iPadOS 只有 I1/P1 的一部分，不能称为完整原生产品交付。
 
@@ -67,9 +67,9 @@ PDF 资料页现在优先下载同一 `storagePath` 的私有原件到应用缓�
 
 `ConuoPdfInkView` 在 PencilKit 的页级绘制变更停止约 0.8 秒后，把原生 `PKDrawing.dataRepresentation()` 与透明 PNG 预览写入 Application Support。目录由账号摘要、source/version 身份和页码隔离，临时文件完成后原子替换；重新创建 PDF reader 时由 PDFKit overlay 按页恢复原始 `PKDrawing`。JS 只收到页级保存完成事件，不转发 Pencil 点，不写入 `public.annotations`。PNG 只作之后 Web 预览的只读候选，不能替代原始 `PKDrawing`。
 
-这一步解决的是“退出 PDF 后再进入仍能看到本机笔迹”。当前状态会在本机快照后启动独立 ink 上传：新的 migration、intent/commit API、私有 Storage bucket 和 Web 透明 PNG 预览已写入本地代码，但尚未部署 staging，因此真机显示“正在同步”或失败时仍保留“本机已保护”，不会冒充云端成功。二进制笔迹不进入现有 workspace 或 annotations。
+这一步解决的是“退出 PDF 后再进入仍能看到本机笔迹”。当前状态会在本机快照后启动独立 ink 上传：新的 migration、intent/commit API、私有 Storage bucket 和 Web 透明 PNG 预览已部署到 staging。二进制笔迹不进入现有 workspace 或 annotations；未登录、权限失败或网络失败时仍显示“本机已保护”，不会冒充云端成功。
 
-本地验证：移动端 108/108 测试通过，Web 全量 251 文件 / 4235 项通过，移动/Web 类型检查通过，Xcode 真机 Debug 构建 0 errors / 0 warnings；还需要在 `dapi` 上对同一份 PDF 完成“落笔 → 等状态变为本机已保护 → 返回列表 → 再进入”的实机验收，并在 migration/API 部署后验收“已保存到云端”和 Web 预览。
+本地验证：移动端 108/108 测试通过，Web 全量 251 文件 / 4235 项通过，移动/Web 类型检查通过，Xcode 真机 Debug 构建 0 errors / 0 warnings。2026-09-23 已推送 staging 提交 `8c2a297fd56907418d7646842a43a9c034d7aedc`；`/api/health` 返回 `branch=staging` 和同一 SHA，Supabase staging 已应用 `20260923000100_pdf_ink_cloud.sql`，未登录 ink 路由按预期返回 401。真实账号上传、跨设备冲突和 Web 预览仍需用户验收。
 
 ## iPadOS WP0 原生 PDF / Pencil 探针（2026-09-22 至 23，技术验证通过）
 

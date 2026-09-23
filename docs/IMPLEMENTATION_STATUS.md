@@ -22,7 +22,7 @@
 
 ## iPadOS 原生 PDF 文件导入（2026-09-23，本地实现）
 
-资料库与学习首页新增系统“文件”PDF 选择入口（单份 ≤30 MiB），PDFKit 提取按页文字；SHA-256 去重与 workspace 3 MiB 容量预检后调用现有原件预留与完成 RPC，向私有 `originals` Storage 上传原始字节，再以 workspace revision CAS 写入资料。云端原件和资料记录都确认后才显示成功；AI 授权默认关闭。PDF 资料页现已接入私有原件下载、PDFKit 原始页面和 PencilKit overlay；提取文本只用于检索/引用。`PKDrawing` 现在会按账号、资料版本和页码自动保存到本机 Application Support，并在重新打开 reader 时恢复；本地代码同时接入了独立 ink migration、intent/commit API、私有 Storage 和 Web PNG 预览，但尚未部署 staging。没有修改生产资源。DOCX / Markdown / TXT 原生导入、Pencil 云端真实验收、P1 其余真机闭环仍待验收。
+资料库与学习首页新增系统“文件”PDF 选择入口（单份 ≤30 MiB），PDFKit 提取按页文字；SHA-256 去重与 workspace 3 MiB 容量预检后调用现有原件预留与完成 RPC，向私有 `originals` Storage 上传原始字节，再以 workspace revision CAS 写入资料。云端原件和资料记录都确认后才显示成功；AI 授权默认关闭。PDF 资料页现已接入私有原件下载、PDFKit 原始页面和 PencilKit overlay；提取文本只用于检索/引用。`PKDrawing` 现在会按账号、资料版本和页码自动保存到本机 Application Support，并在重新打开 reader 时恢复；独立 ink migration、intent/commit API、私有 Storage 和 Web PNG 预览已部署到 staging。没有修改生产资源。DOCX / Markdown / TXT 原生导入、Pencil 云端真实验收、P1 其余真机闭环仍待验收。
 
 本地验证：移动端 108/108 测试通过，类型检查通过；Xcode 27.0 / Expo SDK 57 在已连接 iPad `dapi` 真机构建通过（0 errors / 0 warnings）。真机截图[显示已导入的 PDF 资料](evidence/ipados-pdf-import/2026-09-23-imported-pdf-in-library.png)，资料库已读回一份 PDF；本机恢复仍需要在同一份 PDF 上完成退出/重进实机复测。
 
@@ -38,7 +38,7 @@
 
 原生模块在绘制停止约 0.8 秒后，按页把 `PKDrawing.dataRepresentation()` 与透明 PNG 预览写入 Application Support；账号摘要、source/version 和页码组成隔离目录，原子替换避免半写文件。重建 `ConuoPdfInkView` 时，PDFKit overlay 从对应页恢复 `PKDrawing`。JS 只收到页级快照完成事件，不传 Pencil 点，也不改 `public.annotations`。快照完成后，移动端按页 head 读取独立 ink manifest，上传两个私有对象并提交 CAS；未部署或失败时界面仍显示本机保护，不把本机文件冒充云端成功。
 
-本地测试与类型检查通过，Xcode 真机 Debug 构建 0 errors / 0 warnings，Web 全量 251 文件 / 4235 项通过。新增 migration `20260923000100_pdf_ink_cloud.sql`、三个 Bearer API 路由和 Web PDF PNG 叠层均只存在于本地；未执行真实迁移、未部署 staging、未修改生产资源，因此跨设备云端结果仍未验收。
+本地测试与类型检查通过，Xcode 真机 Debug 构建 0 errors / 0 warnings，Web 全量 251 文件 / 4235 项通过。提交 `8c2a297fd56907418d7646842a43a9c034d7aedc` 已部署到 staging；`/api/health` 返回 staging 分支和该 SHA，Supabase staging 已应用 `20260923000100_pdf_ink_cloud.sql`，未登录 API 探针返回 401。真实账号上传、跨设备冲突和 Web 笔迹预览尚未验收，生产资源未修改。
 
 ## iPadOS WP0 PDFKit / Pencil 真机技术验证（2026-09-23，本地）
 
