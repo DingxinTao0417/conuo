@@ -16,7 +16,7 @@
 | Web 全量测试 | 251 文件、4234 项通过（修复本机 rolldown 绑定后重跑） |
 | Web typecheck / lint / build | 通过；ESLint 0 错误；生产构建通过 |
 
-本轮已提交、推送并部署 staging（`5fa983f`，`/api/health` 已核对）；真实云端闭环联调与真机进度/对话回写仍待执行。
+本轮已提交、推送并部署 staging（`5fa983f`，`/api/health` 已核对），并用真实账号完成原生 Bearer 闭环联调：登录→读取→保存→进度回写→对话历史→409 冲突→真实模型问答，全部通过且测试数据已清理（详见 [CLIENT_IMPLEMENTATION](CLIENT_IMPLEMENTATION.md)）；真机进度/对话回写仍待执行。
 
 ## iOS / iPadOS 网页收集与阅读增量（2026-09-21，本地）
 

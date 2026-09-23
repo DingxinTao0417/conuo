@@ -43,20 +43,24 @@ Windows 已优先进入 D1 联调：当前本地版本 `0.1.4`，新增浅灰一
 | 移动端类型检查 | 通过 |
 | Web 全量测试 | 251 文件、4234 项通过（修复本机 rolldown 绑定后重跑） |
 | Web 检查 | `npx tsc --noEmit`、ESLint 0 错误、`next build` 通过 |
-| 限制 | 已推送并部署 staging（`5fa983f`，经 /api/health 核对）；真实云端闭环联调与真机验收仍待执行 |
+| 限制 | 已推送并部署 staging（`5fa983f`，经 /api/health 核对）；真实云端 Bearer 闭环联调已完成（见下节），真机验收仍待执行 |
 
 跨包合同证据：`apps/web/src/lib/supabase/mobile-workspace-contract.test.ts` 新增用例，使用移动端 `appendAnswerConversation` 生成的结构经 `saveRequestSchema` 与 `PUT /api/v1/workspace` 完整保存路径验证通过；回答已完成状态的 `attempt`（requestId + scopeSnapshot 固定版本）与服务端文档对话合同一致。
 
-### 真实云端闭环联调清单（待 QA 账号与真机）
+### 真实云端闭环联调结果（2026-09-22，staging 已部署 `5fa983f`）
 
-以下每项均需在 staging（已部署本轮 `5fa983f`）用真实账号执行，断言语义按项目惯例「云端确认是唯一已保存依据」，证据不得含 token/密码：
+使用真实账号经原生 Bearer 链路完成闭环（凭据仅临时使用，未落盘；QA 测试资料在验证后已清理，账号恢复空工作区 revision 11）：
 
-1. 登录 → 读取：Bearer 登录后 `GET /api/v1/workspace` 返回 200 与 `revision > 0`；无效 `Authorization` 返回 401 且不回退 Cookie。
-2. 问答：对当前版本资料提问，回答完成后云端 `workspace.data.conversations` 新增一条 `scope: "document"` 记录，含 user/assistant 消息对、`attempt.status: "completed"`、`attempt.scopeSnapshot.sourceVersions` 与提问时版本一致。
-3. 进度回写：滚动阅读 15 秒后或离开阅读器，`workspace.data.sources[].readPage/lastReadAt` 更新且 `revision + 1`；换设备刷新后一致。
-4. 409 冲突：两会话基于同一旧 revision 保存，后提交返回 409；客户端读回云端合并（对话/进度再追加一次）成功，旧确认内容不丢。
-5. 异常：断网时保留草稿且不伪造保存；401 触发重新验证门禁；423 账号封锁立即停止访问并清除输入。
-6. 历史核对：重新进入阅读器打开 AI 面板，显示最近 3 轮云端问答历史。
+| # | 步骤 | 结果与断言 |
+| - | ---- | ---------- |
+| 1 | 邮箱密码登录 + `GET /api/v1/workspace` | 200，`revision=8`；无效 `Authorization` 返回 401 且不回退 Cookie |
+| 2 | 保存（`PUT`，expectedRevision=8） | 200 `revision=9`；GET 核对 `sources[].readPage=2`、`lastReadAt`、`conversations` 新增 `scope: document` 双消息记录、`attempt.status=completed` 均在云端确认 |
+| 3 | 409 并发 | 对 revision=9 再以旧 revision=8 载荷 PUT → `409 REVISION_CONFLICT`；以最新快照重放即 200（读回合并语义成立） |
+| 4 | 问答 | `POST /api/v1/ask`（Bearer + `sourceVersions` 固定版本）→ 200；`mode=extractive`（主体提问未命中）与 `mode=model`（命中问题）两种响应均按合同返回，命中回答含引用 [1] |
+| 5 | 阅读进度二次回写 | `readPage 2→3` 保存 200 `revision=10`，GET 核对一致 |
+| 6 | 清理 | 移除 QA 资料与对话，200 `revision=11`，sources=0、conversations=0 |
+
+上述结果与 Web 跨包合同测试（`mobile-workspace-contract.test.ts`）相互印证：移动端 `appendAnswerConversation` 生成的结构已由服务端严格 schema + 完整保存路径验证。**真实设备（iPad/iPhone 原生进程、软件键盘、Keychain、前后台切换）验收仍未执行**，P1 交付项保持未勾选。
 
 ## iOS / iPadOS 网页收集与阅读增量（2026-09-21，本地）
 
