@@ -203,8 +203,6 @@ describe("reader panel slot", () => {
       "跳转页码",
       "下一页",
       "PDF阅读工具",
-      "单页",
-      "连续滚动",
       "缩小",
       "100%",
       "放大",
@@ -212,15 +210,7 @@ describe("reader panel slot", () => {
       "框选区域交给 AI",
       "我的标注（0）",
     ]);
-    // The single-page/continuous switch belongs to the strip at every width,
-    // including the phone row behind 工具; it no longer keeps a second bar of
-    // its own above the document.
-    expect(host.querySelectorAll('[aria-label="PDF 阅读模式"]')).toHaveLength(1);
-    expect(
-      toolstrip()
-        .querySelector("[data-reader-toolstrip-tools]")
-        ?.querySelector('[aria-label="PDF 阅读模式"]'),
-    ).toBeTruthy();
+    expect(host.querySelectorAll('[aria-label="PDF 阅读模式"]')).toHaveLength(0);
     const collapsedTools = toolstrip().querySelector("[data-reader-toolstrip-tools]")!;
     for (const label of ["上一页", "跳转页码", "下一页"]) {
       const pageControl = toolstrip().querySelector(`[aria-label="${label}"]`);

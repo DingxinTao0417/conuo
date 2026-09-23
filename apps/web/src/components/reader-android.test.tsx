@@ -158,7 +158,7 @@ describe("Android phone reader variant", () => {
     await click(original!);
     expect(workspace().className).toContain("reader-mobile-reading");
     const peek = host.querySelector<HTMLButtonElement>('[aria-label="展开问 AI 工作表"]');
-    expect(peek?.textContent).toContain("问 AI · 此资料 + 我的笔记");
+    expect(peek?.textContent).toContain("问 AI");
     await click(peek!);
     expect(workspace().className).toContain("reader-mobile-ai");
 

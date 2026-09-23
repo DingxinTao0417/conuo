@@ -191,7 +191,7 @@ describe("reader answer stream remains a transient preview until completion", ()
     await act(async () => history.click());
     expect(host.textContent).not.toContain("已删除资料的对照记录");
     expect(host.textContent).not.toContain("跨知识库问题");
-    expect(host.textContent).toContain("发送第一个问题后，对话会保存在这里。");
+    expect(host.textContent).toContain("暂无对话");
   });
 
   it("shows early paragraphs and sources, but only persists the complete answer and then offers save actions", async () => {

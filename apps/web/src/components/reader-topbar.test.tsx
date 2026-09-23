@@ -495,7 +495,7 @@ describe("reader document controls and source actions", () => {
     const askbar = host.querySelector<HTMLElement>(".reader-mobile-askbar");
     expect(askbar?.getAttribute("role")).toBeNull();
     expect(askbar?.querySelector('[aria-label="从底部打开问 AI"]')?.textContent).toContain(
-      "问 AI：基于这篇资料提问",
+      "问 AI",
     );
     expect(askbar?.querySelector('[aria-label="打开问 AI 输入"]')).toBeTruthy();
   });

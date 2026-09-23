@@ -47,7 +47,6 @@ import PdfReader from "../pdf-reader";
 import type { PdfReadingMode } from "../pdf-reader";
 import RegionStudyPanel from "../region-study-panel";
 import DocxContent from "../docx-content";
-import ModelStatus from "../model-status";
 import WebVersionPanel from "../web-version-panel";
 import Modal from "../modal";
 import { assertAnnotationSource, createAnnotation, updateAnnotation } from "@/lib/annotations";
@@ -175,7 +174,7 @@ export default function Reader(props: ReaderProps) {
   const [page, setPage] = useState(source.readPage || 1);
   const pageRef = useRef(source.readPage || 1);
   const [pages, setPages] = useState(source.pageCount || 1);
-  const [pdfReadingMode, setPdfReadingMode] = useState<PdfReadingMode>("single");
+  const [pdfReadingMode] = useState<PdfReadingMode>("continuous");
   const [pdfNavigationRequest, setPdfNavigationRequest] = useState(0);
   const [nativeSelectionPage, setNativeSelectionPage] = useState<number | undefined>();
   const [zoom, setZoom] = useState(100);
@@ -2021,41 +2020,8 @@ export default function Reader(props: ReaderProps) {
     setShowText(!showText);
   }
 
-  function switchPdfReadingMode(next: PdfReadingMode) {
-    if (next === pdfReadingMode) return;
-    clearSearchResults();
-    cancelRegionCapture();
-    setRegionCapture(null);
-    setSelection("");
-    setSelectionPresentation(null);
-    setPlainSelectionAnchor(null);
-    setNativeSelectionPage(undefined);
-    setSelectionToolbar(null);
-    window.getSelection()?.removeAllRanges();
-    setPdfReadingMode(next);
-  }
-
   function pdfReadingModeControls() {
-    return (
-      <div className="reader-pdf-mode" role="group" aria-label="PDF 阅读模式">
-        <button
-          type="button"
-          aria-pressed={pdfReadingMode === "single"}
-          title="只显示当前一页"
-          onClick={() => switchPdfReadingMode("single")}
-        >
-          单页
-        </button>
-        <button
-          type="button"
-          aria-pressed={pdfReadingMode === "continuous"}
-          title="向下滚动阅读所有页面"
-          onClick={() => switchPdfReadingMode("continuous")}
-        >
-          连续滚动
-        </button>
-      </div>
-    );
+    return null;
   }
 
   function startRegionCapture() {
@@ -2685,27 +2651,16 @@ export default function Reader(props: ReaderProps) {
                 eligibilityId: "reader-ask-eligibility",
                 label: "资料问答",
                 title: historical ? "已有问答" : "问 AI",
-                description: historical
-                  ? "查看已有回答和确切版本的原文引用"
-                  : "基于你收藏的资料，陪你读懂每一段",
-                placeholder: "从你不理解的地方开始提问…",
-                footnote: "答案请结合原文判断 · Enter 发送，Shift + Enter 换行",
-                historyTitle: "此资料的对话",
-                historyEmpty: "发送第一个问题后，对话会保存在这里。",
+                description: "",
+                placeholder: "输入问题…",
+                footnote: "Enter 发送 · Shift+Enter 换行",
+                historyTitle: "对话",
+                historyEmpty: "暂无对话",
                 empty: {
-                  title: historical ? "保留当时的阅读依据" : "一起把这一段读懂",
-                  text: historical
-                    ? "这里可查看已有问答与引用。新的问题请回到当前版本发起。"
-                    : "从不理解的地方开始提问。回答会显示依据，你可以随时回到原文核对。",
+                  title: "",
+                  text: "",
                   prompts: READER_EMPTY_PROMPTS,
                 },
-                extra: !historical && (
-                  <ModelStatus
-                    key={props.cloudUserId || "local"}
-                    userId={props.cloudUserId}
-                    compact
-                  />
-                ),
                 hidden: mobileTab === "citation",
               }}
               scope={{
@@ -2765,11 +2720,9 @@ export default function Reader(props: ReaderProps) {
                         )}
                       </div>
                     )}
-                    {scope === "document-notes" && (
+                    {scope === "document-notes" && documentNoteCount > 0 && (
                       <p className="reader-note-scope" role="status">
-                        {documentNoteCount
-                          ? `会同时检索此资料，以及 ${documentNoteCount} 条已关联的人工笔记；回答会明确区分两类依据。`
-                          : "会检索此资料。暂时没有已关联到当前资料、可安全纳入的人工笔记。"}
+                        含 {documentNoteCount} 条关联笔记
                       </p>
                     )}
                   </>
@@ -2879,7 +2832,7 @@ export default function Reader(props: ReaderProps) {
           }}
         >
           <MessageSquare size={17} aria-hidden="true" />
-          <span>{historical ? "查看这个版本的已有问答" : "问 AI：基于这篇资料提问"}</span>
+          <span>{historical ? "已有问答" : "问 AI"}</span>
         </button>
         <button
           type="button"
@@ -2905,7 +2858,7 @@ export default function Reader(props: ReaderProps) {
           >
             <span className="reader-android-ai-peek-grab" aria-hidden="true" />
             <span className="reader-android-ai-peek-title">
-              {historical ? "已有问答 · 此资料" : "问 AI · 此资料 + 我的笔记"}
+              {historical ? "已有问答" : "问 AI"}
             </span>
             <span className="reader-android-ai-peek-hint">点击展开对话</span>
             <span className="reader-android-ai-peek-text">{androidPeekText}</span>

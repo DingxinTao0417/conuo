@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { ChevronRight, FileText, Inbox, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { ChevronRight, FileText, Inbox, Plus, Trash2 } from "lucide-react";
 import type { Note, Source, WorkspaceData } from "@/lib/types";
 import { sections, type Section } from "./navigation";
 import type { WorkspaceUser } from "./types";
@@ -141,19 +141,6 @@ export default function WorkspaceSidebar({
           </button>
         </div>
         <div className="sidebar-bottom">
-          <div className="local-hint">
-            <ShieldCheck size={15} />
-            <span>
-              {user ? "私有学习空间" : "本机工作区"}
-              <small>
-                {user
-                  ? "仅你可以访问"
-                  : cloudConfigured
-                    ? "资料保存在当前浏览器"
-                    : "云端同步暂不可用"}
-              </small>
-            </span>
-          </div>
           <button
             className={`nav-item ${section === "trash" ? "active" : ""}`}
             onClick={() => navigate("trash")}

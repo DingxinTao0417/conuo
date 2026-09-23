@@ -228,7 +228,7 @@ export default function AskPanel({
             <PanelRightClose size={17} />
           </button>
         </div>
-        <p>{surface.description}</p>
+        {surface.description ? <p>{surface.description}</p> : null}
         {surface.extra}
         {singleScope ? (
           <p className="reader-scope reader-scope-fixed">
@@ -299,11 +299,15 @@ export default function AskPanel({
       <div className="reader-messages" aria-live="polite" aria-relevant="additions text">
         {!messages.length && (
           <div className="reader-ai-empty">
-            <div className="reader-ai-empty-icon">
-              <Sparkles size={24} />
-            </div>
-            <h2>{surface.empty.title}</h2>
-            <p>{surface.empty.text}</p>
+            {(surface.empty.title || surface.empty.text) && (
+              <>
+                <div className="reader-ai-empty-icon">
+                  <Sparkles size={24} />
+                </div>
+                {surface.empty.title ? <h2>{surface.empty.title}</h2> : null}
+                {surface.empty.text ? <p>{surface.empty.text}</p> : null}
+              </>
+            )}
             <div>
               {surface.empty.prompts.map((question) => (
                 <button
@@ -765,7 +769,9 @@ export default function AskPanel({
             )}
           </div>
         </div>
-        <p className="reader-ai-footnote">{surface.footnote}</p>
+        {surface.footnote ? (
+          <p className="reader-ai-footnote">{surface.footnote}</p>
+        ) : null}
       </form>
     </aside>
   );

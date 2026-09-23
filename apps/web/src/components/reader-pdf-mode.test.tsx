@@ -25,7 +25,7 @@ vi.mock("./web-version-panel", () => ({ default: () => null }));
 vi.mock("./pdf-reader", () => ({
   default: (props: PdfModeProps) => {
     bridge.pdfProps = props;
-    const pages = props.readingMode === "continuous" ? [1, 2, 3, 4, 5, 6] : [props.page];
+    const pages = [1, 2, 3, 4, 5, 6];
     return createElement(
       "div",
       { "data-pdf-mode-mock": true },
@@ -195,14 +195,8 @@ describe("Reader PDF reading mode integration", () => {
     return candidate!;
   }
 
-  function modeButton(mode: "single" | "continuous") {
-    const group = host.querySelector('[role="group"][aria-label="PDF 阅读模式"]');
-    expect(group).toBeTruthy();
-    const result = [...group!.querySelectorAll<HTMLButtonElement>("button")].find((item) =>
-      item.textContent?.includes(mode === "single" ? "单页" : "连续"),
-    );
-    expect(result).toBeTruthy();
-    return result!;
+  function expectNoModeControls() {
+    expect(host.querySelector('[role="group"][aria-label="PDF 阅读模式"]')).toBeNull();
   }
 
   async function click(target: HTMLButtonElement) {
@@ -282,25 +276,18 @@ describe("Reader PDF reading mode integration", () => {
     vi.mocked(Element.prototype.scrollIntoView).mockClear();
   }
 
-  it("starts in single-page mode and keeps the current page while toggling without recording activity", async () => {
-    expect(modeButton("single").getAttribute("aria-pressed")).toBe("true");
-    expect(modeButton("continuous").getAttribute("aria-pressed")).toBe("false");
-    expect(bridge.pdfProps!.readingMode).toBe("single");
+  it("uses continuous scroll only and keeps the current page without recording activity", async () => {
+    expectNoModeControls();
+    expect(bridge.pdfProps!.readingMode).toBe("continuous");
     expect(bridge.pdfProps!.page).toBe(3);
     expect(bridge.pdfProps!.scrollContainerRef.current).toBe(
       host.querySelector(".reader-document-scroll"),
     );
-    await click(modeButton("continuous"));
-    expect(bridge.pdfProps!.readingMode).toBe("continuous");
-    expect(bridge.pdfProps!.page).toBe(3);
-    expect(modeButton("continuous").getAttribute("aria-pressed")).toBe("true");
-    await click(modeButton("single"));
-    expect(bridge.pdfProps!.page).toBe(3);
     expect(props.onSourceChange).not.toHaveBeenCalled();
   });
 
   it("keeps continuous mode through cloud acknowledgements and source metadata changes", async () => {
-    await click(modeButton("continuous"));
+    // Continuous scroll is the only PDF reading mode.
     const updated = { ...source, title: "更新标题", updatedAt: "2026-09-15T12:00:01.000Z" };
     await render({
       source: updated,
@@ -315,7 +302,7 @@ describe("Reader PDF reading mode integration", () => {
   });
 
   it("debounces visible pages and publishes only the settled latest page without navigation loops", async () => {
-    await click(modeButton("continuous"));
+    // Continuous scroll is the only PDF reading mode.
     const request = bridge.pdfProps!.navigationRequest;
     await visible(4);
     expect(bridge.pdfProps!.page).toBe(4);
@@ -335,7 +322,7 @@ describe("Reader PDF reading mode integration", () => {
   });
 
   it("rate-limits settled continuous reading while preserving pending intent until its flush", async () => {
-    await click(modeButton("continuous"));
+    // Continuous scroll is the only PDF reading mode.
     await visible(4);
     await advance(400);
     const saved = { ...source, readPage: 4, lastReadAt: "2026-09-15T12:00:00.400Z" };
@@ -356,7 +343,7 @@ describe("Reader PDF reading mode integration", () => {
   });
 
   it("clears unsettled page intent when returning to the already saved page", async () => {
-    await click(modeButton("continuous"));
+    // Continuous scroll is the only PDF reading mode.
     await visible(4);
     expect(props.onPendingReadingChange).toHaveBeenLastCalledWith(true);
     await visible(3);
@@ -370,7 +357,7 @@ describe("Reader PDF reading mode integration", () => {
   });
 
   it("flushes the final unsettled PDF page when leaving the reader", async () => {
-    await click(modeButton("continuous"));
+    // Continuous scroll is the only PDF reading mode.
     await visible(5);
     expect(props.onSourceChange).not.toHaveBeenCalled();
     await advance(100);
@@ -384,14 +371,6 @@ describe("Reader PDF reading mode integration", () => {
     expect(props.onSourceChange).toHaveBeenCalledOnce();
   });
 
-  it("ignores visible-page notifications in single-page mode", async () => {
-    await visible(5);
-    await advance(400);
-    expect(bridge.pdfProps!.page).toBe(3);
-    expect(props.onSourceChange).not.toHaveBeenCalled();
-    expect(props.onPendingReadingChange).not.toHaveBeenCalledWith(true);
-  });
-
   it("does not persist PDF mode in browser business storage", async () => {
     const writeStorage = vi.spyOn(Storage.prototype, "setItem");
     const readStorage = vi.spyOn(Storage.prototype, "getItem");
@@ -400,8 +379,7 @@ describe("Reader PDF reading mode integration", () => {
     });
     vi.stubGlobal("indexedDB", { open: openDatabase });
     try {
-      await click(modeButton("continuous"));
-      await click(modeButton("single"));
+      expectNoModeControls();
       expect(writeStorage).not.toHaveBeenCalled();
       expect(readStorage).not.toHaveBeenCalled();
       expect(openDatabase).not.toHaveBeenCalled();
@@ -412,7 +390,7 @@ describe("Reader PDF reading mode integration", () => {
   });
 
   it("explicit page navigation triggers a new request even when jumping to the same visible page", async () => {
-    await click(modeButton("continuous"));
+    // Continuous scroll is the only PDF reading mode.
     const initial = bridge.pdfProps!.navigationRequest;
     await jump(4);
     expect(bridge.pdfProps!.page).toBe(4);
@@ -436,7 +414,7 @@ describe("Reader PDF reading mode integration", () => {
   });
 
   it("applies resolved reading position revisions without resetting the selected mode", async () => {
-    await click(modeButton("continuous"));
+    // Continuous scroll is the only PDF reading mode.
     await visible(4);
     const initial = bridge.pdfProps!.navigationRequest;
     const resolved = { ...source, readPage: 6 };
@@ -454,7 +432,7 @@ describe("Reader PDF reading mode integration", () => {
 
   it("allows viewing historical PDFs without changing the current version reading activity", async () => {
     await render({ currentSource: { ...source, versionId: "current-version" } });
-    await click(modeButton("continuous"));
+    // Continuous scroll is the only PDF reading mode.
     await visible(5);
     await advance(400);
     await jump(6);
@@ -464,7 +442,7 @@ describe("Reader PDF reading mode integration", () => {
   });
 
   it("releases pending continuous progress if the viewed version becomes historical", async () => {
-    await click(modeButton("continuous"));
+    // Continuous scroll is the only PDF reading mode.
     await visible(4);
     expect(props.onPendingReadingChange).toHaveBeenLastCalledWith(true);
     await render({ currentSource: { ...source, versionId: "new-version" } });
@@ -479,17 +457,8 @@ describe("Reader PDF reading mode integration", () => {
     expect(host.querySelector('[role="group"][aria-label="PDF 阅读模式"]')).toBeNull();
   });
 
-  it("cancels an unconfirmed screenshot selection when the display mode changes", async () => {
-    const trigger = host.querySelector<HTMLButtonElement>("[data-reader-region-trigger]")!;
-    await click(trigger);
-    expect(bridge.pdfProps!.capture.active).toBe(true);
-    await click(modeButton("continuous"));
-    expect(bridge.pdfProps!.capture.active).toBe(false);
-    expect(props.onSourceChange).not.toHaveBeenCalled();
-  });
-
   it("binds excerpts to their physical PDF page when another page is currently visible", async () => {
-    await click(modeButton("continuous"));
+    // Continuous scroll is the only PDF reading mode.
     expect(bridge.pdfProps!.page).toBe(3);
     const node = host.querySelector('[data-pdf-mock-page="5"] .textLayer span')!;
     await act(async () => {
@@ -520,7 +489,7 @@ describe("Reader PDF reading mode integration", () => {
   it.each(["next", "jump"] as const)(
     "does not re-center an old citation after manual %s navigation",
     async (navigation) => {
-      await click(modeButton("continuous"));
+      // Continuous scroll is the only PDF reading mode.
       await focusPdfTarget("citation");
       if (navigation === "next")
         await click(host.querySelector<HTMLButtonElement>('[aria-label="下一页"]')!);
@@ -546,7 +515,7 @@ describe("Reader PDF reading mode integration", () => {
       ],
     };
     await render({ source: retained, sources: [retained] });
-    await click(modeButton("continuous"));
+    // Continuous scroll is the only PDF reading mode.
     await focusPdfTarget(kind);
     if (position === "revision") {
       const resolved = { ...retained, readPage: 6 };
@@ -566,7 +535,7 @@ describe("Reader PDF reading mode integration", () => {
   });
 
   it("refuses to create a note citation from a different page when the selected physical page has no matching parser chunk", async () => {
-    await click(modeButton("continuous"));
+    // Continuous scroll is the only PDF reading mode.
     const node = host.querySelector('[data-pdf-mock-page="5"] .textLayer span')!;
     // External PDF text can differ from retained parser output. The same
     // words exist on page 3, but must not become a fabricated page 5 anchor.

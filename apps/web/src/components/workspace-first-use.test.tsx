@@ -185,9 +185,7 @@ describe("Workspace first material path", () => {
       '.sidebar-bottom [aria-label="账号与设置"]',
     );
     expect(entry).toBeInstanceOf(HTMLButtonElement);
-    expect(entry?.textContent).toContain("本机工作区");
     expect(entry?.textContent).toContain("账号与设置");
-    expect(host.textContent).toContain("云端同步暂不可用");
     expect(host.textContent).not.toContain("登录以连接云端");
 
     await act(async () => entry!.click());
