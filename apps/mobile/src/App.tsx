@@ -21,6 +21,9 @@ import {
 } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as Crypto from "expo-crypto";
+import { File } from "expo-file-system";
+import type { DocumentPickerAsset } from "expo-document-picker";
+import { extractPdfText } from "../modules/conuo-pdf-ink";
 import AnswerMarkdown from "./components/AnswerMarkdown";
 import {
   ArrowLeft,
@@ -38,6 +41,7 @@ import {
   Search,
   Sparkles,
   UserRound,
+  Upload,
   X,
   type LucideIcon,
 } from "lucide-react-native";
@@ -76,6 +80,19 @@ import {
 } from "./core/draft-recovery";
 import SourceReader from "./components/SourceReader";
 import { createReaderSession } from "./core/reader";
+import {
+  assertPdfWorkspaceCapacity,
+  buildPdfSource,
+  validatePdfFile,
+} from "./core/pdf-import";
+import {
+  createSupabaseOriginalUploadPort,
+  uploadPdfOriginal,
+} from "./core/original-upload";
+import { saveImportedPdfWithCAS } from "./core/pdf-import-save";
+import PdfImportSheet, {
+  type PdfImportPhase,
+} from "./components/PdfImportSheet";
 import HomeOverview from "./components/HomeOverview";
 import { useReducedMotion } from "./components/useReducedMotion";
 import { useRestoredScroll } from "./components/useRestoredScroll";
@@ -108,6 +125,14 @@ const tabs: { id: Tab; label: string; icon: LucideIcon }[] = [
 ];
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "操作未完成，请稍后重试。";
+async function hashFileBytes(bytes: Uint8Array) {
+  // expo-crypto's native bridge expects an actual TypedArray, not an
+  // ArrayBuffer. Copying also detaches the hash input from FileSystem's
+  // ArrayBufferLike backing store before the bridge receives it.
+  const data = Uint8Array.from(bytes);
+  const digest = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, data);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 function Button({
   title,
   onPress,
@@ -695,15 +720,38 @@ function WorkspaceScreen({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions(),
     wide = width >= 760;
+  const [inkNamespace, setInkNamespace] = useState("demo");
+  useEffect(() => {
+    let cancelled = false;
+    if (demo || !session) {
+      setInkNamespace("demo");
+      return () => {
+        cancelled = true;
+      };
+    }
+    void Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      session.id,
+    ).then((digest) => {
+      if (!cancelled) setInkNamespace(digest.slice(0, 32));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [demo, session?.id]);
   const flushProgressRef = useRef<() => void>(() => {});
   useEffect(() => {
     const listener = AppState.addEventListener("change", (state) => {
       if (state !== "active") flushProgressRef.current();
     });
-    return () => listener.remove();
+    return () => {
+      listener.remove();
+      void flushProgressRef.current();
+    };
   }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [pdfImporting, setPdfImporting] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
   const [highlightRequest, setHighlightRequest] = useState(0);
   const [tab, setTab] = useState<Tab>("home"),
@@ -745,6 +793,7 @@ function WorkspaceScreen({
         ? initialNote.pending
         : null,
     );
+  const pendingPdfImports = useRef(new Map<string, Source>());
   const noteReceipt = useRef<NoteReceipt | undefined>(initialNote?.pending);
   const noteInput = useRef({
     title: initialNote?.title ?? "",
@@ -785,6 +834,9 @@ function WorkspaceScreen({
   const readingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const readingBusy = useRef(false);
   const historyBusy = useRef(false);
+  const pendingHistory = useRef<
+    Array<{ payload: ReturnType<typeof answerScope>; result: Answer }>
+  >([]);
   const canShowSidebar = wide && (!source || width >= 1100);
   const sidebarVisible = canShowSidebar && !sidebarCollapsed;
   pruneDiscussions(discussions.current, workspace);
@@ -940,7 +992,14 @@ function WorkspaceScreen({
     payload: ReturnType<typeof answerScope>,
     result: Answer,
   ) {
-    if (demo || !api || !session || historyBusy.current) return;
+    if (demo || !api || !session) return;
+    // A second answer can finish while the first workspace CAS save is still
+    // in flight. Queue it instead of leaving the in-memory answer without a
+    // cloud history record.
+    if (historyBusy.current) {
+      pendingHistory.current.push({ payload, result });
+      return;
+    }
     historyBusy.current = true;
     const requestId = payload.requestId;
     try {
@@ -965,6 +1024,7 @@ function WorkspaceScreen({
         setSnapshot((previous) => adoptSnapshot(previous, saved));
     } catch (cause) {
       if (authInterruptionReason(cause)) {
+        pendingHistory.current = [];
         if (alive.current) onAuthError(cause);
         return;
       }
@@ -997,6 +1057,10 @@ function WorkspaceScreen({
       }
     } finally {
       historyBusy.current = false;
+      const next = pendingHistory.current.shift();
+      if (next && alive.current) {
+        void persistAnswerHistory(next.payload, next.result);
+      }
     }
   }
   const api = useMemo(
@@ -1043,6 +1107,160 @@ function WorkspaceScreen({
     } finally {
       if (alive.current && loadController.current === controller)
         setLoading(false);
+    }
+  }
+  async function saveImportedPdf(source: Source, spaceId: string) {
+    if (!api || !session || !isCurrentSession())
+      throw new Error("请重新登录后再保存这份 PDF。");
+    const initial = latest.current.snapshot;
+    if (!initial) throw new Error("云端资料尚未读取完成，请稍后重试。");
+    try {
+      const result = await saveImportedPdfWithCAS({
+        owner: session.id,
+        source,
+        spaceId,
+        initial,
+        api,
+        isCurrent: () => alive.current && isCurrentSession(),
+        isAuthenticationError: (cause) => !!authInterruptionReason(cause),
+        onSnapshot: (next) => {
+          if (alive.current)
+            setSnapshot((previous) => adoptSnapshot(previous, next));
+        },
+      });
+      return { source: result.source, duplicate: result.duplicate };
+    } catch (cause) {
+      if (authInterruptionReason(cause)) {
+        onAuthError(cause);
+        throw new Error("登录状态已失效，请重新登录后核对资料库。");
+      }
+      throw cause;
+    }
+  }
+
+  async function importPdfFile(
+    asset: DocumentPickerAsset,
+    spaceId: string,
+    aiAllowed: boolean,
+    onPhase: (phase: PdfImportPhase) => void,
+  ) {
+    if (demo) throw new Error("示例预览不能上传文件，请退出示例并登录真实账号。");
+    if (!api || !session || !isCurrentSession())
+      throw new Error("当前账号不可用，请重新登录后上传。");
+    if (saveBusy.current) throw new Error("另一项资料保存仍在进行，请稍后再上传。");
+
+    saveBusy.current = true;
+    setSaving(true);
+    loadController.current?.abort();
+    setLoading(false);
+    let stage = "准备文件";
+    try {
+      stage = "读取文件元数据";
+      onPhase("reading");
+      const file = new File(asset.uri);
+      const declaredSize =
+        Number.isSafeInteger(asset.size) && (asset.size ?? 0) > 0
+          ? asset.size!
+          : file.size;
+      const filename = validatePdfFile(asset.name, declaredSize);
+      stage = "读取文件内容";
+      const bytes = await file.bytes();
+      validatePdfFile(filename, bytes.byteLength);
+      if (declaredSize > 0 && declaredSize !== bytes.byteLength)
+        throw new Error("所选文件大小在读取时发生变化，请重新选择后再试。");
+      stage = "计算文件指纹";
+      const hash = await hashFileBytes(bytes);
+      const current = latest.current.workspace;
+      const existing = current.sources.find(
+        (item) => !item.deletedAt && item.kind === "pdf" && item.hash === hash,
+      );
+
+      if (existing?.storagePath) {
+        onPhase("saving");
+        const saved = await saveImportedPdf(existing, spaceId);
+        pendingPdfImports.current.delete(hash);
+        return { source: saved.source, duplicate: true };
+      }
+
+      const pendingSource = pendingPdfImports.current.get(hash);
+      let source = pendingSource;
+      if (existing && (!pendingSource || pendingSource.id !== existing.id))
+        source = {
+          ...existing,
+          mime: "application/pdf",
+          size: bytes.byteLength,
+          hash,
+        };
+      if (!source) {
+        let pageCount = 0;
+        let pages: string[] = [];
+        let parseError: string | undefined;
+        try {
+          stage = "提取 PDF 页面文字";
+          const extracted = await extractPdfText(asset.uri);
+          pageCount = Number.isSafeInteger(extracted.pageCount)
+            ? Math.max(0, extracted.pageCount)
+            : 0;
+          pages = Array.isArray(extracted.pages)
+            ? extracted.pages.map((text) => (typeof text === "string" ? text : ""))
+            : [];
+        } catch (cause) {
+          parseError =
+            cause instanceof Error ? cause.message : "PDFKit 无法读取这份文件。";
+        }
+        source = buildPdfSource({
+          id: existing?.id ?? Crypto.randomUUID(),
+          versionId: existing?.versionId ?? Crypto.randomUUID(),
+          filename,
+          size: bytes.byteLength,
+          hash,
+          spaceId,
+          aiAllowed: aiAllowed && current.aiEnabled,
+          pageCount,
+          pages: pages.map((text, index) => ({ page: index + 1, text })),
+          ...(parseError ? { parseError } : {}),
+          createId: Crypto.randomUUID,
+        });
+        pendingPdfImports.current.set(hash, source);
+      } else {
+        source = {
+          ...source,
+          mime: "application/pdf",
+          size: bytes.byteLength,
+          hash,
+          aiAllowed: existing ? existing.aiAllowed : aiAllowed && current.aiEnabled,
+        };
+      }
+
+      const auth = getAuthClient();
+      if (!auth) throw new Error("当前构建尚未配置云端连接，请重新启动移动端开发构建。");
+      stage = "检查工作区容量";
+      assertPdfWorkspaceCapacity(latest.current.workspace, source, spaceId);
+      onPhase("uploading");
+      stage = "上传 PDF 原件";
+      const port = createSupabaseOriginalUploadPort(auth, hashFileBytes);
+      const storagePath = await uploadPdfOriginal(source, bytes, session.id, port);
+      source = { ...source, storagePath, originalMissing: false };
+      pendingPdfImports.current.set(hash, source);
+      if (!alive.current || !isCurrentSession())
+        throw new Error("账号已改变，已停止保存这份 PDF。");
+
+      onPhase("saving");
+      stage = "确认资料库保存";
+      const saved = await saveImportedPdf(source, spaceId);
+      pendingPdfImports.current.delete(hash);
+      setNotice(
+        saved.duplicate
+          ? "相同 PDF 已核对；资料库已使用现有资料。"
+          : "PDF 原件和资料记录已确认保存到云端。",
+      );
+      return saved;
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "未知错误";
+      throw new Error(`${stage}失败：${message}`);
+    } finally {
+      saveBusy.current = false;
+      if (alive.current) setSaving(false);
     }
   }
   useEffect(() => {
@@ -1126,6 +1344,7 @@ function WorkspaceScreen({
     answerRestore.capture();
     askController.current?.abort();
     setAsking(false);
+    void flushReadingProgress();
     setSourceId(null);
     setNoteId(null);
     noteReturn.current = null;
@@ -1420,6 +1639,18 @@ function WorkspaceScreen({
       if (alive.current) setSaving(false);
     }
   }
+  function requestPdfImport() {
+    if (Platform.OS === "web") {
+      setNotice("原生 PDF 文件导入请在 iOS 客户端中使用。");
+      return;
+    }
+    if (demo) {
+      setError("示例模式不连接云端；退出示例并登录后即可上传 PDF。");
+      return;
+    }
+    setError("");
+    setPdfImporting(true);
+  }
   const filteredSources = filterLibrarySources(workspace, filter, search);
   const docRow = (item: Source) => (
     <Pressable
@@ -1512,11 +1743,18 @@ function WorkspaceScreen({
           </Text>
         </View>
         {tab === "library" && snapshot && (
-          <IconButton
-            label="添加网页资料"
-            icon={Plus}
-            onPress={() => setImporting(true)}
-          />
+          <View style={s.row}>
+            <IconButton
+              label="上传 PDF 文件"
+              icon={Upload}
+              onPress={requestPdfImport}
+            />
+            <IconButton
+              label="添加网页资料"
+              icon={Plus}
+              onPress={() => setImporting(true)}
+            />
+          </View>
         )}
         {tab !== "account" && !demo && (
           <IconButton
@@ -1555,6 +1793,7 @@ function WorkspaceScreen({
               onOpenLibrary={openLibrary}
               onCreateNote={startNote}
               onImport={() => setImporting(true)}
+              onImportFile={requestPdfImport}
               onCreateSpace={() => void createSpace()}
               creatingSpace={saving}
               renderSource={docRow}
@@ -1632,7 +1871,7 @@ function WorkspaceScreen({
                         ? "试试更短的关键词，或清除搜索查看当前范围。"
                         : filter === "inbox"
                           ? "尚未归入知识库的资料会出现在这里。可以先收藏一个网页链接。"
-                          : "添加网页链接，或在网页版导入文件。资料会同步到这里。"
+                          : "上传 PDF 原件，或添加网页链接；资料会同步到你的云端工作区。"
                     }
                     action={
                       search.trim() ? (
@@ -1644,11 +1883,19 @@ function WorkspaceScreen({
                           }}
                         />
                       ) : (
-                        <Button
-                          title="添加网页资料"
-                          icon={Plus}
-                          onPress={() => setImporting(true)}
-                        />
+                        <View style={[s.row, { flexWrap: "wrap" }]}>
+                          <Button
+                            title="上传 PDF"
+                            icon={Upload}
+                            onPress={requestPdfImport}
+                          />
+                          <Button
+                            title="添加网页资料"
+                            icon={Plus}
+                            soft
+                            onPress={() => setImporting(true)}
+                          />
+                        </View>
                       )
                     }
                   />
@@ -1718,7 +1965,7 @@ function WorkspaceScreen({
                 <Text style={s.secondary}>
                   {demo
                     ? "示例资料用于预览界面，退出后不保留。"
-                    : "正式资料存放在云端。当前客户端支持网页收集、阅读、资料问答和新建文本笔记。"}
+                    : "正式资料存放在云端。当前客户端支持网页收集、PDF 上传、正文阅读、资料问答和新建文本笔记。"}
                 </Text>
               </View>
               <View style={s.card}>
@@ -1728,8 +1975,7 @@ function WorkspaceScreen({
                   回答附带来源。尚未发送的问题和未保存笔记仅保留在当前会话，离开应用前请完成保存。
                 </Text>
                 <Text style={s.secondary}>
-                  PDF
-                  原件、复杂编辑和本机文件导入可在网页版继续。手写、原生分享和离线资料库尚未启用。
+                  原生 PDF 原件页面阅读、DOCX / Markdown / TXT 导入和复杂编辑可在网页版继续。PDF 手写、原生分享和离线资料库尚未启用。
                 </Text>
               </View>
               <Button
@@ -1882,6 +2128,8 @@ function WorkspaceScreen({
               <Pressable
                 key={`${item.chunkId}-${index}`}
                 accessibilityRole="button"
+                accessibilityLabel={`引用 ${index + 1}：${item.title}${item.page ? `，原文第 ${item.page} 页` : ""}`}
+                accessibilityHint="打开原文并定位到这条引用"
                 onPress={() => setCitation(item)}
                 style={[s.card, { padding: 14 }]}
               >
@@ -1895,7 +2143,7 @@ function WorkspaceScreen({
               </Pressable>
             ))}
             <Text style={s.caption}>
-              本次问答仅保留在当前阅读会话，尚未写入云端对话历史。
+              回答完成后会尝试写入云端文档对话历史；请以 AI 面板历史和保存提示核对结果。
             </Text>
             <Button
               title="写下我的理解"
@@ -2032,6 +2280,7 @@ function WorkspaceScreen({
               <View style={{ flex: 1, flexDirection: "row" }}>
                 <SourceReader
                   source={source}
+                  inkNamespace={inkNamespace}
                   session={readerSession.current}
                   highlight={highlight}
                   highlightRequest={highlightRequest}
@@ -2179,6 +2428,16 @@ function WorkspaceScreen({
             setImporting(false);
             openSource(existing);
           }}
+        />
+      )}
+      {pdfImporting && snapshot && (
+        <PdfImportSheet
+          visible={pdfImporting}
+          spaces={spaces}
+          initialSpace={filter === "all" || filter === "inbox" ? "" : filter}
+          aiEnabled={workspace.aiEnabled}
+          onImport={importPdfFile}
+          onClose={() => setPdfImporting(false)}
         />
       )}
       <Modal

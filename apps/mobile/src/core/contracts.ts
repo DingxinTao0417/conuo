@@ -16,6 +16,9 @@ export const sourceSchema = z.looseObject({
   title: z.string(),
   kind: z.enum(["pdf", "docx", "markdown", "text", "web"]),
   filename: z.string(),
+  mime: z.string().optional(),
+  size: z.number().int().nonnegative().optional(),
+  hash: z.string().optional(),
   text: z.string(),
   spaceIds: z.array(id),
   tags: z.array(z.string()),
@@ -25,6 +28,24 @@ export const sourceSchema = z.looseObject({
   createdAt: z.string(),
   updatedAt: z.string(),
   deletedAt: z.string().nullable(),
+  coverage: z
+    .object({
+      captureScope: z.enum(["full", "selection", "manual", "link"]),
+      parseState: z.enum(["pending", "complete", "partial", "failed", "not-requested"]),
+      unavailablePageRanges: z
+        .array(
+          z.object({
+            start: z.number().int().positive(),
+            end: z.number().int().positive(),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
+  pageCount: z.number().int().positive().optional(),
+  parsedPages: z.number().int().nonnegative().optional(),
+  error: z.string().optional(),
+  storagePath: z.string().optional(),
   readPage: z.number().optional(),
   lastReadAt: z.string().optional(),
   chunks: z.array(
@@ -35,6 +56,7 @@ export const sourceSchema = z.looseObject({
       text: z.string(),
       section: z.string(),
       page: z.number().optional(),
+      order: z.number().int().nonnegative().optional(),
     }),
   ),
 });

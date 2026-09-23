@@ -1,6 +1,6 @@
 # Conuo 客户端开发记录
 
-更新日期：2026-09-21。本页记录 Windows/macOS、iOS/iPadOS 首批本地实现，分别对应 [桌面 PRD](DESKTOP_PRD.md)、[iOS PRD](IOS_PRD.md)与 [iPadOS PRD](IPADOS_PRD.md)。共同业务仍以 [主 PRD](PRD.md)为准。
+更新日期：2026-09-23。本页记录 Windows/macOS、iOS/iPadOS 首批本地实现，分别对应 [桌面 PRD](DESKTOP_PRD.md)、[iOS PRD](IOS_PRD.md)与 [iPadOS PRD](IPADOS_PRD.md)。共同业务仍以 [主 PRD](PRD.md)为准。
 
 Windows 已优先进入 D1 联调：当前本地版本 `0.1.4`，新增浅灰一体标题栏；真实 Electron 会话/网络协议已完成一轮 staging 验证，可见窗口与 AI 等缺项见 [Windows D1 验收记录](WINDOWS_DESKTOP_ACCEPTANCE.md)。这不代表整个 D1 已通过。
 
@@ -14,8 +14,8 @@ Windows 已优先进入 D1 联调：当前本地版本 `0.1.4`，新增浅灰一
 | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Windows | Electron 安全联网宿主；承载现有 Web 工作台；菜单、快捷键、导航隔离、下载进度/取消、连接恢复、关闭/重载保护；未签名便携预览包                                           | 真实云账号完整业务矩阵、本地资料库与离线同步、原生邮件回跳、签名和自动更新                    |
 | macOS   | 同一桌面源码、Cmd 菜单规则与 DMG 构建配置                                                                                                                              | macOS 构建、系统对话框与真机验证、签名及公证                                                  |
-| iOS     | Expo/React Native 工程；登录与 Keychain 会话管理；云端列表、筛选、网页正文／链接收集；正文目录、字号、会话位置；单资料问答、Markdown、引用定位；新建文本笔记及首次空间 | Bearer 后端部署与真机云端联调、文件导入、原件 PDF、进度回写、云端对话历史、完整编辑与系统分享 |
-| iPadOS  | 与 iOS 共用数据合同；窄窗单栏、宽窗原文/AI 并排；按阅读宽度收起主侧栏，宽屏可手动折叠；独立阅读滚动容器                                                                | Pencil、手写批注、多窗口、系统分屏及硬件键盘真机验收                                          |
+| iOS     | Expo/React Native 工程；登录与 Keychain 会话管理；云端列表、筛选、网页正文／链接收集；PDF 原生选择、私有原件上传、PDFKit 页面文字提取；正文目录、字号、会话位置；单资料问答、Markdown、引用定位；新建文本笔记及首次空间；Bearer staging 闭环、阅读进度回写、云端文档对话历史 | DOCX / Markdown / TXT 原生导入、原件 PDF 页面阅读、完整编辑、系统分享及真实设备上传验收 |
+| iPadOS  | 与 iOS 共用数据合同；窄窗单栏、宽窗原文/AI 并排；按阅读宽度收起主侧栏，宽屏可手动折叠；PDF 原生导入、私有原件阅读、PDFKit/PencilKit overlay；按账号、资料版本和页码自动保存 `PKDrawing` 本机快照；本地代码已接入独立 ink intent、Storage、页 head CAS 和 Web PNG 预览；WP0 输入与坐标技术验证已在实体 iPad 通过 | P1 登录流程与 Keychain 生命周期、阅读进度/对话/引用/冲突/键盘等剩余真机矩阵；WP2 真机退出/重进恢复验收；新 ink migration/API 尚未部署 staging，云端同步和跨端预览仍待真实账号验收 |
 
 桌面 D0 通过加载批准的云端 Web 入口，保持业务界面与网页版一致；这依赖联网，不能称为完整 D1 验收或 D2 本地离线工作区。iOS/iPadOS 只有 I1/P1 的一部分，不能称为完整原生产品交付。
 
@@ -30,10 +30,12 @@ Windows 已优先进入 D1 联调：当前本地版本 `0.1.4`，新增浅灰一
 
 ## iPadOS P1 阅读进度与云端对话增量（2026-09-22，本地）
 
-本轮补齐 iPad/iOS 共用工程的 P1 两个云端闭环，均为本地代码与测试，**未部署、未真机、未做真实云端联调**：
+本轮补齐 iPad/iOS 共用工程的 P1 两个云端闭环，并完成 staging Bearer 真实账号联调；原生设备验收仍未完成：
 
 - `readPage/lastReadAt` 回写：正文阅读按段落锚点取当前页，滚动合并 15 秒后保存；离开阅读器与进入后台前刷新；保存 409 或结果未知先读回云端再合并一次，不覆盖其他设备已确认内容。新增纯函数 `applyReadingProgress` 与 `SourceReader.onReadingMove`。
+- 阅读进度在切换全局页面、返回资料列表和 WorkspaceScreen 卸载时也会触发最后一次 flush，避免只在 AppState 变化时保存。
 - 云端对话历史：回答完成即以该资料 `document` 对话追加保存（消息配对 user/assistant、attempt 带 requestId 与 scopeSnapshot，幂等），从云端读取并在 AI 面板展示最近 3 轮核对。新增 `appendAnswerConversation` / `sourceConversation` / `documentConversationId`；`contracts.ts` 将 `conversations` 结构化为 Web 合同兼容 schema。
+- 回答历史写入按当前账号会话串行排队；前一笔 workspace CAS 保存尚未结束时，后续完成的回答不会被丢弃。认证中断会清空队列，结果未知仍先读回权威快照再决定是否重试。
 - 异常矩阵沿用既有 `request-identity.ts` / `draft-recovery.ts` 边界：401 重新验证、423 账号封锁、断网保留草稿、响应丢失读回核对；本次新增进度与历史保存都走同一「结果未知先读回」规则。
 - P2 选型与接口草案记录于 [IPADOS_P2_SELECTION.md](IPADOS_P2_SELECTION.md)（原生 PDF 方案 A/D、笔迹模型与恢复箱、区域 AI、真机清单），**只读设计，未实现**。
 
@@ -43,9 +45,47 @@ Windows 已优先进入 D1 联调：当前本地版本 `0.1.4`，新增浅灰一
 | 移动端类型检查 | 通过 |
 | Web 全量测试 | 251 文件、4234 项通过（修复本机 rolldown 绑定后重跑） |
 | Web 检查 | `npx tsc --noEmit`、ESLint 0 错误、`next build` 通过 |
-| 限制 | 已推送并部署 staging（`5fa983f`，经 /api/health 核对）；真实云端 Bearer 闭环联调已完成（见下节），真机验收仍待执行 |
+| 限制 | 已推送并部署 staging（`5fa983f`，经 /api/health 核对）；真实云端 Bearer 闭环联调已完成（见下节）。2026-09-23 iPad `dapi` 在终止旧进程、重启新 Debug 包后显示一个空的学习空间；该非示例画面对应 App 内 `auth.getUser()` 成功后的真实 workspace 路径，支持一次 Keychain 会话恢复和 workspace 读取通过。账号密码未读取；显式登录／退出循环、云端进度/对话及其余 P1 真机验收仍待执行。本机 CoreDevice 报告目标 iPad 不支持 `devicectl appResize` 自动缩放；手动 Split View / Stage Manager 窄窗矩阵仍可在设备上验收 |
 
 跨包合同证据：`apps/web/src/lib/supabase/mobile-workspace-contract.test.ts` 新增用例，使用移动端 `appendAnswerConversation` 生成的结构经 `saveRequestSchema` 与 `PUT /api/v1/workspace` 完整保存路径验证通过；回答已完成状态的 `attempt`（requestId + scopeSnapshot 固定版本）与服务端文档对话合同一致。
+
+## iPadOS 原生 PDF 文件导入（2026-09-23，本地实现）
+
+学习首页与资料库新增“上传 PDF”入口，从系统“文件”选择一份 PDF（上限 30 MiB），用 PDFKit 按页提取文字并建立引用 chunk；扫描件保留原件但标记无可检索文字，不伪称 OCR。AI 授权默认关闭，用户可在导入时明确打开。SHA-256 重复检查与 workspace 3 MiB 容量预检后，按现有 `reserve_original_upload` → Storage 原始字节写入 → `complete_original_upload` → workspace revision CAS 顺序保存；只有原件和资料库确认均完成后才显示成功。重复资料保留现有身份与权限；原件缺失时使用同一 source/version 身份恢复。未新增服务端路由、迁移或服务端密钥。
+
+PDF 资料页现在优先下载同一 `storagePath` 的私有原件到应用缓存，并使用 `ConuoPdfInkView` 加载 PDFKit 原始页面；提取后的文本仅继续用于检索和 AI 引用，不再作为原始 PDF 的主视觉。原生工具栏提供钢笔、铅笔、橡皮、撤销、重做、缩放和页码控制；`PKDrawing` 已进入本机恢复层，状态显示“本机已保护 · 未同步”。
+
+首次打开原件时曾复现 `undefined is not a function`；原因为旧版 Expo FileSystem 运行时对 `Directory.create` 的兼容差异。缓存已改为直接写入现有 `Paths.cache`，并增加下载、读取字节、写入缓存的阶段错误信息。随后复现的“读取原件字节失败”来自 React Native Blob 缺少可用的 `arrayBuffer()`；已增加 `FileReader.readAsArrayBuffer` 回退，并重新加载真机 bundle。
+
+验证：移动端 108 项测试通过，类型检查通过；Xcode 27.0 / Expo SDK 57 在 `dapi` 真机 Debug 构建通过（0 errors / 0 warnings），新进程已从 Metro 获取 bundle。真机截图[显示已导入的 PDF 资料](evidence/ipados-pdf-import/2026-09-23-imported-pdf-in-library.png)，资料出现在收件箱且状态为“正文已就绪”；这证明 workspace 记录已读回，不等于原始 PDF 和新快照已经完成真机退出/重进验收。
+
+2026-09-23 真机首次尝试选择 PDF 时复现错误：Expo Crypto 原生 `digest` 收到 `ArrayBuffer`，报 `NotTypedArrayException`，因此文件尚未进入上传或云端写入。已改为复制成实际 `Uint8Array` 再调用 SHA-256；移动端 107 项测试、类型检查和差异检查通过，Metro 已重新加载修复后的 bundle。**修复后的真机重新选择 PDF 尚待确认**。
+
+随后真机又复现 `Cannot read property 'rest' of undefined`。该错误实际发生在原件上传的 Supabase RPC 预留调用：移动端抽取 `client.rpc` 后丢失了 client receiver，内部 `rest` 变为 `undefined`。已绑定 `client.rpc`，并把 `extractPdfText` 改为 SDK 推荐的 `Promise.resolve/reject` 形式；Xcode 27.0 真机构建通过（0 errors / 0 warnings）并重新安装。上传流程增加阶段前缀（读取文件、计算指纹、提取文字、上传原件、确认保存），108 项测试与类型检查通过。**修复后的真机重新选择 PDF 尚待确认**。
+
+## iPadOS WP2 本机 PKDrawing 恢复（2026-09-23，本地实现）
+
+`ConuoPdfInkView` 在 PencilKit 的页级绘制变更停止约 0.8 秒后，把原生 `PKDrawing.dataRepresentation()` 与透明 PNG 预览写入 Application Support。目录由账号摘要、source/version 身份和页码隔离，临时文件完成后原子替换；重新创建 PDF reader 时由 PDFKit overlay 按页恢复原始 `PKDrawing`。JS 只收到页级保存完成事件，不转发 Pencil 点，不写入 `public.annotations`。PNG 只作之后 Web 预览的只读候选，不能替代原始 `PKDrawing`。
+
+这一步解决的是“退出 PDF 后再进入仍能看到本机笔迹”。当前状态会在本机快照后启动独立 ink 上传：新的 migration、intent/commit API、私有 Storage bucket 和 Web 透明 PNG 预览已写入本地代码，但尚未部署 staging，因此真机显示“正在同步”或失败时仍保留“本机已保护”，不会冒充云端成功。二进制笔迹不进入现有 workspace 或 annotations。
+
+本地验证：移动端 108/108 测试通过，Web 全量 251 文件 / 4235 项通过，移动/Web 类型检查通过，Xcode 真机 Debug 构建 0 errors / 0 warnings；还需要在 `dapi` 上对同一份 PDF 完成“落笔 → 等状态变为本机已保护 → 返回列表 → 再进入”的实机验收，并在 migration/API 部署后验收“已保存到云端”和 Web 预览。
+
+## iPadOS WP0 原生 PDF / Pencil 探针（2026-09-22 至 23，技术验证通过）
+
+WP0 技术验证退出条件已满足。`apps/mobile/modules/conuo-pdf-ink` 使用 PDFKit + `PDFPageOverlayViewProvider` + PencilKit 读取本机生成的三页测试 PDF（第二页 90° 旋转并内缩 CropBox）；Pencil 笔画留在原生层，JS 只接收页码、缩放和笔迹摘要。`PdfInkProbe` 是隔离验证入口，不是最终资料库 / 阅读 / AI 产品页面。云端 ink API 和文字 `annotations` 仍不在本包内。
+
+构建状态：Xcode 27.0 / build `27A266a`、Expo SDK 57.0.24、React Native 0.86.3。iPad Pro 11-inch (M5) / iOS 27.0 模拟器构建通过，仅作构建证据；iPad Pro 12.9-inch (第 4 代) / iPadOS 26.3 真机截图与观察见下节。`plugins/withSceneLifecycle.js` 接入 `ExpoAppSceneDelegate` 和 scene manifest，以支持 iPadOS 27 启动。旧的 `docs/IPADOS_P2_SELECTION.md` 仍是历史选型草案，其中的 `react-native-pdf`、JSON `InkStroke` 和批次 PUT 合同不得与手写专项 PRD 锁定的 PDFKit + PencilKit、`PKDrawing` 和页级 revision/head CAS 混用。
+
+### WP0 实体 iPad 输入与坐标复核（2026-09-22 至 23）
+
+- 设备：iPad Pro 12.9-inch（第 4 代），iPadOS 26.3；横屏 1366 × 1024 pt。
+- 构建：Conuo 0.1.0 (1)，Xcode 27.0，Git HEAD `48055456d7881d93a9d256389bd6aac48f26d8f8`。
+- 测试素材：探针生成的三页 PDF；第 2 页旋转 90°，CropBox 从 MediaBox 四边内缩 36 pt；本次首笔在第 1 页。
+- 结果：已在真实设备上用 Apple Pencil 落笔，页面显示 `page 1: 1 stroke`；旧版探针当时显示 PencilKit tool picker，状态为 `Pencil input only`。截图：[首次落笔](evidence/ipados-wp0/2026-09-22-pencil-first-stroke.png)只证明当时原生输入链路工作，不代表当前界面验收。随后已按 PRD 将探针改为 Conuo 顶栏和左侧浮动笔栏，紧凑视口通过“更多”切换阅读模式 / 缩放，并移除系统 tool picker；模拟器排版和 Xcode 构建另行复核。
+- 2026-09-23 恢复真机访问后，已在 iPad Pro 12.9-inch（第 4 代）、iPadOS 26.3、横屏 1366 × 1024 pt 前台启动已安装的开发构建，显示 WP0 页面 1/3；截图：[实机界面启动](evidence/ipados-wp0/2026-09-23-ipad-launch.png)。这只证明应用能在真机前台显示当前 Conuo 顶栏 / 浮动工具栏，不证明本轮 Pencil 输入、缩放、平移、旋转页或 CropBox 对齐通过。
+- 2026-09-23 在同一真机进入第 2/3 页（90° 旋转 + 内缩 CropBox）。86% 截图显示 `3 笔 · 仅本机内存` 和三处角点标记；随后 150% 横屏截图显示 4 笔；再把 iPad 转为竖屏，仍在第 2 页、150%，四个角点标记仍贴近紫色测试框对应角。用户确认缩放 / 平移和设备方向变化后没有明显漂移；后续滚动到相邻页时四角仍随页面移动。截图：[86% 旋转页](evidence/ipados-wp0/2026-09-23-ipad-page2-rotated.png)、[150% 横屏](evidence/ipados-wp0/2026-09-23-ipad-page2-zoom150.png)、[150% 竖屏四角](evidence/ipados-wp0/2026-09-23-ipad-page2-portrait-zoom150-four-corners.png)、[竖屏连续滚动](evidence/ipados-wp0/2026-09-23-ipad-page2-scroll.png)。这属于真机视觉观察，不是坐标误差自动测量。
+- 用户还确认手掌接触书写时无误触；测试后截图仍显示 `4 笔 · 仅本机内存`：[手掌测试后](evidence/ipados-wp0/2026-09-23-ipad-page2-palm-check.png)。Apple Pencil 记录为第 2 代（推断）：用户确认末端没有 USB-C 滑盖；这台 iPad 的 Apple 兼容表列出第 2 代与 USB-C 版，序列号未核验（参考 [Apple Pencil 兼容性](https://support.apple.com/en-gb/108937) 与 [USB-C 版配对方式](https://support.apple.com/en-gu/guide/ipad/ipadc3d88218/ipados)）。Xcode 真机构建成功；本机页级持久化尚未实现，留给 WP2 验收。
 
 ### 真实云端闭环联调结果（2026-09-22，staging 已部署 `5fa983f`）
 

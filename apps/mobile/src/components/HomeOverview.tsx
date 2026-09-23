@@ -8,6 +8,7 @@ import {
   Link2,
   PenLine,
   Plus,
+  Upload,
 } from "lucide-react-native";
 import type { Source, Workspace } from "../core/contracts";
 import { colors as c, styles as s } from "../theme";
@@ -18,6 +19,7 @@ type Props = {
   onOpenLibrary: (spaceId?: string) => void;
   onCreateNote: () => void;
   onImport: () => void;
+  onImportFile: () => void;
   onCreateSpace: () => void;
   creatingSpace: boolean;
   renderSource: (source: Source) => React.ReactNode;
@@ -66,6 +68,18 @@ export default function HomeOverview(props: Props) {
             <Link2 size={19} color="#396bb8" />
           </View>
           <Text style={h.actionText}>添加网页</Text>
+          <Plus size={16} color={c.secondary} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="上传 PDF 文件"
+          onPress={props.onImportFile}
+          style={({ pressed }) => [h.quickAction, pressed && h.pressed]}
+        >
+          <View style={[h.actionIcon, { backgroundColor: c.peach }]}>
+            <Upload size={18} color="#926127" />
+          </View>
+          <Text style={h.actionText}>上传 PDF</Text>
           <Plus size={16} color={c.secondary} />
         </Pressable>
         <Pressable

@@ -20,6 +20,7 @@ export interface PdfReaderCaptureControl {
 
 interface Props {
   source: Source;
+  cloudUserId?: string;
   page: number;
   zoom: number;
   getSourceBlob: (source: Source) => Promise<Blob | undefined>;
@@ -56,6 +57,7 @@ function PdfPage({
   onRetry,
   onPageNode,
   onSize,
+  inkPreviewUrl,
 }: {
   source: Source;
   page: number;
@@ -71,6 +73,7 @@ function PdfPage({
   onRetry: () => void;
   onPageNode: (page: number, node: HTMLDivElement | null) => void;
   onSize: (page: number, size: { width: number; height: number }) => void;
+  inkPreviewUrl?: string;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const textLayer = useRef<HTMLDivElement>(null);
@@ -255,6 +258,17 @@ function PdfPage({
         {active ? (
           <>
             <canvas ref={canvas} aria-label={`原始 PDF 第 ${visiblePage} 页`} />
+            {inkPreviewUrl && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="reader-pdf-ink-preview"
+                  src={inkPreviewUrl}
+                  alt={`第 ${visiblePage} 页的 Pencil 笔迹预览`}
+                  draggable={false}
+                />
+              </>
+            )}
             <div
               ref={textLayer}
               className="reader-pdf-text textLayer"
@@ -335,6 +349,7 @@ function readingViewport(container: HTMLDivElement) {
 
 export default function PdfReader({
   source,
+  cloudUserId,
   page,
   zoom,
   getSourceBlob,
@@ -370,6 +385,13 @@ export default function PdfReader({
   const [retry, setRetry] = useState(0);
   const [viewportPage, setViewportPage] = useState(page);
   const [activePages, setActivePages] = useState<number[]>([page]);
+  const [inkPreviewState, setInkPreviewState] = useState<{
+    key: string;
+    urls: Record<number, string>;
+  }>({ key: "", urls: {} });
+  const inkPreviewKey = `${cloudUserId ?? ""}:${source.id}:${source.versionId}`;
+  const inkPreviewUrls =
+    inkPreviewState.key === inkPreviewKey ? inkPreviewState.urls : {};
   const [layoutRevision, setLayoutRevision] = useState(0);
   const sizes = useRef(new Map<number, string>());
   const position = useRef({ page, fraction: 0 });
@@ -394,6 +416,48 @@ export default function PdfReader({
   }, []);
   const handleRendered = useCallback(() => callbacks.current.onRendered(), []);
   const handleRetry = useCallback(() => setRetry((value) => value + 1), []);
+
+  useEffect(() => {
+    let disposed = false;
+    if (!cloudUserId || source.kind !== "pdf") {
+      return () => {
+        disposed = true;
+      };
+    }
+    void fetch(
+      `/api/v1/sources/${encodeURIComponent(source.id)}/versions/${encodeURIComponent(source.versionId)}/ink`,
+      { credentials: "include", headers: { Accept: "application/json" } },
+    )
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: unknown) => {
+        if (disposed || !payload || typeof payload !== "object") return;
+        const pages = (payload as { pages?: unknown }).pages;
+        if (!Array.isArray(pages)) return;
+        const next: Record<number, string> = {};
+        for (const page of pages) {
+          if (!page || typeof page !== "object") continue;
+          const item = page as {
+            pageIndex?: unknown;
+            previewDownloadUrl?: unknown;
+            deleted?: unknown;
+          };
+          if (
+            typeof item.pageIndex === "number" &&
+            Number.isInteger(item.pageIndex) &&
+            typeof item.previewDownloadUrl === "string" &&
+            item.deleted !== true
+          )
+            next[item.pageIndex + 1] = item.previewDownloadUrl;
+        }
+        setInkPreviewState({ key: inkPreviewKey, urls: next });
+      })
+      .catch(() => {
+        if (!disposed) setInkPreviewState({ key: inkPreviewKey, urls: {} });
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [cloudUserId, inkPreviewKey, source.id, source.kind, source.versionId]);
 
   useEffect(() => {
     if (!wrapper.current) return;
@@ -631,6 +695,7 @@ export default function PdfReader({
             onRetry={handleRetry}
             onPageNode={registerPageNode}
             onSize={handleSize}
+            inkPreviewUrl={inkPreviewUrls[number]}
           />
         ))}
       {!loading && pdf && (

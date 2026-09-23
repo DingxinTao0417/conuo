@@ -14,6 +14,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowUpRight, List, Minus, Plus, X } from "lucide-react-native";
 import type { Source } from "../core/contracts";
@@ -31,9 +32,12 @@ import {
 import { colors as c } from "../theme";
 import { useReducedMotion } from "./useReducedMotion";
 import { MarkdownContent } from "./AnswerMarkdown";
+import NativePdfReader from "./NativePdfReader";
 
 export type SourceReaderProps = {
   source: Source;
+  /** Account-isolated namespace used by the native PDF ink recovery layer. */
+  inkNamespace?: string;
   highlight: string | null;
   /** Increments when the same citation is selected again. */
   highlightRequest?: number;
@@ -46,6 +50,22 @@ export type SourceReaderProps = {
 };
 
 export function SourceReader(props: SourceReaderProps) {
+  if (
+    Platform.OS !== "web" &&
+    props.source.kind === "pdf" &&
+    !!props.source.storagePath
+  ) {
+    return (
+      <NativePdfReader
+        source={props.source}
+        inkNamespace={props.inkNamespace}
+        visible={props.visible}
+        wide={props.wide}
+        onReadingMove={props.onReadingMove}
+        onOpenOriginal={props.onOpenOriginal}
+      />
+    );
+  }
   const fallbackSession = useRef<ReaderSession | null>(null);
   if (!fallbackSession.current) fallbackSession.current = createReaderSession();
   return (
@@ -458,7 +478,7 @@ function ReaderDocument({
               )}
             </ScrollView>
             <Text style={r.sessionHint}>
-              阅读位置与字号仅保留在本次使用中。
+              阅读位置会按资料版本回写云端；字号仅保留在本次使用中。
             </Text>
           </View>
         </View>

@@ -6,6 +6,7 @@ import { createEmptyWorkspace } from "../seed";
 
 const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const migrationName = "20260920000300_business_conflict_response.sql";
+const postConflictMigrationName = "20260923000100_pdf_ink_cloud.sql";
 const migrations = new URL("../../../../../supabase/migrations/", import.meta.url);
 
 type FunctionRow = {
@@ -54,7 +55,7 @@ beforeAll(async () => {
     `);
     const names = (await readdir(migrations)).filter((name) => name.endsWith(".sql")).sort();
     for (const name of names) {
-      if (name === migrationName) continue;
+      if (name === migrationName || name === postConflictMigrationName) continue;
       await db.exec(await readFile(new URL(name, migrations), "utf8"));
     }
     before = await functions();

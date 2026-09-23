@@ -2398,6 +2398,7 @@ export default function Reader(props: ReaderProps) {
               <PdfReader
                 key={`${source.id}:${source.versionId}`}
                 source={source}
+                cloudUserId={props.cloudUserId}
                 page={page}
                 readingMode={pdfReadingMode}
                 navigationRequest={pdfNavigationRequest}

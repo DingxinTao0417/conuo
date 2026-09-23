@@ -1,6 +1,6 @@
 # Conuo Web 开发状态
 
-更新日期：2026-09-22。范围：Web 开发增量及独立 staging 部署。Windows/macOS 与 iOS/iPadOS 已开始本地开发，实际实现、测试与尚未完成范围见[客户端开发记录](CLIENT_IMPLEMENTATION.md)；下文历史 staging 推送记录不代表本轮客户端改动已部署。
+更新日期：2026-09-23。范围：Web 开发增量及独立 staging 部署，并链接当前 iPadOS 工作包状态。Windows/macOS 与 iOS/iPadOS 的实现、测试与未完成范围见[客户端开发记录](CLIENT_IMPLEMENTATION.md)；下文历史 staging 推送记录不代表本轮客户端改动已部署。
 
 本项目已有可运行的 Web 工作台，支持导入、阅读与版本历史、笔记与知识审核、普通搜索、原始资料问答、PDF 区域截图学习及个人 ZIP 备份恢复。当前已使用自编 QA 资料完成真实 DeepSeek 问答、回答另存笔记、截图解读／提问／出题、资料分析、跨资料主题生成与人工接受，并确认相关笔记和知识正文的云端保存及刷新恢复；知识页也已基于固定原始依据收到流式问答成功终态，知识页正文本身不充当证据。2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级资料整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、六条主要业务冲突接口，以及孤立上传、带数据历史版本、资料、Storage 和账号 Auth 删除主链路均已通过；一次性 signup/recovery token 的确认与密码更新、真实等待后的过期 signup token、受控邮箱的真实注册确认邮件及同浏览器 PKCE、Chrome／Edge 跨一小时持久会话自动刷新也已通过。三条清理 Cron 已在未手工调用 cleanup API 的情况下达到主自然调度预期终态；被遗弃租约和可重试故障的韧性阶段仍待下一次自然调度。项目所有者于 `2026-09-21` 确认物理双设备同步矩阵及真实找回密码邮件的同浏览器完整链路均无异常；跨浏览器邮件点击仍待验收。原生产数据库未升级，生产网页代码与 schema 仍可能不一致。本轮已提交并推送 `staging`；可变域名的当前版本由 `/api/health` 返回 Vercel 环境、Git 分支和完整 SHA，首次探针验证为 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。 **完整 M0 仍未验收。**
 
@@ -8,7 +8,7 @@
 
 ## iPadOS P1 云端闭环增量（2026-09-22，本地）
 
-移动端补齐 P1 两个云端闭环并全部本地验证：正文阅读位置按语义锚点节流回写 `readPage/lastReadAt`，回答完成后追加保存云端 `conversations`（Web 合同兼容、requestId 幂等、AI 面板可核对最近 3 轮），两者均遵循「结果未知先读回」的 CAS 规则；异常矩阵沿用既有 request-identity / draft-recovery 边界。P2 原生 PDF / Pencil 选型与接口草案输出为[选型证据](IPADOS_P2_SELECTION.md)，未实现。
+移动端补齐 P1 两个云端闭环并全部本地验证：正文阅读位置按语义锚点节流回写 `readPage/lastReadAt`，回答完成后追加保存云端 `conversations`（Web 合同兼容、requestId 幂等、AI 面板可核对最近 3 轮），两者均遵循「结果未知先读回」的 CAS 规则；异常矩阵沿用既有 request-identity / draft-recovery 边界。P2 前置草案见[选型证据](IPADOS_P2_SELECTION.md)，其旧选型不作为当前实现合同；WP0 最新状态见下节。
 
 | 检查 | 结果 |
 | ---- | ---- |
@@ -16,7 +16,33 @@
 | Web 全量测试 | 251 文件、4234 项通过（修复本机 rolldown 绑定后重跑） |
 | Web typecheck / lint / build | 通过；ESLint 0 错误；生产构建通过 |
 
-本轮已提交、推送并部署 staging（`5fa983f`，`/api/health` 已核对），并用真实账号完成原生 Bearer 闭环联调：登录→读取→保存→进度回写→对话历史→409 冲突→真实模型问答，全部通过且测试数据已清理（详见 [CLIENT_IMPLEMENTATION](CLIENT_IMPLEMENTATION.md)）；真机进度/对话回写仍待执行。
+本轮已提交、推送并部署 staging（`5fa983f`，`/api/health` 已核对），并用真实账号完成原生 Bearer 闭环联调：登录→读取→保存→进度回写→对话历史→409 冲突→真实模型问答，全部通过且测试数据已清理（详见 [CLIENT_IMPLEMENTATION](CLIENT_IMPLEMENTATION.md)）；真机重新启动后已观察到非示例空工作区，支持 Keychain 会话恢复与 workspace 读取通过；显式登录／退出流程、进度/对话回写及其他 P1 交互仍待验收。目标 iPad 不支持 CoreDevice `devicectl appResize`，窄窗矩阵需用设备上的手动分屏验证。
+
+2026-09-23 真机接入状态（本地）：从现有被忽略的网页端配置为移动端写入 Supabase URL 与 publishable key，Expo 已加载配置；检查确认 iOS bundle 含这些公开配置且不含示例占位值。iPad `dapi` 已成功从 Metro 获取 iOS bundle。排查发现原生 Debug 包通过 React Native `RCTBundleURLProvider` 连接 Metro，移动端 `start` 原先固定 8082，和原生默认 8081 不一致；已将 `apps/mobile/package.json` 的启动端口统一到 8081。该结果只证明配置 bundle 成功加载，尚未证明用户登录、Keychain 会话、云端进度或对话回写。
+
+## iPadOS 原生 PDF 文件导入（2026-09-23，本地实现）
+
+资料库与学习首页新增系统“文件”PDF 选择入口（单份 ≤30 MiB），PDFKit 提取按页文字；SHA-256 去重与 workspace 3 MiB 容量预检后调用现有原件预留与完成 RPC，向私有 `originals` Storage 上传原始字节，再以 workspace revision CAS 写入资料。云端原件和资料记录都确认后才显示成功；AI 授权默认关闭。PDF 资料页现已接入私有原件下载、PDFKit 原始页面和 PencilKit overlay；提取文本只用于检索/引用。`PKDrawing` 现在会按账号、资料版本和页码自动保存到本机 Application Support，并在重新打开 reader 时恢复；本地代码同时接入了独立 ink migration、intent/commit API、私有 Storage 和 Web PNG 预览，但尚未部署 staging。没有修改生产资源。DOCX / Markdown / TXT 原生导入、Pencil 云端真实验收、P1 其余真机闭环仍待验收。
+
+本地验证：移动端 108/108 测试通过，类型检查通过；Xcode 27.0 / Expo SDK 57 在已连接 iPad `dapi` 真机构建通过（0 errors / 0 warnings）。真机截图[显示已导入的 PDF 资料](evidence/ipados-pdf-import/2026-09-23-imported-pdf-in-library.png)，资料库已读回一份 PDF；本机恢复仍需要在同一份 PDF 上完成退出/重进实机复测。
+
+真机错误记录：首次选择 PDF 时 `expo-crypto` 原生桥因收到 `ArrayBuffer` 而报 `NotTypedArrayException`，错误发生在 SHA-256 计算阶段，未上传原件。已改为传入复制后的 `Uint8Array`，修复后重新启动 iPad 应用并由 Metro 成功打包；需用户再次选择 PDF 才能验证后续 PDFKit 提取、Storage 上传和 workspace CAS。
+
+第二次真机错误为 `Cannot read property 'rest' of undefined`，实际发生在原件上传的 Supabase RPC 预留调用：抽取 `client.rpc` 丢失 receiver。已绑定 `client.rpc`；同时保留 PDFKit Promise 注册修复。Xcode 真机构建通过，移动端 108/108 测试与类型检查通过，尚未确认修复包实际选 PDF 后的后续阶段。
+
+原始 PDF 页面首次打开又复现 `undefined is not a function`；已将原件缓存从 `Directory.create` 改为直接写入 `Paths.cache`，并让错误显示缓存阶段。修复包已由 Metro 重新加载，原始 PDF 和 Pencil overlay 的真机复测待用户再次点入资料。
+
+随后真机显示“读取原件字节失败”：React Native Blob 在当前运行时没有可用的 `arrayBuffer()`。已增加 `FileReader.readAsArrayBuffer` 回退；移动端 108/108 测试和类型检查通过，修复包已重新加载，原始 PDF 打开和 Pencil overlay 仍待真机复测。
+
+## iPadOS WP2 本机 PKDrawing 恢复（2026-09-23，本地）
+
+原生模块在绘制停止约 0.8 秒后，按页把 `PKDrawing.dataRepresentation()` 与透明 PNG 预览写入 Application Support；账号摘要、source/version 和页码组成隔离目录，原子替换避免半写文件。重建 `ConuoPdfInkView` 时，PDFKit overlay 从对应页恢复 `PKDrawing`。JS 只收到页级快照完成事件，不传 Pencil 点，也不改 `public.annotations`。快照完成后，移动端按页 head 读取独立 ink manifest，上传两个私有对象并提交 CAS；未部署或失败时界面仍显示本机保护，不把本机文件冒充云端成功。
+
+本地测试与类型检查通过，Xcode 真机 Debug 构建 0 errors / 0 warnings，Web 全量 251 文件 / 4235 项通过。新增 migration `20260923000100_pdf_ink_cloud.sql`、三个 Bearer API 路由和 Web PDF PNG 叠层均只存在于本地；未执行真实迁移、未部署 staging、未修改生产资源，因此跨设备云端结果仍未验收。
+
+## iPadOS WP0 PDFKit / Pencil 真机技术验证（2026-09-23，本地）
+
+WP0 技术验证退出条件已满足：Xcode 27.0 development build 在 iPad Pro 12.9-inch（第 4 代）/ iPadOS 26.3 运行；真实设备从第 1 页落笔，再到第 2 页旋转 90°、内缩 CropBox 页面，完成 86% / 150% 缩放、平移和横竖屏转向。四角笔迹在用户复核中无明显漂移，用户报告掌托无误触。证据和测试边界见[客户端开发记录](CLIENT_IMPLEMENTATION.md)。Pencil 型号依据无 USB-C 滑盖推断为第 2 代，序列号未核实；云端保存、P1 登录/进度/对话真机闭环仍未完成。
 
 ## iOS / iPadOS 网页收集与阅读增量（2026-09-21，本地）
 

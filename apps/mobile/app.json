@@ -14,7 +14,7 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "plugins": ["expo-secure-store"],
+    "plugins": ["expo-secure-store", "./plugins/withSceneLifecycle"],
     "web": {
       "name": "Conuo 客户端设计预览",
       "bundler": "metro",

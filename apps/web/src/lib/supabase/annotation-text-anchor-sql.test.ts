@@ -11,6 +11,7 @@ const ownerB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const now = "2026-09-14T12:00:00.000Z";
 const migrationName = "20260915045450_annotation_utf16_text_anchors.sql";
 const businessConflictMigrationName = "20260920000300_business_conflict_response.sql";
+const postConflictMigrationName = "20260923000100_pdf_ink_cloud.sql";
 const migrations = new URL("../../../../../supabase/migrations/", import.meta.url);
 const sourceText = "# 起点\n\n😀学习 **梯度下降**。\n\n😀学习 **梯度下降**。\n";
 const quote = "学习 **梯度下降**。";
@@ -174,7 +175,12 @@ beforeAll(async () => {
       GRANT SELECT,INSERT,DELETE ON storage.objects TO authenticated;
     `);
     for (const name of (await readdir(migrations)).filter((name) => name.endsWith(".sql")).sort()) {
-      if (name === migrationName || name === businessConflictMigrationName) continue;
+      if (
+        name === migrationName ||
+        name === businessConflictMigrationName ||
+        name === postConflictMigrationName
+      )
+        continue;
       await db.exec(await readFile(new URL(name, migrations), "utf8"));
     }
     // The old projector accepts the optional JSON field but has no text_anchor

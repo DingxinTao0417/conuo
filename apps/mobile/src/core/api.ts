@@ -166,5 +166,38 @@ export function createApi(
         );
       return result.data;
     },
+    async loadInkManifest(owner: string, sourceId: string, versionId: string, signal?: AbortSignal) {
+      return request(
+        `/api/v1/sources/${encodeURIComponent(sourceId)}/versions/${encodeURIComponent(versionId)}/ink`,
+        owner,
+        { signal },
+      );
+    },
+    async reserveInkUpload(
+      owner: string,
+      sourceId: string,
+      versionId: string,
+      input: unknown,
+      signal?: AbortSignal,
+    ) {
+      return request(
+        `/api/v1/sources/${encodeURIComponent(sourceId)}/versions/${encodeURIComponent(versionId)}/ink/upload-intents`,
+        owner,
+        { method: "POST", signal, body: JSON.stringify(input) },
+      );
+    },
+    async commitInkUpload(
+      owner: string,
+      sourceId: string,
+      versionId: string,
+      input: unknown,
+      signal?: AbortSignal,
+    ) {
+      return request(
+        `/api/v1/sources/${encodeURIComponent(sourceId)}/versions/${encodeURIComponent(versionId)}/ink/commits`,
+        owner,
+        { method: "POST", signal, body: JSON.stringify(input) },
+      );
+    },
   };
 }

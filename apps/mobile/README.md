@@ -7,13 +7,13 @@
 - 邮箱密码登录、Keychain 分块保存会话、前后台刷新、持久退出封锁与账号切换隔离。
 - 读取同一云端工作区：学习概览、知识库、标题／标签筛选、已解析正文、笔记及知识页。
 - 公开网页正文预览或仅收藏链接，可选择收件箱／知识库；重复链接先提示已有资料，独立另存需要明确确认。正文用于 AI 需单独授权，默认关闭。
-- 针对一份固定版本资料提问，Markdown 回答、来源卡片及可精确匹配段落的引用定位。当前使用完整 JSON 回答，本次对话只保留在当前会话。
+- 针对一份固定版本资料提问，Markdown 回答、来源卡片及可精确匹配段落的引用定位。回答完成后会按固定资料版本追加到云端文档对话历史，AI 面板可核对最近记录。
 - 创建学习空间、新建纯文本笔记，沿用服务端工作区 revision CAS；失败保留当前草稿，结果未知时先核对云端，重试保持笔记身份，避免静默覆盖与重复创建。
 - 正文段落目录、15–25 号字号、引用定位与本次会话阅读位置；返回资料或临时收起 AI 后可接续阅读，字号／布局变化按段落位置恢复。
 - 手机单栏阅读；宽度至少 760px 时可并排阅读与 AI，低于 1100px 的阅读页收起主导航，至少 1100px 时可手动折叠侧栏。全局导航重置知识库筛选。
 - 独立的示例预览：不会发起登录、模型请求或保存到云端。
 
-这是原生客户端第一阶段，**不代表完整 iOS/iPadOS PRD 已交付**。当前没有原生文件导入、PDF 原件绘制、手写、系统分享扩展、多窗口、后台传输、离线资料库、云端对话历史写入和阅读进度回写。已有云端阅读进度用于续读入口展示，不能据此宣称原生阅读位置已同步。复杂编辑与原件阅读可在网页版继续。
+这是原生客户端第一阶段，**不代表完整 iOS/iPadOS PRD 已交付**。iOS 原生文件选择目前支持 PDF（单份不超过 30 MiB）：使用系统“文件”选择器，提取 PDFKit 页面文字，AI 授权默认关闭，并通过原件预留、私有 Storage 上传和 workspace revision CAS 确认云端资料。扫描件保留原件但不做 OCR。原生 PDF 原件页面阅读尚未接入普通资料页；DOCX、Markdown、TXT 导入仍可在网页版完成。PDF 手写、系统分享扩展、多窗口、后台传输和离线资料库尚未交付。阅读进度和文档对话历史已有 Bearer 云端合同与 staging 闭环，但原生 iPad 登录、Keychain、文件上传、键盘、触摸和前后台验收仍待真机确认。
 
 ## 本地启动
 
@@ -26,7 +26,7 @@ npm run mobile:dev
 
 配置 `apps/mobile/.env.local`（参考 `.env.example`），只放公开的 API 地址、Supabase URL 和 publishable key。模型密钥、服务端密钥不进入客户端。API 只接受 HTTPS 根地址；默认测试站，生产接入独立验收。
 
-真实 iOS 客户端使用 `Authorization: Bearer` 和 `X-Conuo-User`，无需浏览器 Cookie。**后端必须先部署本轮原生 Bearer 适配**，现有 staging 不会因本地代码变更自动支持该接口。此轮没有部署、创建账号或登录真实用户进行云端联调。
+真实 iOS 客户端使用 `Authorization: Bearer` 和 `X-Conuo-User`，无需浏览器 Cookie。本轮 Bearer 适配已部署到 staging，并已用临时 QA 资料完成服务端闭环；客户端真机验证仍需在目标设备上执行。
 
 在支持相应 SDK 的开发设备上运行 Expo；签名安装包需在 macOS/Xcode 环境构建并完成 Apple 账号配置。当前 Windows 上的 `export:ios` 只验证 JS/Hermes bundle 构建，不会生成 IPA，也不能替代真机验收。没有自动开通 EAS、Apple 付费资源或发布到商店。
 
@@ -36,6 +36,18 @@ npm run export:ios --workspace @conuo/mobile
 npm run typecheck --workspace @conuo/mobile
 npm run test --workspace @conuo/mobile
 ```
+
+## WP0 原生 PDF / Pencil 探针
+
+WP0 使用 `apps/mobile/modules/conuo-pdf-ink` 承载 PDFKit、`PDFPageOverlayViewProvider` 和 PencilKit。它只加载代码生成的三页无敏感内容 PDF（第二页为 90° 旋转并使用内缩 CropBox），不读取网络文件，也不保存笔迹。真机探针使用 Conuo 顶栏和浮动工具栏选择 PencilKit 工具，并启用 PDFKit markup mode 将页面输入交给原生 overlay。使用 iOS development build 启动隔离入口：
+
+```sh
+EXPO_PUBLIC_CONUO_PDF_INK_PROBE=1 npm run ios --workspace @conuo/mobile
+```
+
+没有 Pencil 时，可以临时加上 `EXPO_PUBLIC_CONUO_PDF_INK_FINGER=1` 观察原生 overlay 的手指绘制和事件边界；这只用于开发探针，不能替代 Pencil 真机验收。
+
+该探针只把当前页和笔迹变更摘要传给 JavaScript；它还没有 WP2 的页级恢复或云端保存。没有 Xcode、iPad 和 Pencil 真机证据时，不能把它标为 WP0 完成。
 
 ## 界面预览
 
