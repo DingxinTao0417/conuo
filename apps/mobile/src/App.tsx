@@ -23,7 +23,8 @@ import { StatusBar } from "expo-status-bar";
 import * as Crypto from "expo-crypto";
 import { File } from "expo-file-system";
 import type { DocumentPickerAsset } from "expo-document-picker";
-import { extractPdfText } from "../modules/conuo-pdf-ink";
+import { extractPdfText, type InkTool } from "../modules/conuo-pdf-ink";
+import PdfInkToolbar, { type PdfInkToolsState } from "./components/PdfInkToolbar";
 import AnswerMarkdown from "./components/AnswerMarkdown";
 import {
   ArrowLeft,
@@ -721,6 +722,24 @@ function WorkspaceScreen({
   const { width } = useWindowDimensions(),
     wide = width >= 760;
   const [inkNamespace, setInkNamespace] = useState("demo");
+  const [pdfInkTool, setPdfInkTool] = useState<InkTool>("pen");
+  const [pdfZoomStep, setPdfZoomStep] = useState(0);
+  const [pdfUndoToken, setPdfUndoToken] = useState(0);
+  const [pdfRedoToken, setPdfRedoToken] = useState(0);
+  const pdfInkTools = useMemo<PdfInkToolsState>(
+    () => ({
+      tool: pdfInkTool,
+      setTool: setPdfInkTool,
+      zoomStep: pdfZoomStep,
+      zoomIn: () => setPdfZoomStep((value) => value + 1),
+      zoomOut: () => setPdfZoomStep((value) => value - 1),
+      undoToken: pdfUndoToken,
+      redoToken: pdfRedoToken,
+      undo: () => setPdfUndoToken((value) => value + 1),
+      redo: () => setPdfRedoToken((value) => value + 1),
+    }),
+    [pdfInkTool, pdfZoomStep, pdfUndoToken, pdfRedoToken],
+  );
   useEffect(() => {
     let cancelled = false;
     if (demo || !session) {
@@ -2261,9 +2280,17 @@ function WorkspaceScreen({
                   icon={ArrowLeft}
                   onPress={returnFromSource}
                 />
-                <Text numberOfLines={1} style={[s.docTitle, { flex: 1 }]}>
-                  {source.title}
-                </Text>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text numberOfLines={1} style={s.docTitle}>
+                    {source.title}
+                  </Text>
+                </View>
+                {Platform.OS !== "web" && source.kind === "pdf" && !!source.storagePath && (
+                  <View style={s.headerInkTools}>
+                    <PdfInkToolbar tools={pdfInkTools} />
+                  </View>
+                )}
+                <View style={{ flex: 1 }} />
                 <IconButton
                   label="阅读时写笔记"
                   icon={BookOpen}
@@ -2281,6 +2308,7 @@ function WorkspaceScreen({
                 <SourceReader
                   source={source}
                   inkNamespace={inkNamespace}
+                  tools={pdfInkTools}
                   session={readerSession.current}
                   highlight={highlight}
                   highlightRequest={highlightRequest}

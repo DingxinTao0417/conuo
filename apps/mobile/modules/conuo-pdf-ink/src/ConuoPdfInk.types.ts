@@ -49,4 +49,5 @@ export type ConuoPdfInkViewProps = {
   onDrawingChanged?: (event: { nativeEvent: DrawingChangedEvent }) => void;
   onZoomChanged?: (event: { nativeEvent: ZoomChangedEvent }) => void;
   onLocalSnapshot?: (event: { nativeEvent: LocalSnapshotEvent }) => void;
+  onToolToggled?: (event: { nativeEvent: { tool: InkTool } }) => void;
 };

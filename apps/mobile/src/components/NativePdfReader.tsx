@@ -6,21 +6,12 @@ import {
   Text,
   View,
 } from "react-native";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Eraser,
-  Minus,
-  Pencil,
-  Plus,
-  Redo2,
-  Undo2,
-} from "lucide-react-native";
+import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import {
   ConuoPdfInkView,
-  type InkTool,
   type LocalSnapshotEvent,
 } from "../../modules/conuo-pdf-ink";
+import type { PdfInkToolsState } from "./PdfInkToolbar";
 import { File } from "expo-file-system";
 import * as Crypto from "expo-crypto";
 import type { Source } from "../core/contracts";
@@ -42,6 +33,7 @@ export default function NativePdfReader({
   inkNamespace,
   visible,
   wide,
+  tools,
   onReadingMove,
   onOpenOriginal,
 }: {
@@ -49,6 +41,7 @@ export default function NativePdfReader({
   inkNamespace?: string;
   visible: boolean;
   wide: boolean;
+  tools: PdfInkToolsState;
   onReadingMove?: (page: number | undefined) => void;
   onOpenOriginal?: () => void;
 }) {
@@ -56,10 +49,6 @@ export default function NativePdfReader({
   const [error, setError] = useState("");
   const [page, setPage] = useState(source.readPage ?? 1);
   const [pageCount, setPageCount] = useState(source.pageCount ?? 0);
-  const [tool, setTool] = useState<InkTool>("pen");
-  const [zoomStep, setZoomStep] = useState(0);
-  const [undoToken, setUndoToken] = useState(0);
-  const [redoToken, setRedoToken] = useState(0);
   const [strokeCounts, setStrokeCounts] = useState<Record<number, number>>({});
   const [localProtected, setLocalProtected] = useState(false);
   const [cloudConfirmed, setCloudConfirmed] = useState(false);
@@ -247,12 +236,6 @@ export default function NativePdfReader({
   return (
     <View style={[p.root, !visible && p.hidden]}>
       <View style={p.header}>
-        <View style={p.titleGroup}>
-          <Text style={p.title}>原始 PDF</Text>
-          <Text numberOfLines={1} style={p.subtitle}>
-            保留原始排版 · Pencil 笔迹自动保护
-          </Text>
-        </View>
         <View style={p.pageControls}>
           <Pressable
             accessibilityRole="button"
@@ -277,46 +260,6 @@ export default function NativePdfReader({
           </Pressable>
         </View>
       </View>
-      <View style={p.toolbar}>
-        <ToolButton label="钢笔" active={tool === "pen"} onPress={() => setTool("pen")}>
-          <Pencil size={17} color={tool === "pen" ? c.brand : c.secondary} />
-        </ToolButton>
-        <ToolButton label="铅笔" active={tool === "pencil"} onPress={() => setTool("pencil")}>
-          <Pencil size={17} color={tool === "pencil" ? c.brand : c.secondary} />
-        </ToolButton>
-        <ToolButton
-          label="橡皮擦"
-          active={tool === "eraser"}
-          onPress={() => setTool("eraser")}
-        >
-          <Eraser size={17} color={tool === "eraser" ? c.brand : c.secondary} />
-        </ToolButton>
-        <View style={p.divider} />
-        <ToolButton label="撤销" onPress={() => setUndoToken((value) => value + 1)}>
-          <Undo2 size={17} color={c.secondary} />
-        </ToolButton>
-        <ToolButton label="重做" onPress={() => setRedoToken((value) => value + 1)}>
-          <Redo2 size={17} color={c.secondary} />
-        </ToolButton>
-        <View style={p.divider} />
-        <ToolButton label="缩小" onPress={() => setZoomStep((value) => value - 1)}>
-          <Minus size={17} color={c.secondary} />
-        </ToolButton>
-        <ToolButton label="放大" onPress={() => setZoomStep((value) => value + 1)}>
-          <Plus size={17} color={c.secondary} />
-        </ToolButton>
-        <Text style={p.status}>
-          {cloudConfirmed
-            ? `${strokeCount} 笔 · 已保存到云端`
-            : syncError
-              ? `${strokeCount} 笔 · ${syncError}`
-              : localProtected
-                ? `${strokeCount} 笔 · 本机已保护 · 正在同步`
-                : strokeCount
-                  ? `${strokeCount} 笔 · 正在保护`
-                  : "Pencil 输入 · 等待笔迹"}
-        </Text>
-      </View>
       {error ? (
         <View style={p.message}>
           <Text style={p.error}>{error}</Text>
@@ -340,12 +283,12 @@ export default function NativePdfReader({
           allowsFingerDrawing={false}
           annotationMode
           displayMode="continuous"
-          selectedTool={tool}
+          selectedTool={tools.tool}
           selectedColor="#5850cf"
           currentPage={page}
-          zoomStep={zoomStep}
-          undoToken={undoToken}
-          redoToken={redoToken}
+          zoomStep={tools.zoomStep}
+          undoToken={tools.undoToken}
+          redoToken={tools.redoToken}
           onPageChanged={({ nativeEvent }) => {
             setPage(nativeEvent.page);
             setPageCount(nativeEvent.pageCount);
@@ -363,33 +306,12 @@ export default function NativePdfReader({
               syncSnapshotWithRetry(nativeEvent),
             );
           }}
+          onToolToggled={({ nativeEvent }) => {
+            tools.setTool(nativeEvent.tool);
+          }}
         />
       )}
     </View>
-  );
-}
-
-function ToolButton({
-  label,
-  active = false,
-  onPress,
-  children,
-}: {
-  label: string;
-  active?: boolean;
-  onPress: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={[p.tool, active && p.toolActive]}
-    >
-      {children}
-    </Pressable>
   );
 }
 
@@ -397,36 +319,20 @@ const p = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#e9e9ec" },
   hidden: { display: "none" },
   header: {
-    minHeight: 58,
+    minHeight: 44,
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 4,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
     borderBottomWidth: 1,
     borderBottomColor: c.line,
     backgroundColor: "#fcfcfd",
     gap: 10,
   },
-  titleGroup: { flex: 1, minWidth: 0, gap: 2 },
-  title: { fontSize: 13, fontWeight: "600", color: c.ink },
-  subtitle: { fontSize: 11, color: c.muted },
   pageControls: { flexDirection: "row", alignItems: "center", gap: 2 },
   pageLabel: { minWidth: 52, textAlign: "center", color: c.secondary, fontSize: 12 },
-  icon: { width: 38, height: 38, justifyContent: "center", alignItems: "center", borderRadius: 8 },
-  toolbar: {
-    minHeight: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    gap: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: c.line,
-    backgroundColor: "#fcfcfd",
-  },
-  tool: { width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 8 },
-  toolActive: { backgroundColor: c.purple },
-  divider: { width: 1, height: 25, backgroundColor: c.line, marginHorizontal: 4 },
-  status: { flex: 1, textAlign: "right", color: c.muted, fontSize: 11 },
+  icon: { width: 36, height: 36, justifyContent: "center", alignItems: "center", borderRadius: 8 },
   disabled: { opacity: 0.3 },
   pdf: { flex: 1 },
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },

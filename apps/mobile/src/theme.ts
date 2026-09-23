@@ -236,6 +236,10 @@ export const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
   },
+  headerInkTools: {
+    flexShrink: 0,
+    marginHorizontal: 4,
+  },
   reading: {
     padding: 26,
     gap: 22,

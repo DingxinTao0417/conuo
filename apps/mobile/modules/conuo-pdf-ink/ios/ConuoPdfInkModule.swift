@@ -38,7 +38,7 @@ public class ConuoPdfInkModule: Module {
     }
 
     View(ConuoPdfInkView.self) {
-      Events("onPageChanged", "onDrawingChanged", "onZoomChanged", "onLocalSnapshot")
+      Events("onPageChanged", "onDrawingChanged", "onZoomChanged", "onLocalSnapshot", "onToolToggled")
 
       Prop("documentUri") { (view: ConuoPdfInkView, uri: String) in
         view.setDocumentUri(uri)

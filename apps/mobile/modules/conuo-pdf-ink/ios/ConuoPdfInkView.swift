@@ -12,6 +12,7 @@ final class ConuoPdfInkView: ExpoView {
   let onDrawingChanged = EventDispatcher()
   let onZoomChanged = EventDispatcher()
   let onLocalSnapshot = EventDispatcher()
+  let onToolToggled = EventDispatcher()
 
   private let pdfView = PDFView()
   private var overlayProvider: ConuoPageOverlayProvider!
@@ -21,6 +22,8 @@ final class ConuoPdfInkView: ExpoView {
   private var pageChangedObserver: NSObjectProtocol?
   private var scaleChangedObserver: NSObjectProtocol?
   private var allowsFingerDrawing = false
+  private var lastInkToolName = "pen"
+  private var pencilInteraction: UIPencilInteraction?
 
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
@@ -42,6 +45,12 @@ final class ConuoPdfInkView: ExpoView {
     pdfView.backgroundColor = UIColor(white: 0.92, alpha: 1)
     pdfView.usePageViewController(false)
     addSubview(pdfView)
+
+    // Apple Pencil double-tap toggles eraser ↔ last pen (custom tool bar, not PKToolPicker).
+    let interaction = UIPencilInteraction()
+    interaction.delegate = self
+    addInteraction(interaction)
+    pencilInteraction = interaction
 
     pageChangedObserver = NotificationCenter.default.addObserver(
       forName: Notification.Name.PDFViewPageChanged,
@@ -114,6 +123,9 @@ final class ConuoPdfInkView: ExpoView {
   }
 
   func setSelectedTool(_ name: String) {
+    if name != "eraser" {
+      lastInkToolName = name
+    }
     overlayProvider.selectedToolName = name
     overlayProvider.applySelectedTool()
   }
@@ -515,6 +527,21 @@ private final class ConuoPageOverlayProvider: NSObject, PDFPageOverlayViewProvid
     default:
       return PKInkingTool(.pen, color: selectedColor, width: 2)
     }
+  }
+}
+
+extension ConuoPdfInkView: UIPencilInteractionDelegate {
+  func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
+    let current = overlayProvider.selectedToolName
+    let next: String
+    if current == "eraser" {
+      next = lastInkToolName == "eraser" ? "pen" : lastInkToolName
+    } else {
+      lastInkToolName = current
+      next = "eraser"
+    }
+    setSelectedTool(next)
+    onToolToggled(["tool": next])
   }
 }
 

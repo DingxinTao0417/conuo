@@ -38,6 +38,7 @@ export type SourceReaderProps = {
   source: Source;
   /** Account-isolated namespace used by the native PDF ink recovery layer. */
   inkNamespace?: string;
+  tools?: import("./PdfInkToolbar").PdfInkToolsState;
   highlight: string | null;
   /** Increments when the same citation is selected again. */
   highlightRequest?: number;
@@ -61,6 +62,7 @@ export function SourceReader(props: SourceReaderProps) {
         inkNamespace={props.inkNamespace}
         visible={props.visible}
         wide={props.wide}
+        tools={props.tools!}
         onReadingMove={props.onReadingMove}
         onOpenOriginal={props.onOpenOriginal}
       />
