@@ -5,7 +5,7 @@
 | 项        | 值                                    |
 | --------- | ------------------------------------- |
 | 分支      | `feat/ai-enhancement`（本地，未推送） |
-| 下一个 WP | WP-19                                 |
+| 下一个 WP | WP-20                                 |
 | 当前阶段  | 阶段 1 待评审；阶段 2 进行中          |
 | 更新日期  | 2026-09-24                            |
 
@@ -31,8 +31,8 @@
 | 14   | WP-15        | 完成     | `b7de8ae`、`8fd9d83`                                  | Web 279 个测试文件／4412 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过；仓库级 format:check 被既有 `._*` AppleDouble 文件阻断             | PDF 书签与导入标题目录、版本级派生表与 API、问答 `sectionPath`；真实 PDF 云端浏览器验收未运行                                  |
 | 15   | WP-16        | 待评审   | `09f2f13`、`62562b6`                                                 | Web 284 个测试文件／4427 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过；仓库级 format:check 被既有 36 个 `._*` AppleDouble 文件阻断 | 分层摘要、每日章节额度、版本级缓存、问答 summary grounding 与资料详情入口已完成；WP-02 summary 类别真实模型前后覆盖数字待人工记录 |
 | 16   | WP-17        | 阻塞     | `c29d199`                                               | Web 定向整理回归 185 项通过；Web 全量 284 个测试文件／4431 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过；仓库级 format:check 被既有 `._*` 文件影响 | 代码已完成摘要导航、代表性原文证据、24 段／36,000 字符高预算边界与时间戳指纹；但 WP-16 迁移撤销了 `source_version_summaries` 对 `service_role` 的表权限，和 WP-17 要求 worker 直接查询冲突；需人工决定授权方式后再解除阻塞；未打开 staging 摘要开关 |
-| 17   | WP-18        | 完成     | `94b88f4`                                               | Web 定向 151 项通过；全量 284 个测试文件／4436 项通过、1 项跳过（4438 项中 2 项跳过）；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过；仓库级 format:check 被既有 `._*` AppleDouble 文件阻断 | 默认关闭 `CONUO_FEATURE_KNOWLEDGE_NAVIGATION`；accepted 知识页最多 3 页／6 条当前原文引用进入 targeted/summary grounding；草稿、跨空间、旧版本与正文均被隔离；下一项 WP-19 |
-| 18   | WP-19        | 未开始   |                                                       |                                                                                                                                                                                                  |                                                                                                                                |
+| 17   | WP-18        | 完成     | `94b88f4`                                               | Web 定向 151 项通过；全量 284 个测试文件／4436 项通过、1 项跳过（4438 项中 2 项跳过）；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过；仓库级 format:check 被既有 `._*` AppleDouble 文件阻断 | 默认关闭 `CONUO_FEATURE_KNOWLEDGE_NAVIGATION`；accepted 知识页最多 3 页／6 条当前原文引用进入 targeted/summary grounding；草稿、跨空间、旧版本与正文均被隔离；下一项 WP-20 |
+| 18   | WP-19        | 完成     | `8917df5`                                               | Web 289 个测试文件／4450 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 改动文件 Prettier 定向检查通过；仓库级 format:check 被既有 `._*` AppleDouble 文件阻断 | `glossary-v1` 术语表 RPC、模型建议不自动保存、当前原文 chunkRefs、问答别名扩展与指纹、阅读器首次命中、学习路径拓扑排序；真实模型与 staging 评审待人工；下一项 WP-20 |
 | 19   | WP-20        | 未开始   |                                                       |                                                                                                                                                                                                  | 不改 PRD（DEC-12）                                                                                                             |
 | 20   | WP-21        | 未开始   |                                                       |                                                                                                                                                                                                  | 本轮只做 21-1～21-3；21-1 完成后标待评审                                                                                       |
 | 21   | WP-22        | 未开始   |                                                       |                                                                                                                                                                                                  |                                                                                                                                |
@@ -53,8 +53,8 @@
 | 阶段   | 状态                           | 记录                                                                                              |
 | ------ | ------------------------------ | ------------------------------------------------------------------------------------------------- |
 | 阶段 0 | 完成                           | 离线检索评测通过；`grounding-v7` 基线总体及 15 类均为 1.0，`isolation` 100%，`single-late` 1.0    |
-| 阶段 1 | 进行中                         | WP-11-A、WP-11-B、WP-11-C、WP-11-D、WP-08 已完成；WP-14、WP-13、WP-16 待评审；WP-17 阻塞；WP-15 已完成；下一项 WP-19 |
-| 阶段 2 | 进行中                         | WP-15、WP-16 代码完成待评审；WP-17 阻塞；WP-18 已完成；下一项 WP-19                                                   |
+| 阶段 1 | 进行中                         | WP-11-A、WP-11-B、WP-11-C、WP-11-D、WP-08 已完成；WP-14、WP-13、WP-16 待评审；WP-17 阻塞；WP-15 已完成；下一项 WP-20 |
+| 阶段 2 | 进行中                         | WP-15、WP-16 代码完成待评审；WP-17 阻塞；WP-18、WP-19 已完成；下一项 WP-20                                                   |
 | 阶段 3 | 本轮不做 21-4 起，不跑完整门槛 | DEC-04                                                                                            |
 | 阶段 4 | 未开始                         |                                                                                                   |
 | 阶段 5 | 本轮只做 WP-31                 | DEC-08                                                                                            |
@@ -155,6 +155,8 @@
 
 - 2026-09-24：完成 WP-18 本地实现。`CONUO_FEATURE_KNOWLEDGE_NAVIGATION` 默认关闭；开启后问答只在 `space`、`sources`、`document` 范围搜索前 20 个知识页候选，取前 3 个 accepted 且未删除、属于当前空间的知识页，再把最多 6 条仍绑定当前资料版本的原文引用加入 targeted/summary grounding。知识页正文不会进入提示词；草稿、跨空间、旧版本与不在 selectedSources 的引用均被丢弃。请求指纹加入导航引用签名，AI trace 记录导航引用数；定向 151 项通过，R-15 全量结果见 WP-18 状态行。未打开 staging 开关、未执行远程迁移／operations 脚本、部署或真实模型评测；下一项为 WP-19。
 
+- 2026-09-24：完成 WP-19 本地实现（代码提交 `8917df5`）。新增 `space_glossary_terms` 及 authenticated owner-scoped RPC；`glossary-v1` 建议接口用 `buildGrounding` 的当前原文证据生成 5–20 个术语，结果只进入账本、不自动保存，用户接受或编辑后才 upsert。阅读器规范化文字版只标记每个 accepted 术语或别名的首次出现，定义卡片提供当前版本原文引用入口；问答在 `answerRetrievalQuery` 后追加匹配术语的其他别名并把更新时间签名加入指纹。空间概览新增仅在存在 prerequisite 关系时显示的 Kahn 学习路径，环按最早创建知识页断开并标记。WP19 定向 14 项通过；R-15 全量 289 个测试文件／4450 项通过、2 项跳过，typecheck 通过，lint 0 错误并保留 1 条既有 `_result` 警告；仓库级 `format:check` 仍被既有 `._*` AppleDouble 文件阻断。真实模型术语质量、用户接受流程和 staging 评审待人工；未打开 staging、未执行远程迁移／operations 脚本、部署或供应商调用；下一项为 WP-20。
+
 ## WP-16 自查
 
 - [x] 摘要表、任务表和每日额度表按 owner／资料／不可变版本隔离，启用 RLS、撤销直接权限；资格与租约写入使用既有 `PT409` 冲突契约，版本删除级联清理摘要。
@@ -177,6 +179,14 @@
 - [x] 只对 `space`、`sources`、`document` 范围取前 20 个知识页候选，再限制前 3 个 accepted、未删除且属于当前空间的页面；收件箱、草稿、跨空间和旧版本均不进入导航。
 - [x] 每个知识页只贡献当前 selectedSources 内、`resolveCitation` 成功的原文引用，最多 6 条；grounding 只使用 canonical 原文，知识页正文不会进入模型消息。
 - [x] 导航引用签名进入请求指纹，trace 记录 `navigationCount`；已覆盖 targeted/summary 顺序、过滤、指纹变化、trace 和功能开关关闭回归；未打开 staging、未执行远程操作或真实模型调用。
+
+## WP-19 自查
+
+- [x] `space_glossary_terms` 仅通过 `list_glossary_terms`、`upsert_glossary_term`、`delete_glossary_term` RPC 读写；表启用 RLS、撤销直接权限，定义引用只接受当前资料版本中仍存在的原文切块，空间删除级联清理。
+- [x] `glossary-v1` 严格限制术语、别名、定义和 1–3 个 evidence ID；提示词把资料标题和正文标为不可信数据；模型建议先预占 `ai_requests`，缓存复用，结果不自动保存，用户接受或编辑后再写入术语表。
+- [x] 问答只读取 accepted 术语，在 `answerRetrievalQuery` 后追加未命中的别名，限制 4,000 字符并把匹配术语更新时间加入指纹；阅读器跳过 PDF 画布，只处理规范化文字版，并为失效版本引用显示变化提示。
+- [x] 学习路径只使用当前空间未删除知识页和未删除 prerequisite 关系；Kahn 排序遇环按最早创建时间节点断开并标记；无前置关系时不渲染空状态。已覆盖线性链、多前置、环和无关系测试；未打开 staging、未执行远程迁移或真实模型调用。
+- [ ] 待人工用真实模型抽查术语建议的原文支持和定义质量，确认逐项接受／编辑／忽略流程及 staging 阅读器显示；WP-17 的 service_role 摘要权限冲突仍保持阻塞。
 
 ## WP-11-D 自查
 

@@ -4,6 +4,14 @@
 
 本项目已有可运行的 Web 工作台，支持导入、阅读与版本历史、笔记与知识审核、普通搜索、原始资料问答、PDF 区域截图学习及个人 ZIP 备份恢复。当前已使用自编 QA 资料完成真实 DeepSeek 问答、回答另存笔记、截图解读／提问／出题、资料分析、跨资料主题生成与人工接受，并确认相关笔记和知识正文的云端保存及刷新恢复；知识页也已基于固定原始依据收到流式问答成功终态，知识页正文本身不充当证据。2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级资料整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、六条主要业务冲突接口，以及孤立上传、带数据历史版本、资料、Storage 和账号 Auth 删除主链路均已通过；一次性 signup/recovery token 的确认与密码更新、真实等待后的过期 signup token、受控邮箱的真实注册确认邮件及同浏览器 PKCE、Chrome／Edge 跨一小时持久会话自动刷新也已通过。三条清理 Cron 已在未手工调用 cleanup API 的情况下达到主自然调度预期终态；被遗弃租约和可重试故障的韧性阶段仍待下一次自然调度。项目所有者于 `2026-09-21` 确认物理双设备同步矩阵及真实找回密码邮件的同浏览器完整链路均无异常；跨浏览器邮件点击仍待验收。原生产数据库未升级，生产网页代码与 schema 仍可能不一致。本轮已提交并推送 `staging`；可变域名的当前版本由 `/api/health` 返回 Vercel 环境、Git 分支和完整 SHA，首次探针验证为 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。 **完整 M0 仍未验收。**
 
+## AI 增强 WP-19（2026-09-24，本地）
+
+- 范围：新增 `space_glossary_terms` 迁移和 owner-scoped authenticated RPC；新增 `glossary-v1` 建议路由，复用当前原文 grounding 生成 5–20 个术语，建议进入请求账本但不自动保存，用户接受或编辑后再写入；问答在原始检索查询后追加 accepted 术语的其他别名并加入更新时间指纹。
+- 阅读与学习路径：规范化文字版阅读器对 accepted 术语或别名的首次出现加下划线，定义卡片提供当前版本原文引用入口并提示失效版本；空间概览按 prerequisite 关系执行 Kahn 排序，环按最早创建知识页断开并标记，无关系时不显示空区。
+- 安全边界：术语定义的 `chunkRefs` 只允许当前资料版本的原文切块；表直接权限撤销，读写经过 RPC；提示词把标题与正文视为不可信数据，最终引用仍绑定原文。PDF 画布不处理术语标记。
+- 测试：WP19 定向 14 项通过；R-15 全量 289 个测试文件／4450 项通过、2 项跳过，typecheck 通过，lint 0 错误并保留 1 条既有 `_result` 警告；仓库级 `format:check` 被既有 `._*` AppleDouble 文件阻断，WP19 改动文件定向格式检查通过。
+- 未验收边界：真实模型术语质量、用户逐项接受流程及 staging 阅读器显示仍待人工评审；未打开 staging 开关，未执行远程迁移、operations 脚本、部署或供应商调用。
+
 ## AI 增强 WP-18（2026-09-24，本地）
 
 - 范围：开启 `CONUO_FEATURE_KNOWLEDGE_NAVIGATION` 后，问答在 `space`、`sources`、`document` 范围从前 20 个知识页候选中取前 3 个 accepted 页面，并最多加入 6 条仍属于当前 selectedSources、当前版本且能由 `resolveCitation` 核验的原文切块。
