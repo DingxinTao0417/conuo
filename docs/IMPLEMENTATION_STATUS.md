@@ -6,6 +6,13 @@
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
 
+## AI 增强 WP-11-B（2026-09-23，本地）
+
+- 范围：在 `CONUO_FEATURE_QUERY_REWRITE=on` 且触发连续追问或跨文字体系条件时，用 `fast` 档位把问题改写为独立查询；改写结果与最多两个备用查询分别检索，再用 RRF 去重合并。改写失败或超时 10 秒时回退到既有 `answerRetrievalQuery`。
+- 账本与缓存：改写前预占一次请求账本，回答继续复用同一预占；缓存命中在改写前返回，避免重复模型调用。改写合同为 `rewrite-v1`，trace 记录 `rewrite`。
+- 测试：WP-11-B 定向测试 3 个文件／61 项通过；R-15 全量 Web 测试 271 个文件／4370 项通过、2 项跳过；typecheck 通过；lint 0 错误、保留 1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过。
+- 未验收边界：未打开 staging 开关，未运行真实模型评测、供应商调用、部署或远程数据库操作；仓库级 `format:check` 被既有 36 个 `._*` AppleDouble 文件阻断。
+
 ## AI 增强 WP-11-A（2026-09-23，本地）
 
 - 范围：定向问题的证据组装支持可选邻段扩展；开启 NEIGHBOR_EXPANSION 时为排名最高的最多 4 个命中补充同一资料前后各 1 段，并保留既有范围、版本、引用和上下文预算约束。
