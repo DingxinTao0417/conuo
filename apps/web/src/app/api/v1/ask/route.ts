@@ -470,15 +470,22 @@ export async function POST(request: Request) {
           .slice(0, 12);
         const coverageNotices = sourceCoverageNotices(searchData.sources);
         const coverage = coverageNotices.length ? `\n\n${coverageNotices.join(" ")}` : "";
-        const noteEvidence = citations.length
+        // Cross-language questions can miss the lexical index. Fall back to a
+        // bounded document sample so the model (or extractive quotes) still has
+        // canonical evidence instead of a permanent empty hit.
+        let extractiveCitations = citations;
+        if (!extractiveCitations.length) {
+          extractiveCitations = buildGrounding(initial, question).evidence.slice(0, 6);
+        }
+        const noteEvidence = extractiveCitations.length
           ? selectedDocumentNoteEvidence(initial, question)
           : [];
         const retrieved = {
           mode: "extractive" as const,
-          citations,
+          citations: extractiveCitations,
           ...(noteEvidence.length ? { noteEvidence } : {}),
-          content: citations.length
-            ? `以下是相关原文摘录，使用${searchMode === "semantic" ? "关键词与语义" : "关键词"}检索，未生成答案。\n\n${citations
+          content: extractiveCitations.length
+            ? `以下是相关原文摘录，使用${searchMode === "semantic" ? "关键词与语义" : "关键词"}检索，未生成答案。\n\n${extractiveCitations
                 .map(
                   (citation, index) =>
                     `**${extractiveCitationMarker(index)}**\n\n${citation.quote

@@ -64,8 +64,15 @@ describe("bounded model grounding", () => {
   });
   it("does not broaden ordinary unmatched questions into unrelated source content", () => {
     const { data, question } = fixture();
-    question.question = "tropical hurricane pressure";
+    question.question = "香蕉苹果葡萄";
     expect(buildGrounding(data, question).evidence).toEqual([]);
+  });
+
+  it("samples the document when a Chinese question targets Latin source text", () => {
+    const { data, question } = fixture();
+    setText(data, 0, "Definition. Two vectors are orthogonal if their dot product is zero.");
+    question.question = "这份资料的核心观点是什么？";
+    expect(buildGrounding(data, question).evidence.length).toBeGreaterThan(0);
   });
   it.each(["global", "source", "deleted", "archived", "unknown", "old-index"])(
     "excludes unusable context: %s",

@@ -234,7 +234,12 @@ export function indexedCitations(
       (c) =>
         c.id === candidate.blockId && c.sourceId === source.id && c.versionId === source.versionId,
     );
-    if (!source || !chunk || isHeadingOnly(source, chunk) || !source.text.includes(chunk.text))
+    if (
+      !source ||
+      !chunk ||
+      isHeadingOnly(source, chunk) ||
+      !(source.text.includes(chunk.text) || source.text.replace(/\s+/g, "").includes(chunk.text.replace(/\s+/g, "")))
+    )
       continue;
     const key = `${source.id}:${chunk.id}`;
     if (seen.has(key)) continue;

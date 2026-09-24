@@ -23,8 +23,18 @@ const MAX_CONTEXT_CHARS = 24_000;
 const MAX_CHUNK_CHARS = 8_000;
 export const GROUNDING_CONTRACT_VERSION = "grounding-v6";
 const broadQuestion =
-  /总结|概括|梳理|要点|主要内容|比较|对比|异同|summari[sz]e|summary|overview|compare|comparison|key points/i;
+  /总结|概括|梳理|要点|核心观点|主要(内容|观点|概念)|比较|对比|异同|解释|概念|例子|举例|为什么|怎么|summari[sz]e|summary|overview|compare|comparison|key points|explain|example/i;
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
+const compact = (value: string) => value.replace(/\s+/g, "");
+const hasHan = (value: string) => /[\u3400-\u9fff]/.test(value);
+
+/** Chinese questions on English PDFs (and the reverse) miss lexical search. */
+function isCrossScriptQuestion(question: string, sources: Source[]): boolean {
+  const questionHan = hasHan(question);
+  const body = sources.map((source) => source.text.slice(0, 4_000)).join("\n");
+  const sourceHan = hasHan(body);
+  return questionHan !== sourceHan && body.trim().length > 0;
+}
 const quantifiedRatingScore = String.raw`(?:\d{1,3}(?:\.\d+)?\s*(?:%|％)|\d{1,3}(?:\.\d+)?\s*percent(?:age)?s?\b|百分之\s*(?:\d+(?:\.\d+)?|[零〇一二三四五六七八九十百]+)|\d+(?:\.\d+)?\s*(?:\/|out\s+of)\s*(?:10|100)|\b(?:0(?:\.\d+)?|1(?:\.0+)?)\b)`;
 const chineseAnswerTarget = String.raw`(?:本|此|这个|该|上述|以上|我的|我们的)(?:回答|答案|回复|答复|结论|判断|分析|解释|说法|陈述)`;
 const englishAnswerTarget = String.raw`(?:(?:this|my|our|the\s+above)\s+(?:answer|response|reply|conclusion|analysis|assessment|explanation|judg(?:e)?ment|claim))`;
@@ -123,7 +133,8 @@ export function buildGrounding(
           chunk.versionId === source.versionId &&
           chunk.text.trim() &&
           !isHeadingOnly(source, chunk) &&
-          normalize(source.text).includes(normalize(chunk.text)),
+          (normalize(source.text).includes(normalize(chunk.text)) ||
+            compact(source.text).includes(compact(chunk.text))),
       )
       .sort((a, b) => a.order - b.order)
       .map((chunk): Citation => ({
@@ -137,7 +148,6 @@ export function buildGrounding(
       })),
   );
   const candidateCount = queues.reduce((sum, list) => sum + list.length, 0);
-  const useOverview = broadQuestion.test(request.question) || request.scope === "selection";
   let candidates: Citation[] = fallback.citations.filter((item) =>
     queues.some((queue) =>
       queue.some(
@@ -148,6 +158,16 @@ export function buildGrounding(
       ),
     ),
   );
+  // Cross-language questions (e.g. Chinese on an English PDF) often miss the
+  // keyword index entirely. Sample the document instead of returning “no evidence”.
+  // Unrelated same-language questions still stay empty.
+  const useOverview =
+    broadQuestion.test(request.question) ||
+    request.scope === "selection" ||
+    (!candidates.length &&
+      !isCrossLibraryAnswerRequest(request) &&
+      request.scope !== "space" &&
+      isCrossScriptQuestion(request.question, sources));
   if (useOverview) {
     // Round-robin prevents the first document from consuming the whole context.
     candidates = [];
