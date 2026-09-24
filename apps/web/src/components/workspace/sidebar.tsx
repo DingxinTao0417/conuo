@@ -1,6 +1,8 @@
 "use client";
 import Image from "next/image";
-import { ChevronRight, FileText, Inbox, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronRight, FileText, Inbox, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { getLearningQueue } from "@/lib/cloud";
 import type { Note, Source, WorkspaceData } from "@/lib/types";
 import { sections, type Section } from "./navigation";
 import type { WorkspaceUser } from "./types";
@@ -44,6 +46,28 @@ export default function WorkspaceSidebar({
   openSpaceCreation,
   openAccountSettings,
 }: WorkspaceSidebarProps) {
+  const [reviewDueCount, setReviewDueCount] = useState(0);
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_CONUO_FEATURE_LEARNING !== "on" || !user?.id) {
+      return;
+    }
+    let active = true;
+    const spaceIds =
+      spaceId === "all"
+        ? data.spaces.filter((space) => !space.archived).map((space) => space.id)
+        : [spaceId];
+    void Promise.all(spaceIds.map((id) => getLearningQueue(id, user.id, 100)))
+      .then((batches) => {
+        if (active) setReviewDueCount(batches.reduce((total, batch) => total + batch.length, 0));
+      })
+      .catch(() => {
+        if (active) setReviewDueCount(0);
+      });
+    return () => {
+      active = false;
+    };
+  }, [data.spaces, spaceId, user?.id]);
+
   return (
     <>
       {sidebar && (
@@ -82,6 +106,19 @@ export default function WorkspaceSidebar({
             </button>
           ))}
         </nav>
+        {process.env.NEXT_PUBLIC_CONUO_FEATURE_LEARNING === "on" && (
+          <button
+            className={`nav-item ${section === "review" ? "active" : ""}`}
+            aria-current={section === "review" ? "page" : undefined}
+            aria-label="复习"
+            title="复习"
+            onClick={() => navigate("review")}
+          >
+            <RotateCcw size={17} />
+            <span className="nav-item-label">复习</span>
+            {reviewDueCount > 0 && <span className="nav-count">{reviewDueCount}</span>}
+          </button>
+        )}
         {pinnedSources.length > 0 && (
           <section className="pinned-source-section" aria-labelledby="pinned-source-title">
             <div className="nav-heading">

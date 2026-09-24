@@ -8,6 +8,7 @@ import AiPane from "./ai-pane";
 import ReadingPane from "./reading-pane";
 import SpacesPane from "./spaces-pane";
 import StoragePane from "./storage-pane";
+import LearningPane from "./learning-pane";
 
 export type SettingsSectionProps = {
   data: WorkspaceData;
@@ -58,6 +59,9 @@ export default function SettingsSection({
   openSpaceCreation,
   chooseSpace,
 }: SettingsSectionProps) {
+  const visibleSettingsPanes = settingsPanes.filter(
+    ([pane]) => pane !== "learning" || process.env.NEXT_PUBLIC_CONUO_FEATURE_LEARNING === "on",
+  );
   return (
     <>
       <div className="page-heading">
@@ -68,7 +72,7 @@ export default function SettingsSection({
         </div>
       </div>
       <nav className="settings-panes" aria-label="设置分组">
-        {settingsPanes.map(([pane, label]) => (
+        {visibleSettingsPanes.map(([pane, label]) => (
           <button
             key={pane}
             type="button"
@@ -120,6 +124,7 @@ export default function SettingsSection({
           chooseSpace={chooseSpace}
         />
       )}
+      {settingsPane === "learning" && <LearningPane user={user} />}
     </>
   );
 }

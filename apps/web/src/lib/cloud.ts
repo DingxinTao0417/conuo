@@ -50,6 +50,14 @@ import {
 import type { OnAnswerProgress } from "./answer-stream-types";
 import { aiRequestUsageSchema, notifyAiUsageChanged } from "./ai-request-usage";
 import { observeAccountDeletionFailure } from "./account-deletion-observer";
+import { citationSchema } from "./citation-schema";
+import {
+  learningIdSchema,
+  learningItemSchema,
+  learningSettingsSchema,
+  reviewRequestSchema,
+} from "./learning/schema";
+import type { LearningItem } from "./learning/types";
 
 export type CloudUser = { id: string; email: string };
 export class CloudError extends Error {
@@ -279,6 +287,164 @@ export async function saveCloudWorkspace(
       502,
       "INVALID_WORKSPACE_SAVE_RESPONSE",
     );
+  return parsed.data;
+}
+
+const learningItemResponseSchema = learningItemSchema
+  .extend({
+    createdAt: z.string().datetime({ offset: true }).optional(),
+    updatedAt: z.string().datetime({ offset: true }).optional(),
+    deletedAt: z.string().datetime({ offset: true }).nullable().optional(),
+    card: z.record(z.string(), z.unknown()).nullable().optional(),
+    dueAt: z.string().datetime({ offset: true }).nullable().optional(),
+    version: z.number().int().min(0).nullable().optional(),
+    reps: z.number().int().min(0).nullable().optional(),
+    lapses: z.number().int().min(0).nullable().optional(),
+    lastReviewAt: z.string().datetime({ offset: true }).nullable().optional(),
+  })
+  .strict();
+const learningQueueResponseSchema = z
+  .object({ items: z.array(learningItemResponseSchema) })
+  .strict();
+const learningGradeResponseSchema = z
+  .object({
+    verdict: z.enum(["correct", "partial", "incorrect", "cannot_judge"]),
+    covered: z.array(z.number().int().min(0)).max(12),
+    missing: z.array(z.number().int().min(0)).max(12),
+    misconceptions: z
+      .array(
+        z
+          .object({
+            text: z.string().trim().min(1).max(300),
+            citations: z.array(citationSchema).max(3),
+          })
+          .strict(),
+      )
+      .max(3),
+    feedback: z.string().trim().min(1).max(800),
+    evidence: z.array(citationSchema).max(6),
+  })
+  .strict();
+const learningGradeRequestSchema = z
+  .object({
+    requestId: learningIdSchema,
+    itemId: learningIdSchema,
+    answer: z.string().trim().min(1).max(4_000),
+  })
+  .strict();
+
+export type LearningGradeResult = z.infer<typeof learningGradeResponseSchema>;
+export type LearningSettings = z.infer<typeof learningSettingsSchema>;
+export type LearningReviewInput = z.infer<typeof reviewRequestSchema>;
+
+function learningRequestId(value: string, message: string) {
+  const parsed = learningIdSchema.safeParse(value);
+  if (!parsed.success) throw new CloudError(message, 400, "INVALID_LEARNING_REQUEST");
+  return parsed.data;
+}
+
+function parseLearningItemResponse(value: unknown, code: string) {
+  const parsed = learningItemResponseSchema.safeParse(value);
+  if (!parsed.success) throw new CloudError("学习服务返回了无效题目。", 502, code);
+  return parsed.data as LearningItem;
+}
+
+/** Loads the server-selected active cards for one learning space. */
+export async function getLearningQueue(
+  spaceId: string,
+  expectedUserId: string,
+  limit = 100,
+  signal?: AbortSignal,
+): Promise<LearningItem[]> {
+  const id = learningRequestId(spaceId, "学习空间地址无效。");
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+    throw new CloudError("学习队列参数无效。", 400, "INVALID_LEARNING_REQUEST");
+  const result = await cloudRequest<unknown>(
+    `/api/v1/learning/queue?spaceId=${encodeURIComponent(id)}&limit=${limit}`,
+    expectedUserId,
+    { signal },
+  );
+  const parsed = learningQueueResponseSchema.safeParse(result);
+  if (!parsed.success)
+    throw new CloudError(
+      "学习队列返回了无效数据，请稍后刷新。",
+      502,
+      "INVALID_LEARNING_QUEUE_RESPONSE",
+    );
+  return parsed.data.items as LearningItem[];
+}
+
+export async function getLearningSettings(
+  expectedUserId: string,
+  signal?: AbortSignal,
+): Promise<LearningSettings> {
+  const result = await cloudRequest<unknown>("/api/v1/learning/settings", expectedUserId, {
+    signal,
+  });
+  const parsed = learningSettingsSchema.safeParse(result);
+  if (!parsed.success)
+    throw new CloudError(
+      "学习设置返回了无效数据，请稍后重试。",
+      502,
+      "INVALID_LEARNING_SETTINGS_RESPONSE",
+    );
+  return parsed.data;
+}
+
+export async function saveLearningSettings(
+  expectedUserId: string,
+  settings: LearningSettings,
+  signal?: AbortSignal,
+): Promise<LearningSettings> {
+  const input = learningSettingsSchema.safeParse(settings);
+  if (!input.success) throw new CloudError("学习设置格式无效。", 400, "INVALID_LEARNING_REQUEST");
+  const result = await cloudRequest<unknown>("/api/v1/learning/settings", expectedUserId, {
+    method: "PUT",
+    body: JSON.stringify(input.data),
+    signal,
+  });
+  const parsed = learningSettingsSchema.safeParse(result);
+  if (!parsed.success)
+    throw new CloudError(
+      "学习设置保存结果无效，请稍后重试。",
+      502,
+      "INVALID_LEARNING_SETTINGS_RESPONSE",
+    );
+  return parsed.data;
+}
+
+export async function recordLearningReview(
+  expectedUserId: string,
+  input: LearningReviewInput,
+  signal?: AbortSignal,
+): Promise<LearningItem> {
+  const parsedInput = reviewRequestSchema.safeParse(input);
+  if (!parsedInput.success)
+    throw new CloudError("复习记录格式无效。", 400, "INVALID_LEARNING_REQUEST");
+  const result = await cloudRequest<unknown>("/api/v1/learning/reviews", expectedUserId, {
+    method: "POST",
+    body: JSON.stringify(parsedInput.data),
+    signal,
+  });
+  return parseLearningItemResponse(result, "INVALID_LEARNING_REVIEW_RESPONSE");
+}
+
+export async function gradeLearningAnswer(
+  expectedUserId: string,
+  input: { requestId: string; itemId: string; answer: string },
+  signal?: AbortSignal,
+): Promise<LearningGradeResult> {
+  const parsedInput = learningGradeRequestSchema.safeParse(input);
+  if (!parsedInput.success)
+    throw new CloudError("批改请求格式无效。", 400, "INVALID_LEARNING_REQUEST");
+  const result = await cloudRequest<unknown>("/api/v1/learning/grade", expectedUserId, {
+    method: "POST",
+    body: JSON.stringify(parsedInput.data),
+    signal,
+  });
+  const parsed = learningGradeResponseSchema.safeParse(result);
+  if (!parsed.success)
+    throw new CloudError("批改结果格式无效，请稍后重试。", 502, "INVALID_LEARNING_GRADE_RESPONSE");
   return parsed.data;
 }
 

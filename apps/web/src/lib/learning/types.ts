@@ -30,6 +30,10 @@ export interface LearningItem {
   deletedAt?: string | null;
   card?: Record<string, unknown>;
   dueAt?: string;
+  version?: number | null;
+  reps?: number | null;
+  lapses?: number | null;
+  lastReviewAt?: string | null;
 }
 
 export interface ReviewState {

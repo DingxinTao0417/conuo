@@ -9,6 +9,7 @@ export type Section =
   | "organize"
   | "questions"
   | "practice"
+  | "review"
   | "tasks"
   | "trash"
   | "settings";
@@ -20,6 +21,7 @@ export const spaceTabs = [
   ["knowledge", "知识"],
   ["questions", "问答"],
   ["practice", "练习"],
+  ["review", "复习"],
 ] as const;
 export type SpaceTab = (typeof spaceTabs)[number][0];
 
@@ -55,6 +57,7 @@ export const settingsPanes = [
   ["storage", "云端资料与存储"],
   ["reading", "阅读与同步"],
   ["spaces", "学习空间"],
+  ["learning", "学习"],
 ] as const;
 export type SettingsPane = (typeof settingsPanes)[number][0];
 
@@ -70,6 +73,7 @@ export const labels: Record<Section, string> = {
   organize: "AI 整理",
   questions: "我的问答",
   practice: "练习",
+  review: "复习",
   tasks: "任务中心",
   trash: "回收站",
   settings: "账号与设置",

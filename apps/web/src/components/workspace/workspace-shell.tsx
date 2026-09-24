@@ -147,6 +147,7 @@ import LibrarySection from "./sections/library-section";
 import NotesSection from "./sections/notes-section";
 import QuestionsSection from "./sections/questions-section";
 import PracticeSection from "./sections/practice-section";
+import ReviewSection from "./sections/review-section";
 import SettingsSection from "./sections/settings/settings-section";
 import TrashSection from "./sections/trash-section";
 import {
@@ -527,7 +528,9 @@ export default function Workspace({
     !currentSource &&
     !currentNote &&
     !comparisonRoute &&
-    (["home", "library", "knowledge", "questions", "practice"] as Section[]).includes(section),
+    (["home", "library", "knowledge", "questions", "practice", "review"] as Section[]).includes(
+      section,
+    ),
   );
   const libraryTitle = isCollectionHome
     ? "资料库"
@@ -2445,19 +2448,24 @@ export default function Workspace({
               )}
             </div>
             <div className="space-context-tabs" aria-label="当前空间内容">
-              {spaceTabs.map(([tab, label]) => {
-                const active = section === tab;
-                return (
-                  <button
-                    key={tab}
-                    className={active ? "active" : ""}
-                    aria-current={active ? "page" : undefined}
-                    onClick={() => openSpaceTab(tab)}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+              {spaceTabs
+                .filter(
+                  ([tab]) =>
+                    tab !== "review" || process.env.NEXT_PUBLIC_CONUO_FEATURE_LEARNING === "on",
+                )
+                .map(([tab, label]) => {
+                  const active = section === tab;
+                  return (
+                    <button
+                      key={tab}
+                      className={active ? "active" : ""}
+                      aria-current={active ? "page" : undefined}
+                      onClick={() => openSpaceTab(tab)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
             </div>
           </nav>
         )}
@@ -3165,6 +3173,9 @@ export default function Workspace({
             )}
             {section === "practice" && user && (
               <PracticeSection data={data} spaceId={spaceId} user={user} />
+            )}
+            {section === "review" && user && (
+              <ReviewSection data={data} spaceId={spaceId} user={user} openSource={openSource} />
             )}
             {section === "trash" && (
               <TrashSection
