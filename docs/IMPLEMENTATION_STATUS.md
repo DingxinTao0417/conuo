@@ -4,6 +4,13 @@
 
 本项目已有可运行的 Web 工作台，支持导入、阅读与版本历史、笔记与知识审核、普通搜索、原始资料问答、PDF 区域截图学习及个人 ZIP 备份恢复。当前已使用自编 QA 资料完成真实 DeepSeek 问答、回答另存笔记、截图解读／提问／出题、资料分析、跨资料主题生成与人工接受，并确认相关笔记和知识正文的云端保存及刷新恢复；知识页也已基于固定原始依据收到流式问答成功终态，知识页正文本身不充当证据。2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级资料整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、六条主要业务冲突接口，以及孤立上传、带数据历史版本、资料、Storage 和账号 Auth 删除主链路均已通过；一次性 signup/recovery token 的确认与密码更新、真实等待后的过期 signup token、受控邮箱的真实注册确认邮件及同浏览器 PKCE、Chrome／Edge 跨一小时持久会话自动刷新也已通过。三条清理 Cron 已在未手工调用 cleanup API 的情况下达到主自然调度预期终态；被遗弃租约和可重试故障的韧性阶段仍待下一次自然调度。项目所有者于 `2026-09-21` 确认物理双设备同步矩阵及真实找回密码邮件的同浏览器完整链路均无异常；跨浏览器邮件点击仍待验收。原生产数据库未升级，生产网页代码与 schema 仍可能不一致。本轮已提交并推送 `staging`；可变域名的当前版本由 `/api/health` 返回 Vercel 环境、Git 分支和完整 SHA，首次探针验证为 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。 **完整 M0 仍未验收。**
 
+## AI 增强 WP-31（2026-09-24，本地）
+
+- 范围：新增 UTC 当日 `public.ai_token_usage_today` 汇总 RPC，并在新迁移中复制 WP-08 最新 `reserve_ai_request` 定义，增加 `p_daily_token_limit`；4／5 参数旧调用保持兼容，6 参数调用达到 token 上限时返回 `token_limited`。额度由 `CONUO_AI_DAILY_TOKEN_LIMIT` 控制，默认 `0`，最大 100,000,000。
+- Web：将 `token_limited` 映射为手册指定的 `AI_DAILY_TOKEN_LIMIT`，用量 API 与浏览器 schema 返回 prompt／completion token 和上限，设置页显示“近似”用量；新增只读、手动执行的 `supabase/operations/ai-cost-report.sql`，价格保留占位参数。
+- 测试：定向 6 个文件／94 项通过；R-15 全量 Web 307 个测试文件／4527 项通过、2 项跳过；typecheck 通过；lint 0 错误并保留 1 条既有 `_result` 警告；本 WP 变更文件定向 Prettier 通过。仓库级 `format:check` 被既有 36 个 `._*` AppleDouble 文件阻断。
+- 未验收边界：追踪写入和供应商 token 返回是尽力而为，token 额度是近似值；真实供应商抽查、成本价格参数确认和启用额度待人工评审。未执行远程迁移、operations 脚本、部署或真实模型调用。
+
 ## AI 增强 WP-28（2026-09-24，本地）
 
 - 范围：区域视觉服务端合同增加 `grade_work`，语义版本从 `vision-region-v4` 升至 `vision-region-v5`。结果严格包含识别出的印刷题目、最多 20 个手写步骤的转写与 `ok`／`error`／`unclear` 判定、首个错误步骤、总体结论和下一步提示；提示词要求看不清不猜且不写完整解答，图片内容标为不可信数据。
