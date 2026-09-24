@@ -11,6 +11,7 @@ import type {
   AnswerRequest,
   AnswerResult,
   Citation,
+  Source,
   WorkspaceData,
 } from "../types";
 import { ApiError } from "../supabase/api";
