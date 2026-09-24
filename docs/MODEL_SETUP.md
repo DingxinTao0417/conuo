@@ -18,8 +18,10 @@ Conuo 提供服务端 Chat Completions 适配器，供问答、资料整理和 P
 | `CONUO_MODEL_TOKEN_LIMIT_PARAMETER` | 输出 token 上限的字段名：`max_completion_tokens`（默认）或 `max_tokens`。仅按供应商文档选择，程序不会为同一次请求混用或重试两种字段。          |
 | `CONUO_MODEL_THINKING_MODE`         | 可选、仅服务端。空值省略供应商扩展字段；`enabled`／`disabled` 发送 `thinking: {type: ...}`。仅在供应商明确支持该字段时填写，非法值会阻止调用。 |
 | `CONUO_MODEL_STREAM_USAGE`          | 默认 `false`。设为 `true` 时在流式请求中要求供应商发送最终 usage 帧，用于 AI 请求追踪；仅接受 `true`／`false`。                                |
-| `SUPABASE_SECRET_KEY`               | 现有 Supabase 项目的服务端 secret key，用于受限的模型请求与额度账本操作。旧项目可改用 `SUPABASE_SERVICE_ROLE_KEY`，二者只填一个。              |
-| `CONUO_AI_DAILY_REQUEST_LIMIT`      | 每个账号每天可预占的模型请求次数，默认 `50`；允许 `1` 至 `500` 的整数，按 UTC 日期计数。                                                       |
+
+AI 请求追踪默认关闭；开启 `CONUO_FEATURE_AI_TRACES=on` 后只保存请求路由、结果、模型、检索／证据 ID、延迟和 token 计数等 metadata，服务端写入时清理 30 天前记录，不保存问题、提示词、回答或正文。
+| `SUPABASE_SECRET_KEY` | 现有 Supabase 项目的服务端 secret key，用于受限的模型请求与额度账本操作。旧项目可改用 `SUPABASE_SERVICE_ROLE_KEY`，二者只填一个。 |
+| `CONUO_AI_DAILY_REQUEST_LIMIT` | 每个账号每天可预占的模型请求次数，默认 `50`；允许 `1` 至 `500` 的整数，按 UTC 日期计数。 |
 
 三个模型连接字段必须一起填写；只填一部分会明确报告配置未就绪。`CONUO_MODEL_VISION_ENABLED=true` 只是部署者的显式能力声明，不能使文本模型自动支持图片。Supabase 服务端密钥与浏览器使用的 publishable key 不同，**不能使用 `NEXT_PUBLIC_` 前缀，也不要提交 `.env.local` 或把密钥粘贴到聊天中**。普通用户身份仍通过 Supabase Auth 校验，账本所需的服务端权限不替代用户权限检查。
 

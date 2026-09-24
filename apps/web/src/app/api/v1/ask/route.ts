@@ -36,6 +36,7 @@ import type { AnswerRequest, AnswerResult, WorkspaceData } from "@/lib/types";
 import { indexedCitations, indexedSourceCandidates } from "@/lib/server-search";
 import { readEmbeddingConfig } from "@/lib/ai/embeddings";
 import { createTraceRecorder } from "@/lib/ai/traces";
+import { classifyQuestionIntent } from "@/lib/ai/question-intent";
 import {
   answerStreamResponse,
   ANSWER_STREAM_LIMITS,
@@ -541,6 +542,7 @@ export async function POST(request: Request) {
         };
         const config = readModelConfig();
         traceRecorder?.set({
+          intent: classifyQuestionIntent(question.question),
           scope: question.scope,
           searchMode,
           sourceCount: selectedSources(initial, question).length,
@@ -622,7 +624,8 @@ export async function POST(request: Request) {
           traceRecorder?.mark("modelEnd");
           await send?.({ type: "progress", phase: "validating" });
           answer = bindGeneratedAnswer(raw, grounding, { format });
-          traceOutcome = "completed";
+          traceOutcome =
+            answer.mode === "model" && answer.citations.length === 0 ? "insufficient" : "completed";
         }
         await assertAnswer(answer, signal);
         if (reservation) {
