@@ -28,6 +28,7 @@ export default function AiPane({
     <>
       <div className="settings-card">
         <h2>资料与 AI</h2>
+        <p>你提交的反馈只包含评分和原因；只有勾选后才会附上问题和回答。</p>
         <div className="setting-row">
           <div>
             <b>允许 AI 使用我的资料</b>

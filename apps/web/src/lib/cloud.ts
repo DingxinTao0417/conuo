@@ -777,6 +777,60 @@ export async function askCloud(
   }
 }
 
+export type AnswerFeedbackInput = {
+  requestId: string;
+  conversationId?: string;
+  messageId?: string;
+  rating: "up" | "down";
+  reasons: Array<
+    | "wrong_citation"
+    | "not_answered"
+    | "incorrect"
+    | "incomplete"
+    | "format"
+    | "too_long"
+    | "grading_wrong"
+    | "other"
+  >;
+  comment?: string;
+  includeContent: boolean;
+  question?: string;
+  answer?: string;
+};
+
+const answerFeedbackResponseSchema = z
+  .object({ requestId: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/) })
+  .strict();
+
+export async function submitAnswerFeedback(
+  input: AnswerFeedbackInput,
+  expectedUserId: string,
+): Promise<{ requestId: string }> {
+  const result = await cloudRequest<unknown>("/api/v1/ai/feedback", expectedUserId, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  const parsed = answerFeedbackResponseSchema.safeParse(result);
+  if (!parsed.success)
+    throw new CloudError("反馈保存结果格式无效，请稍后重试。", 502, "INVALID_FEEDBACK_RESPONSE");
+  return parsed.data;
+}
+
+export async function withdrawAnswerFeedback(
+  requestId: string,
+  expectedUserId: string,
+): Promise<{ requestId: string }> {
+  const result = await cloudRequest<unknown>(
+    `/api/v1/ai/feedback?requestId=${encodeURIComponent(requestId)}`,
+    expectedUserId,
+    { method: "DELETE" },
+  );
+  const parsed = answerFeedbackResponseSchema.safeParse(result);
+  if (!parsed.success)
+    throw new CloudError("反馈撤回结果格式无效，请稍后重试。", 502, "INVALID_FEEDBACK_RESPONSE");
+  return parsed.data;
+}
+
 export async function searchCloud(
   request: SearchRequest,
   mode: "keyword" | "semantic",

@@ -29,6 +29,7 @@ export interface NoteAskPanelProps {
   onConversationChange: (conversation: Conversation) => void;
   onOpenSource: (sourceId: string, versionId?: string, citation?: Citation) => void;
   onClose: () => void;
+  expectedUserId?: string;
 }
 
 function conversationTitle(note: Note) {
@@ -52,6 +53,7 @@ export default function NoteAskPanel({
   onConversationChange,
   onOpenSource,
   onClose,
+  expectedUserId,
 }: NoteAskPanelProps) {
   const ask = useAskConversation();
   const evidence = useMemo(() => resolveKnowledgePageOriginalEvidence(data, note), [data, note]);
@@ -181,6 +183,7 @@ export default function NoteAskPanel({
   return (
     <AskPanel
       ask={ask}
+      feedbackUserId={expectedUserId}
       surface={{
         id: "note-ask-panel",
         label: "基于原始依据提问",

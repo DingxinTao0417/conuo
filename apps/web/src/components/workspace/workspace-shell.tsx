@@ -2315,6 +2315,7 @@ export default function Workspace({
         }
         onOpenSource={openSource}
         onClose={() => openNotePanel(null)}
+        expectedUserId={user?.id}
       />
     ) : null;
 

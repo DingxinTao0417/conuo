@@ -2350,7 +2350,6 @@ export default function Reader(props: ReaderProps) {
             ref={textContainer}
             onScroll={saveReadingPosition}
           >
-
             {source.kind === "pdf" && !showText ? (
               <PdfReader
                 key={`${source.id}:${source.versionId}`}
@@ -2692,6 +2691,7 @@ export default function Reader(props: ReaderProps) {
             />
             <AskPanel
               ask={askConversation}
+              feedbackUserId={props.cloudUserId}
               surface={{
                 id: "reader-ai-panel",
                 eligibilityId: "reader-ask-eligibility",

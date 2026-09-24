@@ -32,6 +32,7 @@ import {
   noteEvidenceKey,
 } from "../reader/citation-markdown";
 import { EMPTY_NOTE_EVIDENCE, answerPhases } from "../reader/reader-constants";
+import AnswerFeedback from "./answer-feedback";
 import type { AskConversation } from "./use-ask-conversation";
 import "../reader.css";
 
@@ -131,6 +132,8 @@ export interface AskPanelProps {
   evidence: AskPanelEvidence;
   composer: AskPanelComposer;
   answerActions?: AskPanelAnswerActions;
+  /** Verified cloud identity used for answer feedback requests. */
+  feedbackUserId?: string;
   onClose: () => void;
 }
 
@@ -154,6 +157,7 @@ export default function AskPanel({
   evidence,
   composer,
   answerActions,
+  feedbackUserId,
   onClose,
 }: AskPanelProps) {
   const {
@@ -335,6 +339,11 @@ export default function AskPanel({
                   (item) => item.id === message.attempt?.questionMessageId && item.role === "user",
                 )
               : undefined;
+          const feedbackQuestion = message.attempt
+            ? messages.find(
+                (item) => item.id === message.attempt?.questionMessageId && item.role === "user",
+              )?.content
+            : undefined;
           const attemptNumber = message.attempt
             ? messages
                 .slice(0, index + 1)
@@ -449,6 +458,13 @@ export default function AskPanel({
                     当时使用的资料已彻底删除；此回答仅保留为历史记录。
                   </p>
                 )}
+              {message.role === "assistant" && !message.error && (
+                <AnswerFeedback
+                  message={message}
+                  question={feedbackQuestion}
+                  expectedUserId={feedbackUserId}
+                />
+              )}
               {message.role === "assistant" &&
                 (message.citations.length > 0 || messageNoteEvidence.length > 0) && (
                   <div
@@ -764,9 +780,7 @@ export default function AskPanel({
             )}
           </div>
         </div>
-        {surface.footnote ? (
-          <p className="reader-ai-footnote">{surface.footnote}</p>
-        ) : null}
+        {surface.footnote ? <p className="reader-ai-footnote">{surface.footnote}</p> : null}
       </form>
     </aside>
   );
