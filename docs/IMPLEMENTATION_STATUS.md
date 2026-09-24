@@ -6,6 +6,15 @@
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
 
+## AI 增强 WP-09（2026-09-23，本地）
+
+- 范围：问答在 `CONUO_FEATURE_LONG_CONTEXT=on` 且当前档位 `CONTEXT_CHARS > 0` 时，按范围、资料数、版本和规范切块条件把完整资料交给模型；不满足条件时沿用检索布局。
+- 消息与合同：完整布局使用稳定的系统／静态证据／动态问题三条消息，静态证据按阅读顺序固定；选段证据编号与原文引用仍由服务端绑定，`GROUNDING_CONTRACT_VERSION` 升至 `grounding-v9`，请求指纹加入 `layout`。
+- 边界：服务端在发送前用 UTF-8 证据 JSON 做 `MAX_REQUEST_BYTES × 0.8` 预估；超过阈值回退检索布局。模型输出去重后的原文引用超过 12 条会以 `INVALID_MODEL_CITATION` 拒绝保存。
+- 配置：`docs/MODEL_SETUP.md` 已补充 `CONTEXT_CHARS` 估算、请求体预检查、输入 token、延迟与费用影响。未创建密钥，未修改迁移或远程资源。
+- 测试：Web 全量测试 267 个文件／4328 项通过、2 项跳过；typecheck 通过；ESLint 0 错误、保留 1 条既有 `_result` 警告；本 WP 变更文件定向 Prettier 通过。
+- 未验收边界：未运行真实模型评测、供应商调用、部署、staging 开关或远程数据库操作；仓库级 `format:check` 仍被既有 `._*` AppleDouble 文件阻断。
+
 ## AI 增强 WP-07（2026-09-23，本地）
 
 - 范围：模型适配器支持 `default`、`fast`、`reasoning`、`vision` 四档配置，新增输出 token、超时、请求体和上下文字符数边界；新增集中式问答／轻量任务路由。

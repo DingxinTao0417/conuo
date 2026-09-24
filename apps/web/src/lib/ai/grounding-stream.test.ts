@@ -24,6 +24,7 @@ const grounding: Grounding = {
   ],
   noteEvidence: [],
   coverage: "仅覆盖这两个片段。",
+  layout: "retrieval",
   fallback: { mode: "extractive", content: "原文", citations: [] },
 };
 const first = { text: "第一段", evidenceIds: ["e2"], kind: "source" };

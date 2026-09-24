@@ -18,6 +18,7 @@ import { selectAnswerProfile } from "@/lib/ai/model-routing";
 import {
   type AnswerFormat,
   GROUNDING_CONTRACT_VERSION,
+  buildFullDocumentGrounding,
   buildGrounding,
   bindGeneratedAnswer,
   groundingMessages,
@@ -563,7 +564,18 @@ export async function POST(request: Request) {
         }
         traceModelName = config.model;
         traceModelProfile = selectedProfile.profile;
-        const grounding = buildGrounding(initial, question, retrieved);
+        const fullDocument =
+          aiFeatureEnabled("LONG_CONTEXT") && (config.contextChars ?? 0) > 0
+            ? buildFullDocumentGrounding(initial, question, config.contextChars!)
+            : null;
+        const longContext =
+          fullDocument &&
+          new TextEncoder().encode(JSON.stringify(fullDocument.evidence)).length <=
+            (config.maxRequestBytes ?? Number.MAX_SAFE_INTEGER) * 0.8
+            ? fullDocument
+            : null;
+        const grounding = longContext ?? buildGrounding(initial, question, retrieved);
+        if (longContext) traceRecorder?.set({ longContext: true });
         if (!grounding.evidence.length) {
           traceOutcome = "insufficient";
           return grounding.fallback;
@@ -581,6 +593,7 @@ export async function POST(request: Request) {
               config.jsonMode,
               config.thinkingMode ?? null,
               selectedProfile.profile,
+              grounding.layout,
               contextKey,
               searchMode,
               readEmbeddingConfig()?.fingerprint ?? null,

@@ -17,23 +17,29 @@ Conuo 提供服务端 Chat Completions 适配器，供问答、资料整理和 P
 | `CONUO_MODEL_JSON_MODE`             | 默认 `false`。仅确认该模型支持 JSON mode 后设置为 `true`。不接受 `1`、`yes` 等其他值。                                                         |
 | `CONUO_MODEL_TOKEN_LIMIT_PARAMETER` | 输出 token 上限的字段名：`max_completion_tokens`（默认）或 `max_tokens`。仅按供应商文档选择，程序不会为同一次请求混用或重试两种字段。          |
 | `CONUO_MODEL_THINKING_MODE`         | 可选、仅服务端。空值省略供应商扩展字段；`enabled`／`disabled` 发送 `thinking: {type: ...}`。仅在供应商明确支持该字段时填写，非法值会阻止调用。 |
-| `CONUO_MODEL_MAX_OUTPUT_TOKENS`     | 输出 token 上限，整数 256–65536，默认 `4096`。                                                                                                  |
-| `CONUO_MODEL_TIMEOUT_MS`            | 单次模型请求时限，整数 1000–600000，默认 `45000`。                                                                                              |
-| `CONUO_MODEL_MAX_REQUEST_BYTES`     | 模型请求体上限，整数 65536–4194304，默认 `262144`。                                                                                             |
-| `CONUO_MODEL_CONTEXT_CHARS`         | 长上下文预留字符数，整数 0–2000000，默认 `0`；WP-09 接入前不会改变上下文。                                                                      |
+| `CONUO_MODEL_MAX_OUTPUT_TOKENS`     | 输出 token 上限，整数 256–65536，默认 `4096`。                                                                                                 |
+| `CONUO_MODEL_TIMEOUT_MS`            | 单次模型请求时限，整数 1000–600000，默认 `45000`。                                                                                             |
+| `CONUO_MODEL_MAX_REQUEST_BYTES`     | 模型请求体上限，整数 65536–4194304，默认 `262144`。                                                                                            |
+| `CONUO_MODEL_CONTEXT_CHARS`         | 长上下文预留字符数，整数 0–2000000，默认 `0`；大于 `0` 且开启 `CONUO_FEATURE_LONG_CONTEXT=on` 时，符合范围的完整资料可进入长上下文布局。       |
 | `CONUO_MODEL_STREAM_USAGE`          | 默认 `false`。设为 `true` 时在流式请求中要求供应商发送最终 usage 帧，用于 AI 请求追踪；仅接受 `true`／`false`。                                |
 
 ## 模型档位
 
 普通问答和整理使用 `default` 档位（上表的 `CONUO_MODEL_*` 变量）。轻量任务可配置 `fast`，深度问答可配置 `reasoning`，区域视觉可配置 `vision`。每个专用档位都要同时填写自己的 `BASE_URL`、`API_KEY` 和 `NAME`；其余字段沿用上表规则。专用档位未配置时，`fast` 和 `reasoning` 退回 `default`。视觉专用档位还必须设置 `CONUO_VISION_MODEL_ENABLED=true`；未配置视觉专用档位时，使用 `CONUO_MODEL_VISION_ENABLED` 和 `default` 配置的现有组合。
 
-| 档位 | 变量前缀 | 变量 |
-| --- | --- | --- |
-| `fast` | `CONUO_FAST_MODEL_` | `BASE_URL`、`API_KEY`、`NAME`、`JSON_MODE`、`TOKEN_LIMIT_PARAMETER`、`THINKING_MODE`、`MAX_OUTPUT_TOKENS`、`TIMEOUT_MS`、`MAX_REQUEST_BYTES`、`CONTEXT_CHARS`、`STREAM_USAGE` |
-| `reasoning` | `CONUO_REASONING_MODEL_` | `BASE_URL`、`API_KEY`、`NAME`、`JSON_MODE`、`TOKEN_LIMIT_PARAMETER`、`THINKING_MODE`、`MAX_OUTPUT_TOKENS`、`TIMEOUT_MS`、`MAX_REQUEST_BYTES`、`CONTEXT_CHARS`、`STREAM_USAGE` |
-| `vision` | `CONUO_VISION_MODEL_` | `BASE_URL`、`API_KEY`、`NAME`、`JSON_MODE`、`TOKEN_LIMIT_PARAMETER`、`THINKING_MODE`、`MAX_OUTPUT_TOKENS`、`TIMEOUT_MS`、`MAX_REQUEST_BYTES`、`CONTEXT_CHARS`、`STREAM_USAGE`；另需 `CONUO_VISION_MODEL_ENABLED` |
+| 档位        | 变量前缀                 | 变量                                                                                                                                                                                                             |
+| ----------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fast`      | `CONUO_FAST_MODEL_`      | `BASE_URL`、`API_KEY`、`NAME`、`JSON_MODE`、`TOKEN_LIMIT_PARAMETER`、`THINKING_MODE`、`MAX_OUTPUT_TOKENS`、`TIMEOUT_MS`、`MAX_REQUEST_BYTES`、`CONTEXT_CHARS`、`STREAM_USAGE`                                    |
+| `reasoning` | `CONUO_REASONING_MODEL_` | `BASE_URL`、`API_KEY`、`NAME`、`JSON_MODE`、`TOKEN_LIMIT_PARAMETER`、`THINKING_MODE`、`MAX_OUTPUT_TOKENS`、`TIMEOUT_MS`、`MAX_REQUEST_BYTES`、`CONTEXT_CHARS`、`STREAM_USAGE`                                    |
+| `vision`    | `CONUO_VISION_MODEL_`    | `BASE_URL`、`API_KEY`、`NAME`、`JSON_MODE`、`TOKEN_LIMIT_PARAMETER`、`THINKING_MODE`、`MAX_OUTPUT_TOKENS`、`TIMEOUT_MS`、`MAX_REQUEST_BYTES`、`CONTEXT_CHARS`、`STREAM_USAGE`；另需 `CONUO_VISION_MODEL_ENABLED` |
 
 新增数值字段的范围为：`MAX_OUTPUT_TOKENS` 256–65536（默认 4096），`TIMEOUT_MS` 1000–600000（默认 45000），`MAX_REQUEST_BYTES` 65536–4194304（默认 262144），`CONTEXT_CHARS` 0–2000000（默认 0，供长上下文功能使用）。`CONUO_ORGANIZATION_MODEL_PROFILE` 控制资料整理使用 `default` 或 `fast`，默认 `default`。
+
+### 长上下文估算与费用
+
+`CONTEXT_CHARS` 按规范解析片段的字符总数估算，中文和英文都按 JavaScript 字符计数。先用资料正文与切块结果的实际总量估算，再为系统提示、JSON 字段和回答预留空间；部署初期建议把它设为模型上下文窗口字符容量的约 60%，并通过真实请求逐步校准。`0` 保持检索布局，只有显式打开 `CONUO_FEATURE_LONG_CONTEXT=on` 才会启用完整资料布局。
+
+服务端会在发送前用证据 JSON 的 UTF-8 字节数做预检查，超过 `MAX_REQUEST_BYTES` 的 80% 就回退检索布局。长上下文会把更多原文放进每次请求，通常增加输入 token、延迟和供应商费用；它不会改变每日请求次数账本，也不会自动重试或提高 `MAX_REQUEST_BYTES`。应同时按供应商的上下文窗口、输入 token 价格和请求体上限设置 `CONTEXT_CHARS`。
 
 AI 请求追踪默认关闭；开启 `CONUO_FEATURE_AI_TRACES=on` 后只保存请求路由、结果、模型、检索／证据 ID、延迟和 token 计数等 metadata，服务端写入时清理 30 天前记录，不保存问题、提示词、回答或正文。
 | `SUPABASE_SECRET_KEY` | 现有 Supabase 项目的服务端 secret key，用于受限的模型请求与额度账本操作。旧项目可改用 `SUPABASE_SERVICE_ROLE_KEY`，二者只填一个。 |

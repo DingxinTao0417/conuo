@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { buildGrounding, bindGeneratedAnswer, groundingMessages } from "./grounding";
+import {
+  bindGeneratedAnswer,
+  buildFullDocumentGrounding,
+  buildGrounding,
+  groundingMessages,
+} from "./grounding";
 import { buildOrganizationGrounding } from "./organization";
 import { createDemoWorkspace } from "../seed";
 import { chunkText } from "../import";
 import { retrieveEvidence } from "../retrieval";
-import type { AnswerRequest, Note, WorkspaceData } from "../types";
+import type { AnswerRequest, Note, Source, WorkspaceData } from "../types";
 import type { OrganizationRequest } from "../organization-types";
 
 type AnswerRequestWithUserContext = AnswerRequest & { userContext?: string[] };
@@ -55,6 +60,91 @@ function linkedNote(data: WorkspaceData): Note {
   };
 }
 describe("bounded model grounding", () => {
+  it("builds a complete canonical document grounding within the requested budget", () => {
+    const { data, question } = fixture();
+    setText(data, 0, "第一段资料内容。\n\n第二段资料内容。\n\n第三段资料内容。");
+    const grounding = buildFullDocumentGrounding(data, question, 10_000);
+    expect(grounding).not.toBeNull();
+    expect(grounding).toMatchObject({ layout: "full-document" });
+    expect(grounding?.evidence.map((item) => item.quote)).toEqual(
+      data.sources[0].chunks.map((chunk) => chunk.text),
+    );
+    expect(grounding?.coverage).toContain("依据范围：已提供 1 份资料的全部");
+  });
+
+  it("falls back when full-document evidence exceeds its budget or source cap", () => {
+    const { data, question } = fixture();
+    setText(data, 0, "一".repeat(1_300));
+    expect(buildFullDocumentGrounding(data, question, 10)).toBeNull();
+
+    const source = data.sources[0];
+    const extraSources = [1, 2, 3].map((index) => {
+      const clone: Source = {
+        ...source,
+        id: `extra-source-${index}`,
+        versionId: `extra-version-${index}`,
+        title: `额外资料 ${index}`,
+        chunks: [],
+      };
+      clone.chunks = chunkText(clone.text, clone.id, clone.versionId);
+      return clone;
+    });
+    data.sources = [source, ...extraSources];
+    question.scope = "sources";
+    question.sourceId = undefined;
+    question.sourceIds = data.sources.map((item) => item.id);
+    expect(buildFullDocumentGrounding(data, question, 100_000)).toBeNull();
+  });
+
+  it("requires AI and current canonical versions before using full-document layout", () => {
+    const { data, question } = fixture();
+    data.aiEnabled = false;
+    expect(buildFullDocumentGrounding(data, question, 10_000)).toBeNull();
+
+    data.aiEnabled = true;
+    data.sources[0].versionId = "new-version";
+    expect(buildFullDocumentGrounding(data, question, 10_000)).toBeNull();
+  });
+
+  it("keeps the full-document prompt prefix stable and reports selection evidence IDs", () => {
+    const { data, question } = fixture();
+    setText(data, 0, "第一段资料内容。\n\n第二段资料内容。");
+    const grounding = buildFullDocumentGrounding(data, question, 10_000);
+    expect(grounding).not.toBeNull();
+    const first = groundingMessages(grounding!, question);
+    const followUp = { ...question, question: "第二段讲了什么？" };
+    const second = groundingMessages(grounding!, followUp);
+    expect(first).toHaveLength(3);
+    expect(first[0]).toEqual(second[0]);
+    expect(first[1]).toEqual(second[1]);
+    expect(first[2]).not.toEqual(second[2]);
+
+    const selectedQuestion = {
+      ...question,
+      scope: "selection" as const,
+      selection: "第二段资料内容",
+    };
+    const selectedGrounding = buildFullDocumentGrounding(data, selectedQuestion, 10_000);
+    expect(selectedGrounding).not.toBeNull();
+    const dynamic = JSON.parse(groundingMessages(selectedGrounding!, selectedQuestion)[2].content);
+    expect(dynamic.selectionEvidenceIds).toEqual(["e2"]);
+  });
+
+  it("rejects an answer that cites more than twelve distinct source passages", () => {
+    const { data, question } = fixture();
+    setText(data, 0, Array.from({ length: 13 }, (_, index) => `${index} 内容。`).join("\n\n"));
+    const grounding = buildFullDocumentGrounding(data, question, 10_000);
+    expect(grounding?.evidence.length).toBeGreaterThan(12);
+    const paragraphs = Array.from({ length: 7 }, (_, index) => ({
+      text: `第 ${index + 1} 段`,
+      evidenceIds: index < 6 ? [`e${index * 2 + 1}`, `e${index * 2 + 2}`] : ["e13"],
+      kind: "source" as const,
+    }));
+    expect(() =>
+      bindGeneratedAnswer(JSON.stringify({ status: "answered", paragraphs }), grounding!),
+    ).toThrow("回答引用的原文片段过多，本次未保存。请缩小问题后重试。");
+  });
+
   it("provides real current passages for generic summaries without inventing keyword matches", () => {
     const { data, question } = fixture();
     const context = buildGrounding(data, question);
