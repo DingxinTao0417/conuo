@@ -77,6 +77,7 @@ const config = {
 };
 let workspace: WorkspaceData;
 let currentUser: string | null;
+let cloudRevision: number;
 function deferred<T = void>() {
   let resolve!: (value: T) => void, reject!: (reason: unknown) => void;
   const promise = new Promise<T>((yes, no) => {
@@ -218,6 +219,7 @@ beforeEach(() => {
   Object.values(mock).forEach((fn) => fn.mockReset());
   workspace = createDemoWorkspace();
   currentUser = owner;
+  cloudRevision = 1;
   const chain = { select: mock.select, eq: mock.eq, maybeSingle: mock.read };
   mock.from.mockReturnValue(chain);
   mock.select.mockReturnValue(chain);
@@ -227,7 +229,7 @@ beforeEach(() => {
     error: null,
   }));
   mock.read.mockImplementation(async () => ({
-    data: { data: structuredClone(workspace), revision: 1 },
+    data: { data: structuredClone(workspace), revision: cloudRevision },
     error: null,
   }));
   mock.rpc.mockImplementation(async (_name, args) => ({
@@ -662,6 +664,7 @@ describe("authenticated generated-answer SSE route", () => {
       if (mode === "account") currentUser = "owner-b";
       if (mode === "deleted") workspace.sources[0].deletedAt = new Date().toISOString();
       if (mode === "version") workspace.sources[0].versionId = "new-version";
+      if (mode !== "account") cloudRevision = 2;
       const rest = await events.all();
       expect(rest.some((e) => e.type === "draft" || e.type === "complete")).toBe(false);
       expect(rest.at(-1)).toMatchObject({
@@ -686,6 +689,7 @@ describe("authenticated generated-answer SSE route", () => {
       reading = events.all();
     await vi.waitFor(() => expect(mock.finishRequest).toHaveBeenCalledOnce());
     workspace.sources[0].aiAllowed = false;
+    cloudRevision = 2;
     writing.resolve();
     expect((await reading).at(-1)).toMatchObject({
       type: "error",
@@ -806,6 +810,72 @@ describe("authenticated generated-answer SSE route", () => {
     const events = await readEvents(await POST(request())).all();
     expect(events.at(-1)).toMatchObject({ type: "error", status: 500, code: "CLOUD_ERROR" });
     expect(JSON.stringify(events)).not.toMatch(/server-secret|secret\.example|owner_id/);
+  });
+});
+
+describe("workspace revision probes", () => {
+  function sixParagraphStream() {
+    const first = `{"status":"answered","paragraphs":[${paragraph("第一段依据充分")},`;
+    const middle = [2, 3, 4, 5].map((index) => `${paragraph(`第${index}段依据充分`)},`).join("");
+    const last = `${paragraph("第六段依据充分")}]}`;
+    return [first, middle, last];
+  }
+
+  it("uses revision-only probes while a six-paragraph stream keeps the same revision", async () => {
+    mock.callModelStream.mockImplementationOnce(
+      async (_config, _messages, _signal, onDelta: (text: string) => Promise<void>) => {
+        for (const delta of sixParagraphStream()) await onDelta(delta);
+        return sixParagraphStream().join("");
+      },
+    );
+    const events = await readEvents(await POST(request())).all();
+    expect(events.at(-1)?.type).toBe("complete");
+    expect(mock.select.mock.calls.filter(([fields]) => fields === "data,revision")).toHaveLength(1);
+    expect(
+      mock.select.mock.calls.filter(([fields]) => fields === "revision").length,
+    ).toBeGreaterThan(1);
+    expect(mock.getUser).toHaveBeenCalled();
+  });
+
+  it("reloads the full workspace once after a revision changes without changing evidence", async () => {
+    let reads = 0;
+    let revision = 1;
+    mock.read.mockImplementation(async () => {
+      reads += 1;
+      if (reads === 3) revision = 2;
+      return { data: { data: structuredClone(workspace), revision }, error: null };
+    });
+    const events = await readEvents(await POST(request())).all();
+    expect(events.at(-1)?.type).toBe("complete");
+    expect(mock.select.mock.calls.filter(([fields]) => fields === "data,revision")).toHaveLength(2);
+    expect(
+      mock.select.mock.calls.filter(([fields]) => fields === "revision").length,
+    ).toBeGreaterThan(2);
+  });
+
+  it("stops disclosure when a changed revision disables the source", async () => {
+    let reads = 0;
+    let revision = 1;
+    mock.read.mockImplementation(async () => {
+      reads += 1;
+      if (reads === 3) {
+        revision = 2;
+        workspace.sources[0].aiAllowed = false;
+      }
+      return { data: { data: structuredClone(workspace), revision }, error: null };
+    });
+    mock.callModelStream.mockImplementationOnce(
+      async (_config, _messages, _signal, onDelta: (text: string) => Promise<void>) => {
+        for (const delta of sixParagraphStream()) await onDelta(delta);
+        return sixParagraphStream().join("");
+      },
+    );
+    const events = await readEvents(await POST(request())).all();
+    expect(events.some((event) => event.type === "complete")).toBe(false);
+    expect(events.at(-1)).toMatchObject({ type: "error", code: "QUESTION_CONTEXT_CHANGED" });
+    expect(
+      mock.select.mock.calls.filter(([fields]) => fields === "revision").length,
+    ).toBeGreaterThan(1);
   });
 });
 

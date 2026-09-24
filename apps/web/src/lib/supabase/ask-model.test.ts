@@ -730,6 +730,7 @@ describe("generated answer route with canonical source and request-ledger bounda
     const pending = POST(request());
     await vi.waitFor(() => expect(mock.reserveRequest).toHaveBeenCalledOnce());
     workspace.sources[0].deletedAt = new Date().toISOString();
+    workspaceRevision += 1;
     reserve.resolve({ kind: "reserved" });
     await expectError(await pending, 409, "QUESTION_CONTEXT_CHANGED");
     expect(mock.callModel).not.toHaveBeenCalled();
@@ -781,6 +782,7 @@ describe("generated answer route with canonical source and request-ledger bounda
     await vi.waitFor(() => expect(mock.callModel).toHaveBeenCalledOnce());
     const raw = generated(prompt().evidence[0].text);
     change(workspace);
+    workspaceRevision += 1;
     model.resolve(raw);
     await expectError(await pending, 409, "QUESTION_CONTEXT_CHANGED");
     expect(mock.finishRequest).toHaveBeenCalledExactlyOnceWith(
@@ -922,6 +924,7 @@ describe("generated answer route with canonical source and request-ledger bounda
     const pending = POST(request());
     await vi.waitFor(() => expect(mock.reserveRequest).toHaveBeenCalledOnce());
     workspace.sources[0].aiAllowed = false;
+    workspaceRevision += 1;
     reserve.resolve({ kind: "cached", result: cached });
     await expectError(await pending, 409, "QUESTION_CONTEXT_CHANGED");
     expect(mock.callModel).not.toHaveBeenCalled();
@@ -966,6 +969,7 @@ describe("generated answer route with canonical source and request-ledger bounda
       contentRevision: 4,
       updatedAt: "2026-09-13T00:01:00.000Z",
     };
+    workspaceRevision += 1;
     model.resolve(generated("我当时的笔记结论。", [note!.id], "note"));
 
     await expectError(await pending, 409, "QUESTION_CONTEXT_CHANGED");
@@ -1014,6 +1018,7 @@ describe("generated answer route with canonical source and request-ledger bounda
     const pending = POST(request());
     await vi.waitFor(() => expect(mock.finishRequest).toHaveBeenCalledOnce());
     workspace.sources[0].aiAllowed = false;
+    workspaceRevision += 1;
     finishing.resolve();
     await expectError(await pending, 409, "QUESTION_CONTEXT_CHANGED");
     expect(mock.finishRequest).toHaveBeenCalledOnce();

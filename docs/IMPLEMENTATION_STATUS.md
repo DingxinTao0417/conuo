@@ -19,6 +19,13 @@
 - 配置：新增服务端 `aiFeatureEnabled`，开关默认关闭；新增 `eval:retrieval` 和 `eval:model` 脚本。真实模型评测只有显式设置 `CONUO_EVAL_MODEL=1` 才运行，当前未执行真实模型评测。
 - 本地验证：Web 全量测试 258 个文件／4269 项通过，模型评测 1 个文件跳过；typecheck 通过；lint 0 错误、保留 1 条既有 `_result` 警告；本 WP 变更文件定向 Prettier 通过。仓库级 `format:check` 仍被既有 `._*` 文件和 12 个未涉及文件阻断。
 
+## AI 增强 WP-05（2026-09-23，本地）
+
+- 范围：问答流在每次复核前先读取 `revision`，版本未变化时复用已加载的工作区快照；只有权威版本变化时才重新加载完整工作区，保留每次复核的用户认证。
+- 前置核对：已检查现有 `public.workspaces` 更新 SQL，版本写入均按 `revision = revision + 1`（或等价的当前行版本加一）递增，满足版本探针前提。
+- 测试：新增稳定版本、版本变化触发一次完整重载、版本变化同时禁用 AI 三条路由回归；既有流式和模型测试的模拟云端写入同步递增 `revision`。Web 全量测试 258 个文件／4272 项通过；typecheck 通过；lint 0 错误、保留 1 条既有 `_result` 警告；本 WP 变更文件定向 Prettier 通过。仓库级 `format:check` 仍被既有 `._*` 文件及未涉及文件阻断。
+- 未验收边界：未修改接口契约、认证逻辑或数据库迁移；未执行部署、staging 或远程数据库操作。
+
 ## iPadOS P1 云端闭环增量（2026-09-22，本地）
 
 移动端补齐 P1 两个云端闭环并全部本地验证：正文阅读位置按语义锚点节流回写 `readPage/lastReadAt`，回答完成后追加保存云端 `conversations`（Web 合同兼容、requestId 幂等、AI 面板可核对最近 3 轮），两者均遵循「结果未知先读回」的 CAS 规则；异常矩阵沿用既有 request-identity / draft-recovery 边界。P2 前置草案见[选型证据](IPADOS_P2_SELECTION.md)，其旧选型不作为当前实现合同；WP0 最新状态见下节。

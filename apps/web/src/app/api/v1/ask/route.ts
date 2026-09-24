@@ -294,6 +294,27 @@ export async function POST(request: Request) {
     const loaded = await prepare(load);
     const initial = loaded.workspace;
     const initialRevision = loaded.revision;
+    const probeRevision = async (): Promise<number> => {
+      const { data, error } = await supabase
+        .from("workspaces")
+        .select("revision")
+        .eq("owner_id", user.id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new ApiError(404, "NO_WORKSPACE", "请先将资料保存到云端。");
+      const revision = Number(data.revision);
+      if (!Number.isSafeInteger(revision) || revision < 1)
+        throw new ApiError(422, "INVALID_CLOUD_DATA", "云端资料格式暂时无法读取。");
+      return revision;
+    };
+    let validated: { workspace: WorkspaceData; revision: number } = loaded;
+    /** Full parse only when the authoritative revision moved since the last validated snapshot. */
+    const currentWorkspace = async () => {
+      const revision = await probeRevision();
+      if (revision === validated.revision) return validated;
+      validated = await load();
+      return validated;
+    };
     assertScope(initial, question);
     if (request.signal.aborted)
       throw new ApiError(499, "REQUEST_CANCELLED", "回答已停止，问题已保留。");
@@ -306,7 +327,7 @@ export async function POST(request: Request) {
       const auth = await requireUser(request);
       if (auth.user.id !== user.id)
         throw new ApiError(409, "SESSION_CHANGED", "当前账号已改变，本次回答未保存。");
-      const latest = (await load()).workspace;
+      const latest = (await currentWorkspace()).workspace;
       if (signal.aborted) throw new ApiError(499, "REQUEST_CANCELLED", "回答已停止，问题已保留。");
       checkBudget();
       if (question.sourceVersions && hasFixedMultiSourceRange(question))
@@ -371,7 +392,7 @@ export async function POST(request: Request) {
             throw new ApiError(499, "REQUEST_CANCELLED", "回答已停止，问题已保留。");
           checkBudget();
           const auth = await requireUser(request);
-          const latest = await load();
+          const latest = await currentWorkspace();
           if (signal.aborted)
             throw new ApiError(499, "REQUEST_CANCELLED", "回答已停止，问题已保留。");
           checkBudget();
