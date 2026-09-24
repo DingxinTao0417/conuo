@@ -130,7 +130,7 @@ import type {
   RegionCaptureStart,
   SelectionToolbarPosition,
 } from "./reader-types";
-import type { OutlineItem } from "@/lib/source-outline";
+import { sourceOutlineCache, type OutlineItem } from "@/lib/source-outline";
 
 export default function Reader(props: ReaderProps) {
   const {
@@ -439,6 +439,29 @@ export default function Reader(props: ReaderProps) {
       disposed = true;
     };
   }, [docxStructureKey, source.blobKey, source.kind, source.text]);
+  useEffect(() => {
+    const currentSource = sourceRef.current;
+    if (
+      historical ||
+      !props.cloudUserId ||
+      props.saveState !== "cloud" ||
+      (currentSource.kind !== "markdown" && currentSource.kind !== "docx")
+    )
+      return;
+    const cached = sourceOutlineCache.get(currentSource);
+    if (!cached) return;
+    void fetch(
+      `/api/v1/sources/${encodeURIComponent(currentSource.id)}/versions/${encodeURIComponent(currentSource.versionId)}/outline`,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Conuo-User": props.cloudUserId },
+        body: JSON.stringify(cached),
+      },
+    ).catch(() => {
+      // Outline persistence is derived navigation and must not block reading.
+    });
+  }, [historical, props.cloudUserId, props.saveState, source.id, source.kind, source.versionId]);
   useEffect(
     () => () => {
       if (readingPositionApplyFrame.current !== null)
