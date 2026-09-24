@@ -309,6 +309,7 @@ describe("generated answer route with canonical source and request-ledger bounda
             null,
             "default",
             "retrieval",
+            "neighbor:0",
             questionContextKey(workspace, question()),
             searchMode,
             embeddingFingerprint,
@@ -347,6 +348,18 @@ describe("generated answer route with canonical source and request-ledger bounda
     expect((mock.callModel.mock.calls.at(-1)![1] as ModelMessage[])[0]!.content).toContain(
       "Plain text only, no markdown",
     );
+  });
+
+  it("binds neighbor expansion to the answer grounding and request fingerprint", async () => {
+    const offResponse = await POST(request({ requestId: "neighbor-off" }));
+    expect(offResponse.status).toBe(200);
+    const offFingerprint = mock.reserveRequest.mock.calls.at(-1)![3];
+
+    vi.stubEnv("CONUO_FEATURE_NEIGHBOR_EXPANSION", "on");
+    const onResponse = await POST(request({ requestId: "neighbor-on" }));
+    expect(onResponse.status).toBe(200);
+    const onFingerprint = mock.reserveRequest.mock.calls.at(-1)![3];
+    expect(onFingerprint).not.toBe(offFingerprint);
   });
 
   it("binds omitted, enabled and disabled thinking modes to distinct answer fingerprints", async () => {

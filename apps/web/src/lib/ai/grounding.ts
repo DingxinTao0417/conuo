@@ -161,6 +161,7 @@ export function buildGrounding(
   data: WorkspaceData,
   request: AnswerRequest,
   retrieved?: AnswerResult,
+  options: { neighborRadius?: 0 | 1 } = {},
 ): Grounding {
   const fallback = retrieved ?? retrieveEvidence(data, request);
   const empty = {
@@ -228,7 +229,16 @@ export function buildGrounding(
     candidates = uniqueCitations([...retrievalHits.slice(0, SUMMARY_RETRIEVAL_SLOTS), ...spread()]);
     sampled = true;
   } else {
-    candidates = retrievalHits;
+    const neighborRadius = options.neighborRadius ?? 0;
+    candidates =
+      neighborRadius === 1
+        ? uniqueCitations([
+            ...retrievalHits
+              .slice(0, 4)
+              .flatMap((hit) => [hit, ...adjacentCitations([hit], nonEmptyQueues, 1)]),
+            ...retrievalHits.slice(4),
+          ])
+        : retrievalHits;
     if (
       !candidates.length &&
       !isCrossLibraryAnswerRequest(request) &&

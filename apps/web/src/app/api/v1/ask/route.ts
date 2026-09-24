@@ -412,6 +412,7 @@ export async function POST(request: Request) {
           traceOutcome = "extractive";
           return retrieveEvidence(initial, question);
         }
+        const neighborRadius = aiFeatureEnabled("NEIGHBOR_EXPANSION") ? 1 : 0;
         const currentSearchSnapshot = async () => {
           if (signal.aborted)
             throw new ApiError(499, "REQUEST_CANCELLED", "回答已停止，问题已保留。");
@@ -522,7 +523,9 @@ export async function POST(request: Request) {
         // canonical evidence instead of a permanent empty hit.
         let extractiveCitations = citations;
         if (!extractiveCitations.length) {
-          extractiveCitations = buildGrounding(initial, question).evidence.slice(0, 6);
+          extractiveCitations = buildGrounding(initial, question, undefined, {
+            neighborRadius,
+          }).evidence.slice(0, 6);
         }
         const noteEvidence = extractiveCitations.length
           ? selectedDocumentNoteEvidence(initial, question)
@@ -574,7 +577,11 @@ export async function POST(request: Request) {
             (config.maxRequestBytes ?? Number.MAX_SAFE_INTEGER) * 0.8
             ? fullDocument
             : null;
-        const grounding = longContext ?? buildGrounding(initial, question, retrieved);
+        const grounding =
+          longContext ??
+          buildGrounding(initial, question, retrieved, {
+            neighborRadius,
+          });
         if (longContext) traceRecorder?.set({ longContext: true });
         if (!grounding.evidence.length) {
           traceOutcome = "insufficient";
@@ -594,6 +601,7 @@ export async function POST(request: Request) {
               config.thinkingMode ?? null,
               selectedProfile.profile,
               grounding.layout,
+              "neighbor:" + neighborRadius,
               contextKey,
               searchMode,
               readEmbeddingConfig()?.fingerprint ?? null,

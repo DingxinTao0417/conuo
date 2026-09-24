@@ -9,7 +9,7 @@ import { buildOrganizationGrounding } from "./organization";
 import { createDemoWorkspace } from "../seed";
 import { chunkText } from "../import";
 import { retrieveEvidence } from "../retrieval";
-import type { AnswerRequest, Note, Source, WorkspaceData } from "../types";
+import type { AnswerRequest, AnswerResult, Note, Source, WorkspaceData } from "../types";
 import type { OrganizationRequest } from "../organization-types";
 
 type AnswerRequestWithUserContext = AnswerRequest & { userContext?: string[] };
@@ -94,6 +94,50 @@ describe("bounded model grounding", () => {
     question.sourceId = undefined;
     question.sourceIds = data.sources.map((item) => item.id);
     expect(buildFullDocumentGrounding(data, question, 100_000)).toBeNull();
+  });
+
+  it("expands the top targeted hit by one adjacent chunk on each side without crossing boundaries", () => {
+    const { data, question } = fixture();
+    const source = data.sources[0];
+    source.chunks = Array.from({ length: 25 }, (_, order) => ({
+      id: "neighbor-chunk-" + order,
+      sourceId: source.id,
+      versionId: source.versionId,
+      text: "第 " + order + " 段关于目标主题的正文。",
+      section: "第 " + order + " 节",
+      order,
+    }));
+    source.text = source.chunks.map((chunk) => chunk.text).join("\n\n");
+    const citation = (order: number) => ({
+      sourceId: source.id,
+      versionId: source.versionId,
+      chunkId: source.chunks[order]!.id,
+      title: source.title,
+      quote: source.chunks[order]!.text,
+      section: source.chunks[order]!.section,
+      page: undefined,
+    });
+    const retrieved: AnswerResult = {
+      mode: "extractive",
+      citations: [citation(20)],
+      content: "",
+    };
+    const targeted = { ...question, question: "目标主题的条件是什么？" };
+    const expanded = buildGrounding(data, targeted, retrieved, { neighborRadius: 1 });
+    expect(expanded.evidence.map((item) => item.chunkId)).toEqual([
+      "neighbor-chunk-20",
+      "neighbor-chunk-19",
+      "neighbor-chunk-21",
+    ]);
+    const unchanged = buildGrounding(data, targeted, retrieved, { neighborRadius: 0 });
+    expect(unchanged.evidence.map((item) => item.chunkId)).toEqual(["neighbor-chunk-20"]);
+
+    const edgeRetrieved = { ...retrieved, citations: [citation(0)] };
+    const edge = buildGrounding(data, targeted, edgeRetrieved, { neighborRadius: 1 });
+    expect(edge.evidence.map((item) => item.chunkId)).toEqual([
+      "neighbor-chunk-0",
+      "neighbor-chunk-1",
+    ]);
   });
 
   it("requires AI and current canonical versions before using full-document layout", () => {
