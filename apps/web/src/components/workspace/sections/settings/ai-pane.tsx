@@ -29,6 +29,9 @@ export default function AiPane({
       <div className="settings-card">
         <h2>资料与 AI</h2>
         <p>你提交的反馈只包含评分和原因；只有勾选后才会附上问题和回答。</p>
+        <p>
+          如已启用重排服务，服务端会把检索到的原文片段发送给重排服务重新排序；请先确认服务方的数据处理边界。
+        </p>
         <div className="setting-row">
           <div>
             <b>允许 AI 使用我的资料</b>

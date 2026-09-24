@@ -43,6 +43,7 @@ import {
   needsRewrite,
   rewriteQuery,
 } from "@/lib/ai/query-rewrite";
+import { readRerankConfig, rerank } from "@/lib/ai/rerank";
 import { createTraceRecorder } from "@/lib/ai/traces";
 import { classifyQuestionIntent } from "@/lib/ai/question-intent";
 import {
@@ -485,6 +486,27 @@ export async function POST(request: Request) {
         const selectedProfile = selectAnswerProfile("standard");
         const config = selectedProfile?.config;
         const format: AnswerFormat = aiFeatureEnabled("RICH_ANSWERS") ? "rich" : "plain";
+        const rerankEnabled = aiFeatureEnabled("RERANK");
+        let rerankConfig = null;
+        if (rerankEnabled) {
+          try {
+            rerankConfig = readRerankConfig();
+          } catch {
+            // An incomplete optional reranker configuration keeps the original order.
+          }
+        }
+        const rerankFingerprint = rerankEnabled
+          ? JSON.stringify(
+              rerankConfig
+                ? [
+                    rerankConfig.baseUrl,
+                    rerankConfig.model,
+                    rerankConfig.maxCandidates,
+                    rerankConfig.topN,
+                  ]
+                : null,
+            )
+          : undefined;
         const rewriteRequested =
           aiFeatureEnabled("QUERY_REWRITE") &&
           needsRewrite(question.question, question.userContext, searchData.sources);
@@ -511,6 +533,7 @@ export async function POST(request: Request) {
                 contextKey,
                 searchMode,
                 readEmbeddingConfig()?.fingerprint ?? null,
+                ...(rerankFingerprint === undefined ? [] : ["rerank:" + rerankFingerprint]),
               ]),
             )
             .digest("hex");
@@ -591,8 +614,42 @@ export async function POST(request: Request) {
           candidateLists.length === 1 ? candidateLists[0]! : fuseCandidates(candidateLists);
         await assertSearchCurrent();
         traceRecorder?.mark("retrievalEnd");
+        let orderedCitations = indexedCitations(initial, question, candidates);
+        let rerankUsed = false;
+        if (rerankConfig && orderedCitations.length) {
+          try {
+            const pool = orderedCitations.slice(0, rerankConfig.maxCandidates);
+            const indexes = await rerank(
+              rerankConfig,
+              retrievalQueries[0]!,
+              pool.map((citation) => citation.quote.slice(0, 2_000)),
+              signal,
+            );
+            if (
+              indexes.some(
+                (index, position) =>
+                  !Number.isInteger(index) ||
+                  index < 0 ||
+                  index >= pool.length ||
+                  indexes.indexOf(index) !== position,
+              )
+            )
+              throw new Error("INVALID_RERANK_ORDER");
+            const ranked = indexes.map((index) => pool[index]!);
+            const seen = new Set(indexes);
+            orderedCitations = [
+              ...ranked,
+              ...pool.filter((_citation, index) => !seen.has(index)),
+              ...orderedCitations.slice(rerankConfig.maxCandidates),
+            ];
+            rerankUsed = true;
+          } catch (error) {
+            if (signal.aborted) throw error;
+          }
+        }
+        traceRecorder?.set({ rerank: rerankUsed });
         let evidenceCharacters = 0;
-        const citations = indexedCitations(initial, question, candidates)
+        const citations = orderedCitations
           .filter((citation) => {
             if (citation.quote.length > 8000 || evidenceCharacters + citation.quote.length > 24000)
               return false;
@@ -695,6 +752,7 @@ export async function POST(request: Request) {
                   contextKey,
                   searchMode,
                   readEmbeddingConfig()?.fingerprint ?? null,
+                  ...(rerankFingerprint === undefined ? [] : ["rerank:" + rerankFingerprint]),
                 ]),
               )
               .digest("hex"),

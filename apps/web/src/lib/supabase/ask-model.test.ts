@@ -29,6 +29,8 @@ const mock = vi.hoisted(() => ({
   embeddingConfig: vi.fn(),
   reserveEmbeddingUsage: vi.fn(),
   embedQuery: vi.fn(),
+  readRerankConfig: vi.fn(),
+  rerank: vi.fn(),
 }));
 const accountAccess = {
   state: null,
@@ -72,6 +74,10 @@ vi.mock("@/lib/ai/embeddings", () => ({
   readEmbeddingConfig: mock.embeddingConfig,
   reserveEmbeddingUsage: mock.reserveEmbeddingUsage,
   embedQuery: mock.embedQuery,
+}));
+vi.mock("@/lib/ai/rerank", () => ({
+  readRerankConfig: mock.readRerankConfig,
+  rerank: mock.rerank,
 }));
 import { POST } from "@/app/api/v1/ask/route";
 
@@ -262,6 +268,7 @@ describe("generated answer route with canonical source and request-ledger bounda
     workspace = createDemoWorkspace();
     workspaceRevision = 1;
     mock.embeddingConfig.mockReturnValue(null);
+    mock.readRerankConfig.mockReturnValue(null);
     currentUser = owner;
     const chain = { select: mock.select, eq: mock.eq, maybeSingle: mock.read };
     mock.from.mockReturnValue(chain);
@@ -1112,6 +1119,74 @@ describe("generated answer route with canonical source and request-ledger bounda
     expect(response.status).toBe(200);
     expect(mock.rpc.mock.calls[0]?.[1].p_query).toBe("为什么？\n学习率过高会怎样？");
     expect(mock.reserveRequest).toHaveBeenCalledOnce();
+  });
+
+  it("reranks citations before applying the existing evidence budget", async () => {
+    vi.stubEnv("CONUO_FEATURE_RERANK", "on");
+    const source = workspace.sources[0]!;
+    const chunks = source.chunks.filter((chunk) => chunk.text.length > 80).slice(0, 2);
+    expect(chunks).toHaveLength(2);
+    mock.readRerankConfig.mockReturnValue({
+      baseUrl: "https://rerank.example/v1",
+      apiKey: "secret",
+      model: "rerank-model",
+      maxCandidates: 40,
+      topN: 12,
+    });
+    mock.rerank.mockResolvedValueOnce([1, 0]);
+    mock.rpc.mockImplementation(async (name) => {
+      expect(name).toBe("search_source_chunks");
+      return {
+        data: chunks.map((chunk, index) => ({
+          source_id: source.id,
+          version_id: source.versionId,
+          chunk_id: chunk.id,
+          score: 1 - index / 10,
+          workspace_revision: workspaceRevision,
+        })),
+        error: null,
+      };
+    });
+    const response = await POST(request({ requestId: "rerank-request" }));
+    expect(response.status).toBe(200);
+    expect(mock.rerank).toHaveBeenCalledOnce();
+    expect(mock.rerank).toHaveBeenCalledWith(
+      expect.anything(),
+      "学习率过高会怎样？",
+      chunks.map((chunk) => chunk.text),
+      expect.any(AbortSignal),
+    );
+    expect(prompt().evidence[0]!.text).toBe(chunks[1]!.text);
+  });
+
+  it("keeps the indexed citation order when reranking fails", async () => {
+    vi.stubEnv("CONUO_FEATURE_RERANK", "on");
+    const source = workspace.sources[0]!;
+    const chunks = source.chunks.filter((chunk) => chunk.text.length > 80).slice(0, 2);
+    mock.readRerankConfig.mockReturnValue({
+      baseUrl: "https://rerank.example/v1",
+      apiKey: "secret",
+      model: "rerank-model",
+      maxCandidates: 40,
+      topN: 12,
+    });
+    mock.rerank.mockRejectedValueOnce(new Error("provider unavailable"));
+    mock.rpc.mockImplementation(async (name) => {
+      expect(name).toBe("search_source_chunks");
+      return {
+        data: chunks.map((chunk, index) => ({
+          source_id: source.id,
+          version_id: source.versionId,
+          chunk_id: chunk.id,
+          score: 1 - index / 10,
+          workspace_revision: workspaceRevision,
+        })),
+        error: null,
+      };
+    });
+    const response = await POST(request({ requestId: "rerank-failure" }));
+    expect(response.status).toBe(200);
+    expect(prompt().evidence[0]!.text).toBe(chunks[0]!.text);
   });
 
   it("rechecks source permission before disclosing a cached result", async () => {
