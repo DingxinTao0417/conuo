@@ -74,4 +74,3 @@
 {"id":"formula-2","category":"formula","question":"学习率更新公式中的步长系数是什么？","scope":{"type":"document","doc":"ml"},"expect":{"answerable":true,"evidence":[{"doc":"ml","contains":"0.1 *"}],"evidenceMode":"any","forbiddenDocs":[]}}
 {"id":"formula-3","category":"formula","question":"学习率更新公式中的步长系数是什么？","scope":{"type":"document","doc":"ml"},"expect":{"answerable":true,"evidence":[{"doc":"ml","contains":"0.1 *"}],"evidenceMode":"any","forbiddenDocs":[]}}
 {"id":"formula-4","category":"formula","question":"学习率更新公式中的步长系数是什么？","scope":{"type":"document","doc":"ml"},"expect":{"answerable":true,"evidence":[{"doc":"ml","contains":"0.1 *"}],"evidenceMode":"any","forbiddenDocs":[]}}
-
