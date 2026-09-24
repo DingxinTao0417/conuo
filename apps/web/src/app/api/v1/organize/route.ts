@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { z } from "zod";
 import { ApiError, failure, json, readJson, requireUser } from "@/lib/supabase/api";
 import { workspaceSchema } from "@/lib/supabase/validation";
 import { organizationRequestSchema } from "@/lib/organization-schema";
@@ -17,10 +18,68 @@ import {
   organizationTargetSignature,
   ORGANIZATION_MODEL_CONTRACT_VERSION,
 } from "@/lib/ai/organization";
+import { aiFeatureEnabled } from "@/lib/ai/features";
+import type { SummaryRow } from "@/lib/ai/grounding";
+import type { SummaryRows } from "@/lib/ai/organization";
+import type { WorkspaceData } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+const summaryRowSchema = z
+  .object({
+    level: z.enum(["section", "document"]),
+    sectionIndex: z.number().int().min(0).max(1000),
+    title: z.string().min(1).max(200),
+    pageStart: z.number().int().positive().nullable().optional(),
+    pageEnd: z.number().int().positive().nullable().optional(),
+    chunkIds: z.array(z.string()).min(1).max(400),
+    summary: z
+      .object({
+        paragraphs: z
+          .array(z.object({ text: z.string(), chunkIds: z.array(z.string()).min(1).max(6) }))
+          .max(8),
+      })
+      .passthrough(),
+    modelName: z.string().nullable().optional(),
+    createdAt: z.string().optional(),
+  })
+  .strict();
+
+async function readOrganizationSummaries(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  sources: WorkspaceData["sources"],
+): Promise<Map<string, SummaryRows>> {
+  const result = new Map<string, SummaryRows>();
+  if (!aiFeatureEnabled("SECTION_SUMMARIES")) return result;
+  for (const source of sources) {
+    try {
+      const { data, error } = await supabase.rpc("read_source_summaries", {
+        p_source_id: source.id,
+        p_version_id: source.versionId,
+      });
+      if (error || !Array.isArray(data)) continue;
+      const rows = data.flatMap((value: unknown) => {
+        const parsed = summaryRowSchema.safeParse(value);
+        return parsed.success ? [parsed.data as SummaryRow] : [];
+      });
+      if (rows.length) result.set(source.id, rows);
+    } catch {
+      // Summary navigation is an optional enhancement; the original grounding remains usable.
+    }
+  }
+  return result;
+}
+
+function summaryFingerprint(summaries: Map<string, SummaryRows>): string | null {
+  const values = [...summaries.entries()].flatMap(([sourceId, rows]) =>
+    rows.map((row) => [sourceId, row.level, row.sectionIndex, row.createdAt ?? ""]),
+  );
+  return values.length
+    ? JSON.stringify(values.sort((left, right) => left.join("/").localeCompare(right.join("/"))))
+    : null;
+}
 
 export async function POST(request: Request) {
   let reservation:
@@ -85,21 +144,27 @@ export async function POST(request: Request) {
         "MODEL_NOT_CONFIGURED",
         "尚未配置生成模型，暂不能生成整理建议。原文阅读和检索仍可使用。",
       );
-    const grounding = buildOrganizationGrounding(initial, input);
+    const selectedInitialSources = initial.sources.filter((source) =>
+      input.sourceIds.includes(source.id),
+    );
+    const summaries = await readOrganizationSummaries(supabase, selectedInitialSources);
+    const summaryVersion = summaryFingerprint(summaries);
+    const grounding = buildOrganizationGrounding(initial, input, {
+      summaries,
+      maxRequestBytes: config.maxRequestBytes,
+    });
     const contextKey = organizationContextKey(initial, input);
-    const fingerprint = createHash("sha256")
-      .update(
-        JSON.stringify([
-          ORGANIZATION_MODEL_CONTRACT_VERSION,
-          config.baseUrl,
-          config.model,
-          config.jsonMode,
-          config.thinkingMode ?? null,
-          selectedProfile.profile,
-          contextKey,
-        ]),
-      )
-      .digest("hex");
+    const fingerprintParts: unknown[] = [
+      ORGANIZATION_MODEL_CONTRACT_VERSION,
+      config.baseUrl,
+      config.model,
+      config.jsonMode,
+      config.thinkingMode ?? null,
+      selectedProfile.profile,
+      contextKey,
+    ];
+    if (summaryVersion) fingerprintParts.push(summaryVersion);
+    const fingerprint = createHash("sha256").update(JSON.stringify(fingerprintParts)).digest("hex");
     const store = createRequestStore();
     // Shares the same account quota/concurrency ledger with questions.
     const saved = await reserveRequest(store, user.id, input.requestId, fingerprint);
@@ -123,7 +188,19 @@ export async function POST(request: Request) {
             organizationTargetSignature(basis)
         );
       });
-      if (targetChanged || organizationContextKey(latest, input) !== contextKey)
+      const latestSummaryVersion = summaryVersion
+        ? summaryFingerprint(
+            await readOrganizationSummaries(
+              supabase,
+              latest.sources.filter((source) => input.sourceIds.includes(source.id)),
+            ),
+          )
+        : null;
+      if (
+        targetChanged ||
+        organizationContextKey(latest, input) !== contextKey ||
+        latestSummaryVersion !== summaryVersion
+      )
         throw new ApiError(
           409,
           "ORGANIZATION_CONTEXT_CHANGED",

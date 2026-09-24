@@ -137,6 +137,70 @@ beforeEach(() => {
 });
 
 describe("runOrganizationTasks", () => {
+  it("reads service-side summaries for the worker and keeps them out of original evidence", async () => {
+    vi.stubEnv("CONUO_FEATURE_SECTION_SUMMARIES", "on");
+    const source = workspace.sources[0]!;
+    const representative = source.chunks.at(-1)!;
+    const rows = [
+      {
+        level: "section",
+        section_index: 0,
+        title: "章节导航",
+        page_start: representative.page ?? null,
+        page_end: representative.page ?? null,
+        chunk_ids: [representative.id],
+        summary: {
+          paragraphs: [{ text: "WORKER_NAVIGATION_ONLY", chunkIds: [representative.id] }],
+        },
+        model_name: "summary-model",
+        created_at: "2026-09-24T00:00:00.000Z",
+      },
+      {
+        level: "document",
+        section_index: 0,
+        title: "全书摘要",
+        page_start: null,
+        page_end: null,
+        chunk_ids: [representative.id],
+        summary: {
+          paragraphs: [{ text: "WORKER_DOCUMENT_NAVIGATION_ONLY", chunkIds: [representative.id] }],
+        },
+        model_name: "summary-model",
+        created_at: "2026-09-24T00:00:00.000Z",
+      },
+    ];
+    const query = {
+      select: () => query,
+      eq: () => query,
+      then: (resolve: (value: unknown) => unknown) =>
+        Promise.resolve({ data: rows, error: null }).then(resolve),
+    };
+    const store = {
+      rpc: mock.taskRpc,
+      from: () => query,
+    } as unknown as OrganizationTaskStore;
+    try {
+      taskRpcWithContext();
+      mock.readModelConfig.mockReturnValue({ ...modelConfig, maxRequestBytes: 524_288 });
+      const summary = await runOrganizationTasks(store, {
+        workerId: "organization-worker-1",
+        limit: 1,
+        leaseSeconds: 60,
+      });
+      expect(summary).toMatchObject({ claimed: 1, staged: 1, published: 1 });
+      const messages = mock.callModel.mock.calls[0]![1] as Array<{ role: string; content: string }>;
+      const prompt = JSON.parse(messages[1]!.content) as {
+        sectionSummaries: Array<{ text: string }>;
+        evidence: Array<{ text: string }>;
+      };
+      expect(prompt.sectionSummaries[0]!.text).toBe("WORKER_NAVIGATION_ONLY");
+      expect(prompt.evidence[0]!.text).toBe(representative.text);
+      expect(mock.reserveRequest.mock.calls[0]![3]).toMatch(/^[a-f0-9]{64}$/);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("keeps the worker protocol while versions of the model contract invalidate old fingerprints", async () => {
     taskRpcWithContext();
     await runOrganizationTasks(taskStore(), {
@@ -159,7 +223,7 @@ describe("runOrganizationTasks", () => {
           ]),
         )
         .digest("hex");
-    expect(mock.reserveRequest.mock.calls[0][3]).toBe(fingerprintFor("organization-v2"));
+    expect(mock.reserveRequest.mock.calls[0][3]).toBe(fingerprintFor("organization-v3"));
     expect(mock.reserveRequest.mock.calls[0][3]).not.toBe(fingerprintFor());
     expect(mock.callModel).toHaveBeenCalledOnce();
   });
@@ -184,7 +248,7 @@ describe("runOrganizationTasks", () => {
           .update(
             JSON.stringify([
               "organization-worker-v1",
-              "organization-v2",
+              "organization-v3",
               modelConfig.baseUrl,
               modelConfig.model,
               modelConfig.jsonMode,

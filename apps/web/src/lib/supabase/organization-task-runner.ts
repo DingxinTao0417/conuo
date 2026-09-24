@@ -9,9 +9,12 @@ import {
   organizationMessages,
   validateOrganizationResult,
   ORGANIZATION_MODEL_CONTRACT_VERSION,
+  type SummaryRows,
 } from "@/lib/ai/organization";
 import { callModel, readModelProfile, type ModelProfileName } from "@/lib/ai/model";
 import { selectFastProfile } from "@/lib/ai/model-routing";
+import { aiFeatureEnabled } from "@/lib/ai/features";
+import type { SummaryRow } from "@/lib/ai/grounding";
 import { createRequestStore, finishRequest, reserveRequest } from "@/lib/ai/requests";
 import { createTraceRecorder } from "@/lib/ai/traces";
 import { organizationRequestSchema, organizationResultSchema } from "@/lib/organization-schema";
@@ -26,6 +29,16 @@ export interface OrganizationTaskStore {
   // service client and small deterministic test stores.
   rpc(name: string, args: Record<string, unknown>): PromiseLike<RpcResponse>;
 }
+
+type SummaryQueryResponse = { data: unknown; error: RpcFailure };
+type SummaryQuery = {
+  select(columns: string): SummaryQuery;
+  eq(column: string, value: string): SummaryQuery;
+  then<TResult1 = SummaryQueryResponse, TResult2 = never>(
+    onfulfilled?: ((value: SummaryQueryResponse) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): PromiseLike<TResult1 | TResult2>;
+};
 
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);
 const workerId = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/);
@@ -71,6 +84,25 @@ const failureSchema = z
   .object({
     state: z.enum(["queued", "failed", "cancelled"]),
     revision: z.number().int().positive().nullable().optional(),
+  })
+  .strict();
+const summaryRowSchema = z
+  .object({
+    level: z.enum(["section", "document"]),
+    section_index: z.number().int().min(0).max(1000),
+    title: z.string().min(1).max(200),
+    page_start: z.number().int().positive().nullable(),
+    page_end: z.number().int().positive().nullable(),
+    chunk_ids: z.array(z.string()).min(1).max(400),
+    summary: z
+      .object({
+        paragraphs: z
+          .array(z.object({ text: z.string(), chunkIds: z.array(z.string()).min(1).max(6) }))
+          .max(8),
+      })
+      .passthrough(),
+    model_name: z.string().nullable(),
+    created_at: z.string(),
   })
   .strict();
 
@@ -125,6 +157,53 @@ function retryable(error: unknown): boolean {
 function stableErrorCode(error: unknown): string {
   if (error instanceof ApiError && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code)) return error.code;
   return "ORGANIZATION_PROCESSING_FAILED";
+}
+
+async function readOrganizationSummaries(
+  store: OrganizationTaskStore,
+  ownerId: string,
+  workspace: z.infer<typeof workspaceSchema>,
+  request: z.infer<typeof organizationRequestSchema>,
+): Promise<Map<string, SummaryRows>> {
+  const result = new Map<string, SummaryRows>();
+  if (!aiFeatureEnabled("SECTION_SUMMARIES")) return result;
+  const from = (store as unknown as { from?: (relation: string) => SummaryQuery }).from;
+  if (!from) return result;
+  for (const source of workspace.sources.filter((item) => request.sourceIds.includes(item.id))) {
+    try {
+      const response = await from("source_version_summaries")
+        .select(
+          "level,section_index,title,page_start,page_end,chunk_ids,summary,model_name,created_at",
+        )
+        .eq("owner_id", ownerId)
+        .eq("source_id", source.id)
+        .eq("version_id", source.versionId)
+        .eq("profile", "summary-v1");
+      if (response.error || !Array.isArray(response.data)) continue;
+      const rows = response.data.flatMap((value: unknown) => {
+        const parsed = summaryRowSchema.safeParse(value);
+        if (!parsed.success) return [];
+        const row = parsed.data;
+        return [
+          {
+            level: row.level,
+            sectionIndex: row.section_index,
+            title: row.title,
+            pageStart: row.page_start,
+            pageEnd: row.page_end,
+            chunkIds: row.chunk_ids,
+            summary: row.summary,
+            modelName: row.model_name,
+            createdAt: row.created_at,
+          } as SummaryRow,
+        ];
+      });
+      if (rows.length) result.set(source.id, rows);
+    } catch {
+      // A missing optional summary read leaves the original organization path intact.
+    }
+  }
+  return result;
 }
 
 async function heartbeat(
@@ -212,7 +291,6 @@ async function processClaim(
     // All evidence is rebuilt from the worker-read current snapshot. The caller
     // never supplies source text, pages, quotations or target note bodies.
     assertOrganizationScope(context.workspace, context.request);
-    const grounding = buildOrganizationGrounding(context.workspace, context.request);
     const requestedProfile = process.env.CONUO_ORGANIZATION_MODEL_PROFILE?.trim() || "default";
     if (requestedProfile !== "default" && requestedProfile !== "fast")
       throw new ApiError(503, "MODEL_CONFIGURATION", "模型服务配置不完整或无效，请联系管理员。");
@@ -221,20 +299,36 @@ async function processClaim(
     const config = selectedProfile?.config;
     if (!selectedProfile || !config)
       throw new ApiError(503, "MODEL_NOT_CONFIGURED", "尚未配置生成模型，暂不能生成整理建议。");
-    const fingerprint = createHash("sha256")
-      .update(
-        JSON.stringify([
-          "organization-worker-v1",
-          ORGANIZATION_MODEL_CONTRACT_VERSION,
-          config.baseUrl,
-          config.model,
-          config.jsonMode,
-          config.thinkingMode ?? null,
-          selectedProfile.profile,
-          context.contextDigest,
-        ]),
-      )
-      .digest("hex");
+    const summaries = await readOrganizationSummaries(
+      store,
+      job.ownerId,
+      context.workspace,
+      context.request,
+    );
+    const summaryVersionRows = [...summaries.entries()].flatMap(([sourceId, rows]) =>
+      rows.map((row) => [sourceId, row.level, row.sectionIndex, row.createdAt ?? ""]),
+    );
+    const summaryVersion = summaryVersionRows.length
+      ? JSON.stringify(
+          summaryVersionRows.sort((left, right) => left.join("/").localeCompare(right.join("/"))),
+        )
+      : null;
+    const grounding = buildOrganizationGrounding(context.workspace, context.request, {
+      summaries,
+      maxRequestBytes: config.maxRequestBytes,
+    });
+    const fingerprintParts: unknown[] = [
+      "organization-worker-v1",
+      ORGANIZATION_MODEL_CONTRACT_VERSION,
+      config.baseUrl,
+      config.model,
+      config.jsonMode,
+      config.thinkingMode ?? null,
+      selectedProfile.profile,
+      context.contextDigest,
+    ];
+    if (summaryVersion) fingerprintParts.push(summaryVersion);
+    const fingerprint = createHash("sha256").update(JSON.stringify(fingerprintParts)).digest("hex");
     const ledger = createRequestStore();
     const reserved = await reserveRequest(
       ledger,

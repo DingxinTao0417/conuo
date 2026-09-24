@@ -682,6 +682,79 @@ describe("knowledge update API preserves owned note versions", () => {
 });
 
 describe("organization API account, evidence, and shared-ledger boundaries", () => {
+  it("loads current source summaries as navigation context and fingerprints their timestamps", async () => {
+    vi.stubEnv("CONUO_FEATURE_SECTION_SUMMARIES", "on");
+    const source = workspace.sources[0]!;
+    const representative = source.chunks.at(-1)!;
+    mock.rpc.mockImplementation(async (name: string) =>
+      name === "read_source_summaries"
+        ? {
+            data: [
+              {
+                level: "section",
+                sectionIndex: 0,
+                title: "章节导航",
+                pageStart: representative.page ?? null,
+                pageEnd: representative.page ?? null,
+                chunkIds: [representative.id],
+                summary: {
+                  paragraphs: [{ text: "ROUTE_NAVIGATION_ONLY", chunkIds: [representative.id] }],
+                },
+                modelName: "summary-model",
+                createdAt: "2026-09-24T00:00:00.000Z",
+              },
+              {
+                level: "document",
+                sectionIndex: 0,
+                title: "全书摘要",
+                chunkIds: [representative.id],
+                summary: {
+                  paragraphs: [{ text: "DOCUMENT_NAVIGATION_ONLY", chunkIds: [representative.id] }],
+                },
+                modelName: "summary-model",
+                createdAt: "2026-09-24T00:00:00.000Z",
+              },
+            ],
+            error: null,
+          }
+        : { data: null, error: null },
+    );
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    const messages = mock.callModel.mock.calls[0]![1] as ModelMessage[];
+    const prompt = JSON.parse(messages[1]!.content) as {
+      sectionSummaries: Array<{ text: string }>;
+      evidence: Array<{ text: string }>;
+    };
+    expect(prompt.sectionSummaries).toEqual([
+      expect.objectContaining({ text: "ROUTE_NAVIGATION_ONLY" }),
+    ]);
+    expect(prompt.evidence).toHaveLength(1);
+    expect(prompt.evidence[0]!.text).toBe(representative.text);
+    const summaryVersion = JSON.stringify(
+      [
+        [source.id, "section", 0, "2026-09-24T00:00:00.000Z"],
+        [source.id, "document", 0, "2026-09-24T00:00:00.000Z"],
+      ].sort((left, right) => left.join("/").localeCompare(right.join("/"))),
+    );
+    const expectedFingerprint = createHash("sha256")
+      .update(
+        JSON.stringify([
+          "organization-v3",
+          config.baseUrl,
+          config.model,
+          config.jsonMode,
+          null,
+          "default",
+          organizationContextKey(workspace, input()),
+          summaryVersion,
+        ]),
+      )
+      .digest("hex");
+    expect(mock.reserveRequest.mock.calls[0]![3]).toBe(expectedFingerprint);
+    vi.unstubAllEnvs();
+  });
+
   it("versions the model output contract in the interactive organization fingerprint", async () => {
     const organizationInput = input();
     const response = await POST(request());
@@ -694,13 +767,13 @@ describe("organization API account, evidence, and shared-ledger boundaries", () 
             config.baseUrl,
             config.model,
             config.jsonMode,
-            ...(contract === "organization-v2" ? [null] : []),
+            ...(contract === "organization-v3" ? [null] : []),
             "default",
             organizationContextKey(workspace, organizationInput),
           ]),
         )
         .digest("hex");
-    expect(mock.reserveRequest.mock.calls[0][3]).toBe(fingerprintFor("organization-v2"));
+    expect(mock.reserveRequest.mock.calls[0][3]).toBe(fingerprintFor("organization-v3"));
     expect(mock.reserveRequest.mock.calls[0][3]).not.toBe(fingerprintFor("organization-v1"));
     expect(mock.callModel).toHaveBeenCalledOnce();
   });
@@ -719,7 +792,7 @@ describe("organization API account, evidence, and shared-ledger boundaries", () 
         createHash("sha256")
           .update(
             JSON.stringify([
-              "organization-v2",
+              "organization-v3",
               config.baseUrl,
               config.model,
               config.jsonMode,

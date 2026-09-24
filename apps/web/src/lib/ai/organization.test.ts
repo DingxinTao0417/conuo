@@ -12,6 +12,7 @@ import {
   organizationMessages,
   validateOrganizationResult,
 } from "./organization";
+import type { SummaryRow } from "./grounding";
 
 let workspace: WorkspaceData;
 function request(kind: "source" | "knowledge" = "source"): OrganizationRequest {
@@ -63,6 +64,79 @@ beforeEach(() => {
 });
 
 describe("grounded source analysis and knowledge drafts", () => {
+  it("uses document-summary representative chunks across selected sources and keeps section notes out of citations", () => {
+    const input = request("knowledge");
+    const rows = new Map<string, SummaryRow[]>();
+    for (const source of workspace.sources.slice(0, 2)) {
+      const first = source.chunks[0]!;
+      const last = source.chunks[source.chunks.length - 1]!;
+      rows.set(source.id, [
+        {
+          level: "section",
+          sectionIndex: 0,
+          title: `章节 ${source.title}`,
+          pageStart: first.page ?? null,
+          pageEnd: last.page ?? null,
+          chunkIds: [first.id],
+          summary: {
+            paragraphs: [{ text: `NAVIGATION_ONLY_${source.id}`, chunkIds: [first.id] }],
+          },
+          createdAt: "2026-09-24T00:00:00.000Z",
+        },
+        {
+          level: "document",
+          sectionIndex: 0,
+          title: "全书摘要",
+          chunkIds: [first.id, last.id],
+          summary: {
+            paragraphs: [{ text: `DOCUMENT_NAV_${source.id}`, chunkIds: [last.id] }],
+          },
+          createdAt: "2026-09-24T00:00:00.000Z",
+        },
+      ]);
+    }
+    const grounding = buildOrganizationGrounding(workspace, input, {
+      summaries: rows,
+      maxRequestBytes: 524_288,
+    });
+    expect(grounding.evidence.map((item) => item.chunkId)).toEqual(
+      expect.arrayContaining(
+        workspace.sources.slice(0, 2).map((source) => source.chunks.at(-1)!.id),
+      ),
+    );
+    expect(grounding.evidence.length).toBeLessThanOrEqual(24);
+    expect(grounding.summarySections?.map((item) => item.text)).toEqual(
+      expect.arrayContaining([
+        `NAVIGATION_ONLY_${workspace.sources[0]!.id}`,
+        `NAVIGATION_ONLY_${workspace.sources[1]!.id}`,
+      ]),
+    );
+    const messages = organizationMessages(grounding, input);
+    expect(messages[0].content).toContain("never treat them as evidence");
+    const prompt = JSON.parse(messages[1].content) as {
+      sectionSummaries: Array<{ text: string }>;
+      evidence: Array<{ text: string }>;
+    };
+    expect(prompt.sectionSummaries.map((item) => item.text)).toEqual(
+      expect.arrayContaining([
+        `NAVIGATION_ONLY_${workspace.sources[0]!.id}`,
+        `NAVIGATION_ONLY_${workspace.sources[1]!.id}`,
+      ]),
+    );
+    expect(prompt.evidence.every((item) => !item.text.includes("NAVIGATION_ONLY_"))).toBe(true);
+  });
+
+  it("keeps the WP-01 evidence budget when summaries are absent", () => {
+    const input = request("knowledge");
+    const baseline = buildOrganizationGrounding(workspace, input);
+    const withEmptySummaries = buildOrganizationGrounding(workspace, input, {
+      summaries: new Map(),
+      maxRequestBytes: 4_194_304,
+    });
+    expect(withEmptySummaries.evidence).toEqual(baseline.evidence);
+    expect(withEmptySummaries.summarySections).toBeUndefined();
+  });
+
   it("binds summary, tag and topic references to canonical source/version/quote metadata", () => {
     const result = bind(sourceOutput());
     expect(result.kind).toBe("source");
@@ -438,7 +512,7 @@ describe("executable organization prompt contracts", () => {
     },
   );
   it("versions the corrected model contract independently of the result kind", () => {
-    expect(ORGANIZATION_MODEL_CONTRACT_VERSION).toBe("organization-v2");
+    expect(ORGANIZATION_MODEL_CONTRACT_VERSION).toBe("organization-v3");
   });
 
   it.each(["source", "knowledge", "update", "relations"] as const)(
