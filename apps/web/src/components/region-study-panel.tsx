@@ -27,6 +27,7 @@ import "katex/dist/katex.min.css";
 import "./region-study-panel.css";
 
 type StudyTask = "explain" | "ask" | "quiz";
+type WebVisionStudyResult = Exclude<VisionStudyResult, { task: "grade_work" }>;
 
 const tasks: { id: StudyTask; label: string; description: string; icon: typeof Lightbulb }[] = [
   { id: "explain", label: "解读", description: "梳理图中内容与关键点", icon: Lightbulb },
@@ -49,13 +50,13 @@ function taskAction(task: StudyTask) {
   return "开始解读";
 }
 
-function resultTitle(result: VisionStudyResult) {
+function resultTitle(result: WebVisionStudyResult) {
   if (result.task === "ask") return "区域回答";
   if (result.task === "quiz") return "区域练习";
   return "区域解读";
 }
 
-function resultForClipboard(result: VisionStudyResult) {
+function resultForClipboard(result: WebVisionStudyResult) {
   if (result.task !== "quiz") return result.content;
   return result.questions
     .map(
@@ -86,7 +87,7 @@ export default function RegionStudyPanel({
     | { state: "ready"; value: VisionRegionAvailability }
     | { state: "error"; message: string }
   >({ state: "checking" });
-  const [result, setResult] = useState<VisionStudyResult | null>(null);
+  const [result, setResult] = useState<WebVisionStudyResult | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -210,6 +211,10 @@ export default function RegionStudyPanel({
         controller.signal,
       );
       if (!controller.signal.aborted) {
+        if (next.task === "grade_work") {
+          setError("手写批改仅支持 iPad 区域学习。请在 iPad 上发送包含笔迹的截图。");
+          return;
+        }
         setResult(next);
         if (task === "ask" && next.task === "ask")
           setHistory((current) =>

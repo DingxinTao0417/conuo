@@ -208,6 +208,6 @@ describe("structured region explanation", () => {
   });
 
   it("isolates the structured output contract from old completed ledger semantics", () => {
-    expect(VISION_STUDY_SEMANTICS_VERSION).toBe("vision-region-v4");
+    expect(VISION_STUDY_SEMANTICS_VERSION).toBe("vision-region-v5");
   });
 });

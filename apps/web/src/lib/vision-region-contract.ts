@@ -53,7 +53,7 @@ const visionHistoryItemSchema = z
 export const visionStudyRequestSchema = z
   .object({
     requestId: id,
-    task: z.enum(["explain", "ask", "quiz"]),
+    task: z.enum(["explain", "ask", "quiz", "grade_work"]),
     provenance: visionProvenanceSchema,
     image: visionImageInputSchema,
     question: z.string().trim().min(1).max(2_000).optional(),
@@ -173,6 +173,29 @@ export const visionStudyResultSchema = z.discriminatedUnion("task", [
       provenance: visionProvenanceSchema,
       visibleText: visibleTextSchema.optional(),
       questions: z.array(quizQuestion).min(1).max(8),
+    })
+    .strict(),
+  z
+    .object({
+      mode: z.literal("vision"),
+      task: z.literal("grade_work"),
+      provenance: visionProvenanceSchema,
+      problem: z.string().trim().min(1).max(2_000),
+      steps: z
+        .array(
+          z
+            .object({
+              index: z.number().int(),
+              transcription: z.string().trim().max(1_000),
+              verdict: z.enum(["ok", "error", "unclear"]),
+              comment: z.string().trim().max(500),
+            })
+            .strict(),
+        )
+        .max(20),
+      firstErrorStep: z.number().int().nullable(),
+      overall: z.enum(["correct", "partially_correct", "incorrect", "cannot_judge"]),
+      hint: z.string().trim().max(600),
     })
     .strict(),
 ]);

@@ -540,7 +540,7 @@ describe("region visual-learning route", () => {
         createHash("sha256")
           .update(
             JSON.stringify([
-              "vision-region-v4",
+              "vision-region-v5",
               config.baseUrl,
               config.model,
               config.jsonMode,
@@ -687,7 +687,7 @@ describe("region visual-learning route", () => {
     },
   );
 
-  it.each(["explain", "ask", "quiz"] as const)(
+  it.each(["explain", "ask", "quiz", "grade_work"] as const)(
     "publishes and records %s for a scan with no indexed text or transcription",
     async (task) => {
       const source = workspace.sources[0];
@@ -714,9 +714,22 @@ describe("region visual-learning route", () => {
                 },
               ],
             }
-          : task === "explain"
-            ? explanation()
-            : { task, content: "箭头表示图中变量之间的影响方向。" };
+          : task === "grade_work"
+            ? {
+                task,
+                problem: "解方程 2x + 1 = 5。",
+                steps: [
+                  { index: 1, transcription: "2x + 1 = 5", verdict: "ok", comment: "抄写正确。" },
+                  { index: 2, transcription: "2x = 4", verdict: "ok", comment: "两边同时减 1。" },
+                  { index: 3, transcription: "x = 3", verdict: "error", comment: "应为 x = 2。" },
+                ],
+                firstErrorStep: 3,
+                overall: "partially_correct",
+                hint: "检查最后一步除以 2 的计算。",
+              }
+            : task === "explain"
+              ? explanation()
+              : { task, content: "箭头表示图中变量之间的影响方向。" };
       mock.callVisionModel.mockResolvedValueOnce(JSON.stringify(generated));
 
       const response = await POST(post(input));
@@ -729,6 +742,11 @@ describe("region visual-learning route", () => {
         ...(task === "explain" ? { content: explanationContent } : {}),
       });
       expect(result).not.toHaveProperty("visibleText");
+      if (task === "grade_work") {
+        const system = mock.callVisionModel.mock.calls[0][1][0].content;
+        expect(system).toContain("transcribe each visible handwritten step in order");
+        expect(system).toContain("Do not provide the complete solution");
+      }
       expect(mock.callVisionModel).toHaveBeenCalledExactlyOnceWith(
         config,
         expect.any(Array),

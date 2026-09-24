@@ -149,6 +149,29 @@ describe("RegionStudyPanel", () => {
     expect(host.textContent).toContain("请结合原图核对");
   });
 
+  it("does not render the iPad-only grade_work result in the Web panel", async () => {
+    mock.request.mockResolvedValue({
+      mode: "vision",
+      task: "grade_work",
+      provenance: {
+        sourceId: "source-one",
+        versionId: "version-one",
+        page: 7,
+        region: capture.region,
+      },
+      problem: "解方程 2x + 1 = 5。",
+      steps: [{ index: 1, transcription: "2x + 1 = 5", verdict: "ok", comment: "抄写正确。" }],
+      firstErrorStep: null,
+      overall: "correct",
+      hint: "继续检查下一步。",
+    } satisfies VisionStudyResult);
+    await render();
+    await click(button("开始解读"));
+
+    expect(host.querySelector(".region-study-result")).toBeNull();
+    expect(host.textContent).toContain("手写批改仅支持 iPad 区域学习");
+  });
+
   it("keeps links, images and HTML inactive while rendering Markdown", async () => {
     const content =
       "请核对 ![remote](https://tracker.invalid/pixel) [外部链接](https://tracker.invalid) <script>alert(1)</script>";
