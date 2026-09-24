@@ -168,6 +168,40 @@ function request(patch: Partial<AnswerRequest> = {}, signal?: AbortSignal) {
     signal,
   });
 }
+function configureCrossLibraryRange() {
+  const firstSpace = workspace.spaces[0]!;
+  const secondSpace = {
+    ...firstSpace,
+    id: "cross-library-space-two",
+    name: "第二个知识库",
+  };
+  workspace.spaces.push(secondSpace);
+  const [first, second] = workspace.sources;
+  first!.spaceIds = [firstSpace.id];
+  second!.spaceIds = [secondSpace.id];
+  const sourceIds = [first!.id, second!.id];
+  return {
+    sourceIds,
+    sourceVersions: sourceIds.map((sourceId) => {
+      const source = workspace.sources.find((item) => item.id === sourceId)!;
+      return { sourceId, versionId: source.versionId };
+    }),
+  };
+}
+function crossLibraryQuestion(
+  range: ReturnType<typeof configureCrossLibraryRange>,
+  patch: Partial<AnswerRequest> = {},
+) {
+  return question({
+    question: "两份资料如何帮助理解学习率？",
+    scope: "cross-library-sources",
+    sourceId: undefined,
+    sourceIds: range.sourceIds,
+    sourceVersions: range.sourceVersions,
+    spaceId: "all",
+    ...patch,
+  });
+}
 function generated(text: string, ids = ["e1"], kind: "source" | "note" | "inference" = "source") {
   return JSON.stringify({
     status: "answered",
@@ -219,6 +253,7 @@ async function expectError(response: Response, status: number, code: string) {
 describe("generated answer route with canonical source and request-ledger boundaries", () => {
   beforeEach(() => {
     vi.stubEnv("CONUO_FEATURE_RICH_ANSWERS", "off");
+    vi.stubEnv("CONUO_FEATURE_CROSS_LIBRARY_SEMANTIC", "off");
     Object.values(mock).forEach((fn) => fn.mockReset());
     mock.readModelProfile.mockImplementation(() => {
       const config = mock.readModelConfig();
@@ -360,6 +395,79 @@ describe("generated answer route with canonical source and request-ledger bounda
     expect(onResponse.status).toBe(200);
     const onFingerprint = mock.reserveRequest.mock.calls.at(-1)![3];
     expect(onFingerprint).not.toBe(offFingerprint);
+  });
+
+  it("uses semantic retrieval for a fixed cross-library range only when enabled", async () => {
+    const range = configureCrossLibraryRange();
+    workspace.semanticSearch = true;
+    const embedding = {
+      baseUrl: "https://embedding.example/v1",
+      apiKey: "test-only-embedding-key",
+      model: "test-only-embedding",
+      fingerprint: "a".repeat(64),
+    };
+    mock.embeddingConfig.mockReturnValue(embedding);
+    mock.reserveEmbeddingUsage.mockResolvedValue(undefined);
+    mock.embedQuery.mockResolvedValue([1, ...Array<number>(1535).fill(0)]);
+    const rows = (sourceIds: string[]) =>
+      sourceIds.map((sourceId) => {
+        const source = workspace.sources.find((item) => item.id === sourceId)!;
+        const chunk = source.chunks.find((item) => item.text.length > 80) ?? source.chunks[0]!;
+        return {
+          source_id: source.id,
+          version_id: source.versionId,
+          chunk_id: chunk.id,
+          score: 1,
+          workspace_revision: workspaceRevision,
+        };
+      });
+    mock.rpc.mockImplementation(async (name, args) => {
+      const sourceIds = args.p_source_ids as string[];
+      if (name === "search_source_chunks") return { data: rows(sourceIds), error: null };
+      if (name === "embedding_job_status")
+        return {
+          data: {
+            jobs: sourceIds.map((sourceId) => ({
+              sourceId,
+              versionId: workspace.sources.find((item) => item.id === sourceId)!.versionId,
+              state: "succeeded",
+              profileFingerprint: embedding.fingerprint,
+            })),
+          },
+          error: null,
+        };
+      if (name === "semantic_source_chunks") return { data: rows(sourceIds), error: null };
+      throw new Error(`unexpected RPC ${name}`);
+    });
+
+    const keywordResponse = await POST(request(crossLibraryQuestion(range)));
+    expect(keywordResponse.status).toBe(200);
+    expect(mock.rpc.mock.calls.map(([name]) => name)).toEqual(["search_source_chunks"]);
+    expect(mock.embedQuery).not.toHaveBeenCalled();
+
+    mock.rpc.mockClear();
+    mock.embedQuery.mockClear();
+    vi.stubEnv("CONUO_FEATURE_CROSS_LIBRARY_SEMANTIC", "on");
+    const semanticResponse = await POST(
+      request({
+        ...crossLibraryQuestion(range),
+        requestId: "cross-library-semantic-on",
+      }),
+    );
+    expect(semanticResponse.status).toBe(200);
+    expect(mock.rpc.mock.calls.map(([name]) => name)).toEqual([
+      "search_source_chunks",
+      "embedding_job_status",
+      "semantic_source_chunks",
+    ]);
+    expect(mock.rpc).toHaveBeenCalledWith(
+      "semantic_source_chunks",
+      expect.objectContaining({
+        p_space_id: "*",
+        p_source_ids: range.sourceIds,
+      }),
+    );
+    expect(mock.embedQuery).toHaveBeenCalledOnce();
   });
 
   it("binds omitted, enabled and disabled thinking modes to distinct answer fingerprints", async () => {

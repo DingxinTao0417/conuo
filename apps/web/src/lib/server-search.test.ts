@@ -144,6 +144,7 @@ function searchRequest(
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("CONUO_FEATURE_CROSS_LIBRARY_SEMANTIC", "off");
   revision = 12;
   data = createEmptyWorkspace();
   data.spaces = ["alpha", "beta"].map((id) => ({
@@ -384,6 +385,76 @@ describe("semantic query disclosure and freshness", () => {
       expect(mock.embed).not.toHaveBeenCalled();
     },
   );
+
+  it("allows bounded AI all-library semantic search when the switch is on", async () => {
+    vi.stubEnv("CONUO_FEATURE_CROSS_LIBRARY_SEMANTIC", "on");
+    data.sources = [source("one"), source("two", { spaceIds: ["beta"] })];
+    const jobs = data.sources.map((item) => ({
+      sourceId: item.id,
+      versionId: item.versionId,
+      state: "succeeded",
+      profileFingerprint: fingerprint,
+    }));
+    mock.rpc.mockImplementation(async (name) => {
+      if (name === "embedding_job_status") return { data: { jobs }, error: null };
+      if (name === "search_source_chunks") return { data: [row(data.sources[0])], error: null };
+      if (name === "semantic_source_chunks") return { data: [row(data.sources[1])], error: null };
+      throw new Error(`unexpected RPC ${name}`);
+    });
+
+    const result = await indexedSourceCandidates(
+      client as never,
+      data,
+      revision,
+      { ...query, scope: { kind: "all" } },
+      true,
+      semanticOptions(),
+    );
+
+    expect(mock.rpc).toHaveBeenCalledWith(
+      "semantic_source_chunks",
+      expect.objectContaining({
+        p_space_id: "*",
+        p_source_ids: ["one", "two"],
+      }),
+    );
+    expect(result.map((item) => item.objectId).sort()).toEqual(["one", "two"]);
+  });
+
+  it("keeps non-AI all-library semantic search rejected when the switch is on", async () => {
+    vi.stubEnv("CONUO_FEATURE_CROSS_LIBRARY_SEMANTIC", "on");
+    await expect(
+      indexedSourceCandidates(
+        client as never,
+        data,
+        revision,
+        { ...query, scope: { kind: "all" } },
+        false,
+        semanticOptions(),
+      ),
+    ).rejects.toMatchObject({ status: 400, code: "SEMANTIC_SCOPE_REQUIRED" });
+    expect(mock.rpc).not.toHaveBeenCalled();
+    expect(mock.embed).not.toHaveBeenCalled();
+  });
+
+  it("keeps all-library semantic search bounded to five AI sources", async () => {
+    vi.stubEnv("CONUO_FEATURE_CROSS_LIBRARY_SEMANTIC", "on");
+    data.sources = Array.from({ length: 6 }, (_, index) =>
+      source(`source-${index}`, { spaceIds: [index % 2 ? "beta" : "alpha"] }),
+    );
+    await expect(
+      indexedSourceCandidates(
+        client as never,
+        data,
+        revision,
+        { ...query, scope: { kind: "all" } },
+        true,
+        semanticOptions(),
+      ),
+    ).rejects.toMatchObject({ status: 400, code: "SEMANTIC_SCOPE_REQUIRED" });
+    expect(mock.rpc).not.toHaveBeenCalled();
+    expect(mock.embed).not.toHaveBeenCalled();
+  });
 
   it.each(["aiEnabled", "semanticSearch"] as const)(
     "requires %s before even checking the index",

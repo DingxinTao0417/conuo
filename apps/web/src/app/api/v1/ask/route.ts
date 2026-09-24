@@ -467,8 +467,13 @@ export async function POST(request: Request) {
               : { kind: "space" as const, spaceId: question.spaceId },
           limit: 100,
         };
+        const crossLibrary = isCrossLibraryAnswerRequest(question);
+        const crossLibrarySemanticEnabled =
+          crossLibrary && aiFeatureEnabled("CROSS_LIBRARY_SEMANTIC");
         let searchMode: "keyword" | "semantic" =
-          !isCrossLibraryAnswerRequest(question) && initial.semanticSearch && readEmbeddingConfig()
+          (!crossLibrary || crossLibrarySemanticEnabled) &&
+          initial.semanticSearch &&
+          readEmbeddingConfig()
             ? "semantic"
             : "keyword";
         let candidates;

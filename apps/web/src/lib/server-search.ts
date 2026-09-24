@@ -7,6 +7,7 @@ import type { SearchCandidate, SearchRequest } from "./search-types";
 import { materializeSearchCandidates, searchItemEligible, searchWorkspace } from "./search";
 import { isHeadingOnly, selectedSources } from "./retrieval";
 import { readEmbeddingConfig, embedQuery, reserveEmbeddingUsage } from "./ai/embeddings";
+import { aiFeatureEnabled } from "./ai/features";
 
 type Client = Awaited<ReturnType<typeof createClient>>;
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);
@@ -40,16 +41,6 @@ export async function indexedSourceCandidates(
 ): Promise<SearchCandidate[]> {
   // All metadata filters run BEFORE the database candidate limit, never only after ANN top-K.
   materializeSearchCandidates(data, request, []);
-  if (options?.mode === "semantic") {
-    if (request.scope.kind === "all")
-      throw new ApiError(
-        400,
-        "SEMANTIC_SCOPE_REQUIRED",
-        "请先选择一个知识库或收件箱，再进行语义搜索。",
-      );
-    if (!data.aiEnabled || !data.semanticSearch)
-      throw new ApiError(403, "SEMANTIC_DISABLED", "请先在设置中开启语义索引与搜索。");
-  }
   const ids = data.sources
     .filter(
       (source) =>
@@ -58,6 +49,19 @@ export async function indexedSourceCandidates(
           (data.aiEnabled && source.aiAllowed && ["ready", "partial"].includes(source.status))),
     )
     .map((source) => source.id);
+  if (options?.mode === "semantic") {
+    if (
+      request.scope.kind === "all" &&
+      !(forAI && ids.length <= 5 && aiFeatureEnabled("CROSS_LIBRARY_SEMANTIC"))
+    )
+      throw new ApiError(
+        400,
+        "SEMANTIC_SCOPE_REQUIRED",
+        "请先选择一个知识库或收件箱，再进行语义搜索。",
+      );
+    if (!data.aiEnabled || !data.semanticSearch)
+      throw new ApiError(403, "SEMANTIC_DISABLED", "请先在设置中开启语义索引与搜索。");
+  }
   if (!ids.length) return [];
   const args = {
     p_space_id:
@@ -125,7 +129,10 @@ export async function indexedSourceCandidates(
   };
   const keyword = await parse(lexical.data);
   if (options?.mode !== "semantic") return keyword;
-  if (request.scope.kind === "all")
+  if (
+    request.scope.kind === "all" &&
+    !(forAI && ids.length <= 5 && aiFeatureEnabled("CROSS_LIBRARY_SEMANTIC"))
+  )
     throw new ApiError(
       400,
       "SEMANTIC_SCOPE_REQUIRED",
@@ -238,7 +245,10 @@ export function indexedCitations(
       !source ||
       !chunk ||
       isHeadingOnly(source, chunk) ||
-      !(source.text.includes(chunk.text) || source.text.replace(/\s+/g, "").includes(chunk.text.replace(/\s+/g, "")))
+      !(
+        source.text.includes(chunk.text) ||
+        source.text.replace(/\s+/g, "").includes(chunk.text.replace(/\s+/g, ""))
+      )
     )
       continue;
     const key = `${source.id}:${chunk.id}`;
