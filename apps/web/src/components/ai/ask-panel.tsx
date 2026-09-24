@@ -165,6 +165,8 @@ export default function AskPanel({
     setInput,
     deepThinking,
     setDeepThinking,
+    tutorMode,
+    setTutorMode,
     busy,
     stopping,
     answerDraft,
@@ -765,6 +767,17 @@ export default function AskPanel({
                   onChange={(event) => setDeepThinking(event.target.checked)}
                 />
                 <span>深度思考</span>
+              </label>
+            )}
+            {process.env.NEXT_PUBLIC_CONUO_FEATURE_TUTOR_MODE === "on" && (
+              <label className="reader-tutor-toggle" title="引导我思考，而不是一次给出完整答案">
+                <input
+                  type="checkbox"
+                  checked={tutorMode}
+                  disabled={composerDisabled}
+                  onChange={(event) => setTutorMode(event.target.checked)}
+                />
+                <span>回答方式：{tutorMode ? "引导我思考" : "直接解答"}</span>
               </label>
             )}
             {busy ? (

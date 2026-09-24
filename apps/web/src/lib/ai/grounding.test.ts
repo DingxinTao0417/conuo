@@ -99,6 +99,18 @@ describe("bounded model grounding", () => {
       groundingMessages(grounding, question, {}),
     );
   });
+
+  it("adds the tutor instructions only for tutor mode", () => {
+    const { data, question } = fixture();
+    const grounding = buildGrounding(data, question);
+    const tutor = groundingMessages(grounding, question, { mode: "tutor" });
+    const answer = groundingMessages(grounding, question, { mode: "answer" });
+    expect(tutor[0]!.content).toContain("Tutor mode: help the learner reason");
+    expect(tutor[0]!.content).toContain(
+      "Give the complete answer only when the learner explicitly asks for it",
+    );
+    expect(answer[0]!.content).not.toContain("Tutor mode: help the learner reason");
+  });
   it("builds a complete canonical document grounding within the requested budget", () => {
     const { data, question } = fixture();
     setText(data, 0, "第一段资料内容。\n\n第二段资料内容。\n\n第三段资料内容。");

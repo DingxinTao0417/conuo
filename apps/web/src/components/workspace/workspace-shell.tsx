@@ -2636,6 +2636,7 @@ export default function Workspace({
                     ...latest,
                     question: input.question,
                     requestId: input.requestId,
+                    ...(input.mode === "tutor" ? { mode: input.mode } : {}),
                   });
                   const request = validateComparisonAnswerRequest(latest, {
                     ...base,

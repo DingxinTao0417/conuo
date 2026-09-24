@@ -545,6 +545,23 @@ describe("generated answer route with canonical source and request-ledger bounda
     );
   });
 
+  it("uses tutor instructions and a distinct fingerprint only when the server switch is on", async () => {
+    vi.stubEnv("CONUO_FEATURE_TUTOR_MODE", "on");
+    const enabled = await POST(request({ mode: "tutor", requestId: "tutor-enabled" }));
+    expect(enabled.status).toBe(200);
+    const enabledMessages = mock.callModel.mock.calls.at(-1)?.[1] as ModelMessage[];
+    expect(enabledMessages[0]?.content).toContain("Tutor mode: help the learner reason");
+    const enabledFingerprint = mock.reserveRequest.mock.calls.at(-1)?.[3];
+
+    vi.stubEnv("CONUO_FEATURE_TUTOR_MODE", "off");
+    const disabled = await POST(request({ mode: "tutor", requestId: "tutor-disabled" }));
+    expect(disabled.status).toBe(200);
+    const disabledMessages = mock.callModel.mock.calls.at(-1)?.[1] as ModelMessage[];
+    expect(disabledMessages[0]?.content).not.toContain("Tutor mode: help the learner reason");
+    const disabledFingerprint = mock.reserveRequest.mock.calls.at(-1)?.[3];
+    expect(enabledFingerprint).not.toBe(disabledFingerprint);
+  });
+
   it("relabels a source paragraph when the fast verifier marks it unsupported", async () => {
     vi.stubEnv("CONUO_FEATURE_ANSWER_VERIFY", "on");
     mock.callModel

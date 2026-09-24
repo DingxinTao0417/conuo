@@ -476,6 +476,8 @@ export async function POST(request: Request) {
     );
     if (!parsed.success) throw new ApiError(400, "INVALID_QUESTION", "请检查问题长度与资料范围。");
     const question = parsed.data;
+    const tutorModeEnabled = aiFeatureEnabled("TUTOR_MODE");
+    const mode = tutorModeEnabled && question.mode === "tutor" ? "tutor" : "answer";
     const depth =
       question.depth === "deep" && aiFeatureEnabled("DEEP_THINKING") ? "deep" : "standard";
     deadlineAt = startedAt + (depth === "deep" ? 280_000 : ANSWER_STREAM_LIMITS.durationMs);
@@ -759,6 +761,7 @@ export async function POST(request: Request) {
                 readEmbeddingConfig()?.fingerprint ?? null,
                 ...(rerankFingerprint === undefined ? [] : ["rerank:" + rerankFingerprint]),
                 "depth:" + depth,
+                ...(tutorModeEnabled ? ["mode:" + mode] : []),
                 ...(verifyEnabled ? [VERIFY_CONTRACT_VERSION] : []),
                 ...(memoryEnabled ? ["memory:" + priorMemory.key] : []),
                 ...outlineFingerprint,
@@ -1002,6 +1005,7 @@ export async function POST(request: Request) {
                   readEmbeddingConfig()?.fingerprint ?? null,
                   ...(rerankFingerprint === undefined ? [] : ["rerank:" + rerankFingerprint]),
                   "depth:" + depth,
+                  ...(tutorModeEnabled ? ["mode:" + mode] : []),
                   ...(verifyEnabled ? [VERIFY_CONTRACT_VERSION] : []),
                   ...(memoryEnabled ? ["memory:" + priorMemory.key] : []),
                   ...outlineFingerprint,
@@ -1032,6 +1036,7 @@ export async function POST(request: Request) {
           const preview = send ? createGroundingPreview(grounding, { format }) : undefined;
           const messages = groundingMessages(grounding, question, {
             format,
+            mode,
             ...(memoryEnabled ? { priorAnswers: priorMemory.answers } : {}),
           });
           traceRecorder?.mark("modelStart");

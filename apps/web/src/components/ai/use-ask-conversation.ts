@@ -12,6 +12,7 @@ export interface AskRunHandlers {
     signal: AbortSignal,
     onProgress: OnAnswerProgress,
     depth: "standard" | "deep",
+    mode: "answer" | "tutor",
   ) => Promise<AnswerResult>;
   /**
    * Whether the host still owns this request. A reader that has navigated to
@@ -41,6 +42,7 @@ export interface AskRunHandlers {
 export function useAskConversation() {
   const [input, setInput] = useState("");
   const [deepThinking, setDeepThinking] = useState(false);
+  const [tutorMode, setTutorMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [answerDraft, setAnswerDraft] = useState<AnswerResult | null>(null);
@@ -95,6 +97,7 @@ export function useAskConversation() {
     setHistoryOpen(false);
     setInput("");
     setDeepThinking(false);
+    setTutorMode(false);
     setError("");
     setSaveTargetMessageId(null);
     setKnowledgePageTargetId("");
@@ -108,6 +111,7 @@ export function useAskConversation() {
     replaceAnswerDraft(null);
     setInput("");
     setDeepThinking(false);
+    setTutorMode(false);
     setBusy(false);
     setStopping(false);
     setAnswerPhase("retrieving");
@@ -156,6 +160,7 @@ export function useAskConversation() {
             else setAnswerPhase(event.phase);
           },
           deepThinking ? "deep" : "standard",
+          tutorMode ? "tutor" : "answer",
         );
         if (requestController.signal.aborted) throw new DOMException("已停止", "AbortError");
         onAnswer(answer);
@@ -182,7 +187,7 @@ export function useAskConversation() {
         }
       }
     },
-    [deepThinking, replaceAnswerDraft],
+    [deepThinking, replaceAnswerDraft, tutorMode],
   );
 
   return {
@@ -190,6 +195,8 @@ export function useAskConversation() {
     setInput,
     deepThinking,
     setDeepThinking,
+    tutorMode,
+    setTutorMode,
     busy,
     stopping,
     answerDraft,

@@ -163,6 +163,20 @@ describe("answer request contract per scope option", () => {
     expect(request).not.toHaveProperty("userContext");
   });
 
+  it("carries tutor mode outside the frozen scope snapshot", () => {
+    const request = answerRequestFromSnapshot(
+      {
+        scope: "document",
+        sourceId: source.id,
+        sourceIds: [],
+        spaceId,
+      },
+      { question: "引导我思考", mode: "tutor" },
+    );
+    expect(request.mode).toBe("tutor");
+    expect(request).not.toHaveProperty("depth");
+  });
+
   it("keeps the document and document-notes ranges pinned to one document", () => {
     for (const scope of ["document", "document-notes"] as const) {
       const request = readerSnapshot(scope);

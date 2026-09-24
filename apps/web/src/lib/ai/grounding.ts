@@ -582,7 +582,11 @@ function evidenceJson(citation: Citation, id: string, outlines?: Map<string, Out
 export function groundingMessages(
   grounding: Grounding,
   request: AnswerRequest,
-  options: { format?: AnswerFormat; priorAnswers?: Array<{ text: string }> } = {},
+  options: {
+    format?: AnswerFormat;
+    priorAnswers?: Array<{ text: string }>;
+    mode?: AnswerRequest["mode"];
+  } = {},
 ): Array<{ role: "system" | "user"; content: string }> {
   const format = options.format ?? "plain";
   const answerFormatInstruction =
@@ -606,6 +610,15 @@ export function groundingMessages(
       ? [
           "The evidence array contains the complete parsed text of the selected document(s), in reading order.",
           "Cite at most 12 distinct evidence IDs in the whole answer; choose the most specific passages.",
+        ]
+      : []),
+    ...(options.mode === "tutor"
+      ? [
+          "Tutor mode: help the learner reason instead of giving the full answer at once.",
+          "- If the learner has not attempted an answer yet, ask one focused guiding question grounded in the evidence, optionally with a short hint.",
+          "- If the learner's latest message is an attempt, say what is correct, point out one gap with evidence, then ask the next guiding question.",
+          '- Give the complete answer only when the learner explicitly asks for it (for example "直接告诉我") or after two attempts on the same point.',
+          "- Keep the same JSON output contract. The final paragraph should usually be the question for the learner.",
         ]
       : []),
   ].join("\n");

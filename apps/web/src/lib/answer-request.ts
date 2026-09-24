@@ -15,6 +15,7 @@ export function answerRequestFromSnapshot(
     question: string;
     requestId?: string;
     depth?: AnswerRequest["depth"];
+    mode?: AnswerRequest["mode"];
     conversationId?: string;
   },
 ): AnswerRequest {
@@ -27,6 +28,7 @@ export function answerRequestFromSnapshot(
     ...(input.conversationId ? { conversationId: input.conversationId } : {}),
     question: input.question,
     ...(input.depth ? { depth: input.depth } : {}),
+    ...(input.mode && input.mode !== "answer" ? { mode: input.mode } : {}),
     ...(snapshot.userContext?.length ? { userContext: [...snapshot.userContext] } : {}),
     scope: snapshot.scope,
     sourceId: singleDocument ? snapshot.sourceId : undefined,

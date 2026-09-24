@@ -1912,12 +1912,13 @@ export default function Reader(props: ReaderProps) {
     const readerIdentity = `${source.id}:${source.versionId}`;
     await runAsk({
       accepts: () => activeSourceId.current === readerIdentity,
-      dispatch: (signal, onProgress, depth) =>
+      dispatch: (signal, onProgress, depth, mode) =>
         onAsk(
           answerRequestFromSnapshot(requestSnapshot, {
             question,
             requestId: attempt.id,
             depth,
+            mode,
             conversationId: next.id,
           }),
           signal,

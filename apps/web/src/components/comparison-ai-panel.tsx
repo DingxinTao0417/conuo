@@ -39,6 +39,7 @@ export interface ComparisonAskInput {
   requestId: string;
   question: string;
   conversationId?: string;
+  mode?: "answer" | "tutor";
   /** Prior learner questions only; model responses never become question context. */
   userContext?: string[];
 }
@@ -236,6 +237,8 @@ export default function ComparisonAskPanel({
   const {
     input,
     setInput,
+    tutorMode,
+    setTutorMode,
     busy,
     stopping,
     answerDraft,
@@ -365,12 +368,13 @@ export default function ComparisonAskPanel({
 
     await ask.run({
       accepts: owns,
-      dispatch: (signal, onProgress) =>
+      dispatch: (signal, onProgress, _depth, mode) =>
         onAsk(
           {
             requestId: attempt.id,
             question,
             conversationId: next.id,
+            ...(mode === "tutor" ? { mode } : {}),
             ...(userContext.length ? { userContext } : {}),
           },
           signal,
@@ -583,6 +587,17 @@ export default function ComparisonAskPanel({
           />
           <div>
             <span>{busy ? "范围已锁定为两份资料" : "⌘ / Ctrl + Enter 发送"}</span>
+            {process.env.NEXT_PUBLIC_CONUO_FEATURE_TUTOR_MODE === "on" && (
+              <label className="comparison-ai-tutor-toggle">
+                <input
+                  type="checkbox"
+                  checked={tutorMode}
+                  disabled={busy || !!unavailableReason}
+                  onChange={(event) => setTutorMode(event.target.checked)}
+                />
+                <span>回答方式：{tutorMode ? "引导我思考" : "直接解答"}</span>
+              </label>
+            )}
             {busy ? (
               <button
                 type="button"

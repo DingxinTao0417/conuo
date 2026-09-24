@@ -282,7 +282,7 @@ export type Scope =
  */
 export type AnswerScopeSnapshot = Omit<
   AnswerRequest,
-  "requestId" | "question" | "depth" | "conversationId"
+  "requestId" | "question" | "depth" | "conversationId" | "mode"
 >;
 export interface AnswerAttempt {
   /** Unique request ID for this try. It is never reused when retrying. */
@@ -363,6 +363,7 @@ export interface AnswerRequest {
   conversationId?: string;
   question: string;
   depth?: "standard" | "deep";
+  mode?: "answer" | "tutor";
   /** Bounded, prior user questions used only to resolve a follow-up's subject. */
   userContext?: string[];
   scope: Scope;

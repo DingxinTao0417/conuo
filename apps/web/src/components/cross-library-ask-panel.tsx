@@ -148,6 +148,7 @@ export default function CrossLibraryAskPanel({
   const [input, setInput] = useState(() =>
     initialConversation || initialConversationId ? "" : (initialQuestion ?? "").slice(0, 4000),
   );
+  const [tutorMode, setTutorMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const controller = useRef<AbortController | null>(null);
@@ -201,6 +202,7 @@ export default function CrossLibraryAskPanel({
     appliedInitialConversationId.current = initialConversationId;
     setHistoryOpen(false);
     setInput("");
+    setTutorMode(false);
     setError("");
     if (initialConversation) {
       setSelectedConversationId(initialConversation.id);
@@ -239,6 +241,7 @@ export default function CrossLibraryAskPanel({
     setSelectedIds([]);
     setHistoryOpen(false);
     setInput("");
+    setTutorMode(false);
     setError("");
     if (hadActiveConversation) onActiveConversationChange();
   }
@@ -329,7 +332,14 @@ export default function CrossLibraryAskPanel({
     const signal = new AbortController();
     controller.current = signal;
     try {
-      const answer = await onAsk({ ...request, conversationId: thread.id }, signal.signal);
+      const answer = await onAsk(
+        {
+          ...request,
+          conversationId: thread.id,
+          ...(tutorMode ? { mode: "tutor" as const } : {}),
+        },
+        signal.signal,
+      );
       if (controller.current !== signal) return;
       if (signal.signal.aborted) {
         throw signal.signal.reason instanceof Error
@@ -610,6 +620,17 @@ export default function CrossLibraryAskPanel({
               <span>
                 {conversation ? "会沿用保存的资料与版本" : "首次发送后将锁定当前资料版本"}
               </span>
+              {process.env.NEXT_PUBLIC_CONUO_FEATURE_TUTOR_MODE === "on" && (
+                <label className="cross-library-tutor-toggle">
+                  <input
+                    type="checkbox"
+                    checked={tutorMode}
+                    disabled={busy || !data.aiEnabled || Boolean(unavailable)}
+                    onChange={(event) => setTutorMode(event.target.checked)}
+                  />
+                  <span>回答方式：{tutorMode ? "引导我思考" : "直接解答"}</span>
+                </label>
+              )}
               {busy ? (
                 <button
                   type="button"
