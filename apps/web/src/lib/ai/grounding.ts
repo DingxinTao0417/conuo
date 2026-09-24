@@ -481,6 +481,18 @@ const generatedSchema = z
   .strict();
 const escapeMarkdown = (value: string) => value.replace(/[\\`*_{}\[\]<>#!|]/g, "\\$&");
 
+export interface ParsedAnswerParagraph {
+  text: string;
+  kind: "source" | "note" | "inference";
+  evidenceIndexes: number[];
+  noteIndexes: number[];
+}
+
+export type ParsedAnswer =
+  { status: "insufficient" } | { status: "answered"; paragraphs: ParsedAnswerParagraph[] };
+
+const parsedReferenceOrder = new WeakMap<ParsedAnswerParagraph, string[]>();
+
 function containsQuantifiedAnswerSelfRating(text: string): boolean {
   const normalized = text.normalize("NFKC");
   return normalized
@@ -496,12 +508,8 @@ function insufficientAnswer(grounding: Grounding): AnswerResult {
   };
 }
 
-/** The model supplies references only; canonical source IDs/quotes/pages remain server-owned. */
-export function bindGeneratedAnswer(
-  raw: string,
-  grounding: Grounding,
-  options: { format?: AnswerFormat } = {},
-): AnswerResult {
+/** Validates the model response and resolves its references to grounding indexes. */
+export function parseGeneratedAnswer(raw: string, grounding: Grounding): ParsedAnswer {
   let value: unknown;
   try {
     value = JSON.parse(raw);
@@ -511,61 +519,111 @@ export function bindGeneratedAnswer(
   const parsed = generatedSchema.safeParse(value);
   if (!parsed.success)
     throw new ApiError(502, "INVALID_MODEL_ANSWER", "模型回答格式不完整，请重新生成。");
-  const hasQuantifiedSelfRating =
-    parsed.data.status === "answered" &&
-    parsed.data.paragraphs.some((paragraph) => containsQuantifiedAnswerSelfRating(paragraph.text));
   if (parsed.data.status === "insufficient") {
     if (parsed.data.paragraphs.length)
       throw new ApiError(502, "INVALID_MODEL_ANSWER", "模型回答状态不一致，请重新生成。");
-    return insufficientAnswer(grounding);
+    return { status: "insufficient" };
   }
   if (!parsed.data.paragraphs.length)
     throw new ApiError(502, "INVALID_MODEL_ANSWER", "模型未返回可核对的回答，请重新生成。");
-  const citations: Citation[] = [];
-  const noteEvidence: AnswerNoteEvidence[] = [];
-  const numbering = new Map<string, number>();
-  const noteNumbering = new Map<string, number>();
-  const content = parsed.data.paragraphs
-    .map((paragraph) => {
-      let hasSource = false;
-      let hasNote = false;
-      const refs = [...new Set(paragraph.evidenceIds)].map((id) => {
-        const index = Number(id.slice(1)) - 1;
-        if (id.startsWith("e")) {
-          const canonical = grounding.evidence[index];
-          if (!canonical)
-            throw new ApiError(
-              502,
-              "INVALID_MODEL_CITATION",
-              "模型引用了范围外的片段，此次回答未保存。请重新生成。",
-            );
-          hasSource = true;
-          if (!numbering.has(id)) {
-            citations.push(canonical);
-            numbering.set(id, citations.length);
-          }
-          return `[${numbering.get(id)}]`;
-        }
-        const canonical = grounding.noteEvidence[index];
-        if (!canonical)
+
+  const sourceIndexes = new Set<number>();
+  const paragraphs = parsed.data.paragraphs.map((paragraph) => {
+    const evidenceIndexes: number[] = [];
+    const noteIndexes: number[] = [];
+    const referenceOrder: string[] = [];
+    let hasSource = false;
+    let hasNote = false;
+    for (const id of [...new Set(paragraph.evidenceIds)]) {
+      const index = Number(id.slice(1)) - 1;
+      if (id.startsWith("e")) {
+        if (!grounding.evidence[index])
+          throw new ApiError(
+            502,
+            "INVALID_MODEL_CITATION",
+            "模型引用了范围外的片段，此次回答未保存。请重新生成。",
+          );
+        hasSource = true;
+        sourceIndexes.add(index);
+        evidenceIndexes.push(index);
+      } else {
+        if (!grounding.noteEvidence[index])
           throw new ApiError(
             502,
             "INVALID_MODEL_CITATION",
             "模型引用了范围外的笔记依据，此次回答未保存。请重新生成。",
           );
         hasNote = true;
-        if (!noteNumbering.has(id)) {
-          noteEvidence.push(canonical);
-          noteNumbering.set(id, noteEvidence.length);
+        noteIndexes.push(index);
+      }
+      referenceOrder.push(id);
+    }
+    if (paragraph.kind === "source" && (!hasSource || hasNote))
+      throw new ApiError(502, "INVALID_MODEL_CITATION", "原文结论只能引用原始资料依据。");
+    if (paragraph.kind === "note" && (!hasNote || hasSource))
+      throw new ApiError(502, "INVALID_MODEL_CITATION", "笔记结论只能引用我的笔记依据。");
+    const result: ParsedAnswerParagraph = {
+      text: paragraph.text,
+      kind: paragraph.kind,
+      evidenceIndexes,
+      noteIndexes,
+    };
+    parsedReferenceOrder.set(result, referenceOrder);
+    return result;
+  });
+  if (sourceIndexes.size > MAX_CHUNKS)
+    throw new ApiError(
+      502,
+      "INVALID_MODEL_CITATION",
+      "回答引用的原文片段过多，本次未保存。请缩小问题后重试。",
+    );
+  if (paragraphs.some((paragraph) => containsQuantifiedAnswerSelfRating(paragraph.text)))
+    throw new ApiError(
+      502,
+      "INVALID_MODEL_ANSWER",
+      "模型回答包含不可核验的量化自评，本次未保存。请重新生成。",
+    );
+  return { status: "answered", paragraphs };
+}
+
+/** Renders a validated answer while keeping canonical citations server-owned. */
+export function renderGeneratedAnswer(
+  parsed: ParsedAnswer,
+  grounding: Grounding,
+  options: { format?: AnswerFormat; unsupported?: ReadonlySet<number> } = {},
+): AnswerResult {
+  if (parsed.status === "insufficient") return insufficientAnswer(grounding);
+  const citations: Citation[] = [];
+  const noteEvidence: AnswerNoteEvidence[] = [];
+  const numbering = new Map<number, number>();
+  const noteNumbering = new Map<number, number>();
+  const content = parsed.paragraphs
+    .map((paragraph, paragraphIndex) => {
+      const order = parsedReferenceOrder.get(paragraph) ?? [
+        ...paragraph.evidenceIndexes.map((index) => `e${index + 1}`),
+        ...paragraph.noteIndexes.map((index) => `n${index + 1}`),
+      ];
+      const refs = order.map((id) => {
+        const index = Number(id.slice(1)) - 1;
+        if (id.startsWith("e")) {
+          const canonical = grounding.evidence[index]!;
+          if (!numbering.has(index)) {
+            citations.push(canonical);
+            numbering.set(index, citations.length);
+          }
+          return `[${numbering.get(index)}]`;
         }
-        return `**${answerNoteMarker(noteNumbering.get(id)! - 1)}**`;
+        const canonical = grounding.noteEvidence[index]!;
+        if (!noteNumbering.has(index)) {
+          noteEvidence.push(canonical);
+          noteNumbering.set(index, noteEvidence.length);
+        }
+        return `**${answerNoteMarker(noteNumbering.get(index)! - 1)}**`;
       });
-      if (paragraph.kind === "source" && (!hasSource || hasNote))
-        throw new ApiError(502, "INVALID_MODEL_CITATION", "原文结论只能引用原始资料依据。");
-      if (paragraph.kind === "note" && (!hasNote || hasSource))
-        throw new ApiError(502, "INVALID_MODEL_CITATION", "笔记结论只能引用我的笔记依据。");
-      const prefix =
-        paragraph.kind === "inference"
+      const unsupported = paragraph.kind === "source" && options.unsupported?.has(paragraphIndex);
+      const prefix = unsupported
+        ? "**推断（原文未直接支持，请核对）：** "
+        : paragraph.kind === "inference"
           ? "**推断：** "
           : paragraph.kind === "note"
             ? "**来自我的笔记：** "
@@ -577,22 +635,19 @@ export function bindGeneratedAnswer(
       return withReferences(withLabel(body, prefix), refs.join(" "));
     })
     .join("\n\n");
-  if (citations.length > MAX_CHUNKS)
-    throw new ApiError(
-      502,
-      "INVALID_MODEL_CITATION",
-      "回答引用的原文片段过多，本次未保存。请缩小问题后重试。",
-    );
-  if (hasQuantifiedSelfRating)
-    throw new ApiError(
-      502,
-      "INVALID_MODEL_ANSWER",
-      "模型回答包含不可核验的量化自评，本次未保存。请重新生成。",
-    );
   return {
     mode: "model",
     citations,
     ...(noteEvidence.length ? { noteEvidence } : {}),
     content: `${content}\n\n---\n\n${grounding.coverage}`,
   };
+}
+
+/** The model supplies references only; canonical source IDs/quotes/pages remain server-owned. */
+export function bindGeneratedAnswer(
+  raw: string,
+  grounding: Grounding,
+  options: { format?: AnswerFormat } = {},
+): AnswerResult {
+  return renderGeneratedAnswer(parseGeneratedAnswer(raw, grounding), grounding, options);
 }

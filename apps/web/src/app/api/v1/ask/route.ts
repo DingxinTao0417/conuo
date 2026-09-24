@@ -13,15 +13,22 @@ import {
   answerResultSchema,
   workspaceSchema,
 } from "@/lib/supabase/validation";
-import { callModel, callModelStream, type ModelProfileName } from "@/lib/ai/model";
+import {
+  callModel,
+  callModelStream,
+  type ModelObserver,
+  type ModelProfileName,
+} from "@/lib/ai/model";
 import { selectAnswerProfile, selectFastProfile } from "@/lib/ai/model-routing";
+import { findUnsupportedParagraphs, VERIFY_CONTRACT_VERSION } from "@/lib/ai/answer-verification";
 import {
   type AnswerFormat,
   GROUNDING_CONTRACT_VERSION,
   buildFullDocumentGrounding,
   buildGrounding,
-  bindGeneratedAnswer,
   groundingMessages,
+  parseGeneratedAnswer,
+  renderGeneratedAnswer,
 } from "@/lib/ai/grounding";
 import { aiFeatureEnabled } from "@/lib/ai/features";
 import { createGroundingPreview } from "@/lib/ai/grounding-stream";
@@ -497,6 +504,7 @@ export async function POST(request: Request) {
         const selectedProfile = selectAnswerProfile(depth);
         const config = selectedProfile?.config;
         const format: AnswerFormat = aiFeatureEnabled("RICH_ANSWERS") ? "rich" : "plain";
+        const verifyEnabled = aiFeatureEnabled("ANSWER_VERIFY");
         const rerankEnabled = aiFeatureEnabled("RERANK");
         let rerankConfig = null;
         if (rerankEnabled) {
@@ -546,6 +554,7 @@ export async function POST(request: Request) {
                 readEmbeddingConfig()?.fingerprint ?? null,
                 ...(rerankFingerprint === undefined ? [] : ["rerank:" + rerankFingerprint]),
                 "depth:" + depth,
+                ...(verifyEnabled ? [VERIFY_CONTRACT_VERSION] : []),
               ]),
             )
             .digest("hex");
@@ -767,6 +776,7 @@ export async function POST(request: Request) {
                   readEmbeddingConfig()?.fingerprint ?? null,
                   ...(rerankFingerprint === undefined ? [] : ["rerank:" + rerankFingerprint]),
                   "depth:" + depth,
+                  ...(verifyEnabled ? [VERIFY_CONTRACT_VERSION] : []),
                 ]),
               )
               .digest("hex"),
@@ -792,6 +802,20 @@ export async function POST(request: Request) {
           const messages = groundingMessages(grounding, question, { format });
           traceRecorder?.mark("modelStart");
           let lastReasoningHeartbeat = 0;
+          const modelObserver: ModelObserver = {
+            onUsage: (usage) => traceRecorder?.addUsage(usage),
+            onFirstDelta: () => traceRecorder?.mark("firstDraft"),
+            ...(depth === "deep"
+              ? {
+                  onReasoningDelta: async () => {
+                    const now = Date.now();
+                    if (now - lastReasoningHeartbeat < 5_000) return;
+                    lastReasoningHeartbeat = now;
+                    await send?.({ type: "progress", phase: "reasoning" });
+                  },
+                }
+              : {}),
+          };
           const raw = send
             ? await callModelStream(
                 config,
@@ -802,27 +826,33 @@ export async function POST(request: Request) {
                   if (draft)
                     await send({ type: "draft", answer: draft }, () => assertAnswer(draft, signal));
                 },
-                {
-                  onUsage: (usage) => traceRecorder?.addUsage(usage),
-                  onFirstDelta: () => traceRecorder?.mark("firstDraft"),
-                  ...(depth === "deep"
-                    ? {
-                        onReasoningDelta: async () => {
-                          const now = Date.now();
-                          if (now - lastReasoningHeartbeat < 5_000) return;
-                          lastReasoningHeartbeat = now;
-                          await send({ type: "progress", phase: "reasoning" });
-                        },
-                      }
-                    : {}),
-                },
+                modelObserver,
               )
-            : await callModel(config, messages, signal, {
-                onUsage: (usage) => traceRecorder?.addUsage(usage),
-              });
+            : await callModel(config, messages, signal, modelObserver);
           traceRecorder?.mark("modelEnd");
           await send?.({ type: "progress", phase: "validating" });
-          answer = bindGeneratedAnswer(raw, grounding, { format });
+          const parsedAnswer = parseGeneratedAnswer(raw, grounding);
+          let unsupported = new Set<number>();
+          if (verifyEnabled && parsedAnswer.status === "answered") {
+            traceRecorder?.mark("verifyStart");
+            try {
+              const fastProfile = selectFastProfile();
+              if (fastProfile?.config) {
+                unsupported = await findUnsupportedParagraphs(
+                  fastProfile.config,
+                  parsedAnswer,
+                  grounding,
+                  AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
+                  modelObserver,
+                );
+              } else traceRecorder?.set({ verify: "skipped" });
+            } catch (error) {
+              if (signal.aborted) throw error;
+              traceRecorder?.set({ verify: "skipped" });
+            }
+            traceRecorder?.mark("verifyEnd");
+          }
+          answer = renderGeneratedAnswer(parsedAnswer, grounding, { format, unsupported });
           traceOutcome =
             answer.mode === "model" && answer.citations.length === 0 ? "insufficient" : "completed";
         }

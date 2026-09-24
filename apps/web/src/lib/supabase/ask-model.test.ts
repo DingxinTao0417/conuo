@@ -395,6 +395,51 @@ describe("generated answer route with canonical source and request-ledger bounda
     expect(response.headers.get("Cache-Control")).toContain("no-store");
   });
 
+  it("relabels a source paragraph when the fast verifier marks it unsupported", async () => {
+    vi.stubEnv("CONUO_FEATURE_ANSWER_VERIFY", "on");
+    mock.callModel
+      .mockImplementationOnce(async (_config: unknown, messages: ModelMessage[]) => {
+        const value = JSON.parse(
+          messages.find((message) => message.role === "user")!.content,
+        ) as EvidencePrompt;
+        return generated(value.evidence[0].text);
+      })
+      .mockResolvedValueOnce(
+        JSON.stringify({ results: [{ paragraph: 1, verdict: "unsupported" }] }),
+      );
+
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    const answer = (await response.json()) as AnswerResult;
+    expect(answer.content).toContain("**推断（原文未直接支持，请核对）：**");
+    expect(mock.callModel).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the answer when verification fails", async () => {
+    vi.stubEnv("CONUO_FEATURE_ANSWER_VERIFY", "on");
+    mock.callModel
+      .mockImplementationOnce(async (_config: unknown, messages: ModelMessage[]) => {
+        const value = JSON.parse(
+          messages.find((message) => message.role === "user")!.content,
+        ) as EvidencePrompt;
+        return generated(value.evidence[0].text);
+      })
+      .mockRejectedValueOnce(new DOMException("verification timed out", "TimeoutError"));
+
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    const answer = (await response.json()) as AnswerResult;
+    expect(answer.content).not.toContain("原文未直接支持");
+    expect(answer.citations.length).toBeGreaterThan(0);
+  });
+
+  it("does not call the verifier when the feature is off", async () => {
+    vi.stubEnv("CONUO_FEATURE_ANSWER_VERIFY", "off");
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect(mock.callModel).toHaveBeenCalledOnce();
+  });
+
   it("routes deep thinking through the reasoning profile and longer ledger TTL", async () => {
     vi.stubEnv("CONUO_FEATURE_DEEP_THINKING", "on");
     mock.readModelProfile.mockImplementation((profile: string) =>

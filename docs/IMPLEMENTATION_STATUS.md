@@ -6,6 +6,14 @@
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
 
+## AI 增强 WP-14（2026-09-24，本地）
+
+- 范围：新增 `answer-verification.ts` 的 `verify-v1` 严格 JSON 合同；最终回答发布前可用 `fast` 档位逐段核对原文结论与其引用的片段，未被直接支持的原文段落标为“推断（原文未直接支持，请核对）”。证据文本每条最多 2,000 字符，核验输入最多 60,000 字符。
+- 结构：将 `bindGeneratedAnswer` 拆为 `parseGeneratedAnswer` 与 `renderGeneratedAnswer`；缓存结果继续直接返回，预览保持既有合同，标签只出现在最终结果。核验失败或 15 秒超时保留原回答；取消沿用既有取消错误。
+- 开关与缓存：`CONUO_FEATURE_ANSWER_VERIFY` 默认关闭；开启时请求指纹追加 `verify-v1`，trace 记录核验耗时及 `verify: "skipped"`。
+- 测试：新增核验合同、证据截断、非法 JSON、unsupported 下标及问答路由开关、重新标记、超时回退测试；R-15 全量结果记录在实施进度表。
+- 未验收边界：尚未运行 WP-02 真实模型逐段人工抽查，也未确认错误改标低于 10% 与核验 p95 不超过 5 秒；未打开 staging 开关、未执行部署、远程数据库操作或真实供应商调用。
+
 ## AI 增强 WP-08（2026-09-23，本地）
 
 - 范围：为问答请求增加可选 `depth`；深度请求在服务端开关打开且使用 SSE 时路由到 `reasoning` 档位，使用 280 秒服务端预算、300 秒 Route Handler 上限和 330 秒账本 TTL；默认开关仍关闭，普通请求边界保持不变。

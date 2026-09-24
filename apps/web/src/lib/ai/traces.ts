@@ -41,6 +41,7 @@ const metricNames = new Set([
   "longContext",
   "rerank",
   "rewrite",
+  "verify",
 ]);
 
 function boundedMetric(values: TraceValues): TraceValues {

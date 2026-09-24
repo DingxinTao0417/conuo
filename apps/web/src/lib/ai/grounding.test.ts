@@ -4,6 +4,8 @@ import {
   buildFullDocumentGrounding,
   buildGrounding,
   groundingMessages,
+  parseGeneratedAnswer,
+  renderGeneratedAnswer,
 } from "./grounding";
 import { buildOrganizationGrounding } from "./organization";
 import { createDemoWorkspace } from "../seed";
@@ -566,6 +568,16 @@ describe("server-owned citations", () => {
     expect(answer.citations).toEqual([ctx.evidence[1], ctx.evidence[0]]);
     expect(answer.content).toContain("[1] [2]");
     expect(answer.content).toContain("**推断：**");
+  });
+  it("labels a source paragraph that verification marked unsupported", () => {
+    const ctx = context();
+    const parsed = parseGeneratedAnswer(
+      JSON.stringify({ status: "answered", paragraphs: [paragraph] }),
+      ctx,
+    );
+    expect(parsed.status).toBe("answered");
+    const answer = renderGeneratedAnswer(parsed, ctx, { unsupported: new Set([0]) });
+    expect(answer.content).toContain("**推断（原文未直接支持，请核对）：**");
   });
   it.each([
     { status: "answered", paragraphs: [{ ...paragraph, evidenceIds: ["e999"] }] },
