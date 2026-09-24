@@ -16,6 +16,7 @@ const mock = vi.hoisted(() => ({
   ledgerSelect: vi.fn(),
   ledgerLimit: vi.fn(),
   readVisionModelConfig: vi.fn(),
+  readModelProfile: vi.fn(),
   callVisionModel: vi.fn(),
   createRequestStore: vi.fn(),
   reserveRequest: vi.fn(),
@@ -51,6 +52,7 @@ vi.mock("./config", () => ({
 }));
 vi.mock("@/lib/ai/model", () => ({
   readVisionModelConfig: mock.readVisionModelConfig,
+  readModelProfile: mock.readModelProfile,
   callVisionModel: mock.callVisionModel,
 }));
 vi.mock("@/lib/ai/requests", () => ({
@@ -153,6 +155,10 @@ function deferred<T>() {
 describe("region visual-learning route", () => {
   beforeEach(() => {
     Object.values(mock).forEach((fn) => fn.mockReset());
+    mock.readModelProfile.mockImplementation(() => {
+      const config = mock.readVisionModelConfig();
+      return config ? { profile: "vision", config } : null;
+    });
     workspace = createDemoWorkspace();
     workspace.sources[0].kind = "pdf";
     workspace.sources[0].mime = "application/pdf";
@@ -503,6 +509,7 @@ describe("region visual-learning route", () => {
               config.jsonMode,
               mode ?? null,
               config.tokenLimitParameter,
+              "vision",
               input.task,
               input.question ?? null,
               input.provenance,

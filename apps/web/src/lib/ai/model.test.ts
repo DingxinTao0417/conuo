@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/supabase/api";
-import { callModel, readModelConfig, type ModelConfig } from "./model";
+import { callModel, readModelConfig, readModelProfile, type ModelConfig } from "./model";
 
 const config: ModelConfig = {
   baseUrl: "https://model.example.test/v1",
@@ -67,6 +67,69 @@ afterEach(() => {
 });
 
 describe("model configuration", () => {
+  it.each([
+    ["CONUO_MODEL_MAX_OUTPUT_TOKENS", "255"],
+    ["CONUO_MODEL_MAX_OUTPUT_TOKENS", "65537"],
+    ["CONUO_MODEL_TIMEOUT_MS", "999"],
+    ["CONUO_MODEL_TIMEOUT_MS", "600001"],
+    ["CONUO_MODEL_MAX_REQUEST_BYTES", "65535"],
+    ["CONUO_MODEL_MAX_REQUEST_BYTES", "4194305"],
+    ["CONUO_MODEL_CONTEXT_CHARS", "-1"],
+    ["CONUO_MODEL_CONTEXT_CHARS", "2000001"],
+  ])("rejects an out-of-range bounded setting %s=%s", (key, value) => {
+    expect(() => readModelConfig({ ...env, [key]: value })).toThrowError(
+      expect.objectContaining({ code: "MODEL_CONFIGURATION" }),
+    );
+  });
+
+  it("loads bounded generation settings and writes the selected output field", async () => {
+    const bounded = readModelConfig({
+      ...env,
+      CONUO_MODEL_MAX_OUTPUT_TOKENS: "8192",
+      CONUO_MODEL_MAX_REQUEST_BYTES: "131072",
+      CONUO_MODEL_CONTEXT_CHARS: "120000",
+    });
+    expect(bounded).toMatchObject({
+      maxOutputTokens: 8192,
+      maxRequestBytes: 131072,
+      contextChars: 120000,
+    });
+    fetchMock.mockResolvedValue(response());
+    await callModel({ ...config, maxOutputTokens: 8192 }, messages);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toHaveProperty(
+      "max_completion_tokens",
+      8192,
+    );
+  });
+
+  it("falls back to the default profile when fast is not configured", () => {
+    expect(readModelProfile("fast", env)).toMatchObject({ profile: "default" });
+  });
+
+  it("selects dedicated and legacy vision profiles", () => {
+    expect(
+      readModelProfile("vision", {
+        ...env,
+        CONUO_VISION_MODEL_BASE_URL: "https://vision.example/v1",
+        CONUO_VISION_MODEL_API_KEY: "vision-key",
+        CONUO_VISION_MODEL_NAME: "vision-model",
+        CONUO_VISION_MODEL_ENABLED: "true",
+      }),
+    ).toMatchObject({ profile: "vision", config: { model: "vision-model" } });
+    expect(
+      readModelProfile("vision", { ...env, CONUO_MODEL_VISION_ENABLED: "true" }),
+    ).toMatchObject({ profile: "default", config: { model: config.model } });
+    expect(
+      readModelProfile("vision", {
+        ...env,
+        CONUO_VISION_MODEL_BASE_URL: "https://vision.example/v1",
+        CONUO_VISION_MODEL_API_KEY: "vision-key",
+        CONUO_VISION_MODEL_NAME: "vision-model",
+        CONUO_VISION_MODEL_ENABLED: "false",
+      }),
+    ).toBeNull();
+  });
+
   it.each(["enabled", "disabled"] as const)("loads explicit thinking mode %s", (thinkingMode) => {
     expect(readModelConfig({ ...env, CONUO_MODEL_THINKING_MODE: thinkingMode })).toEqual({
       ...config,

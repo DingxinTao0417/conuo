@@ -9,6 +9,9 @@ export interface ModelConfig {
   thinkingMode?: "enabled" | "disabled";
   tokenLimitParameter: "max_completion_tokens" | "max_tokens";
   timeoutMs: number;
+  maxOutputTokens?: number;
+  maxRequestBytes?: number;
+  contextChars?: number;
   streamUsage?: boolean;
 }
 
@@ -58,6 +61,20 @@ function parseStreamUsage(value: string): boolean {
   return value === "true";
 }
 
+function parseBoundedInteger(
+  value: string | undefined,
+  min: number,
+  max: number,
+  fallback: number,
+) {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return fallback;
+  if (!/^\d+$/.test(trimmed)) throw configurationError();
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) throw configurationError();
+  return parsed;
+}
+
 function baseUrl(value: string): string {
   try {
     // Reject ambiguous host spelling, backslashes, and URL credentials before normalization.
@@ -105,28 +122,62 @@ function validateConfig(config: ModelConfig): ModelConfig {
       config.tokenLimitParameter !== "max_tokens") ||
     !Number.isInteger(config.timeoutMs) ||
     config.timeoutMs < 1 ||
-    config.timeoutMs > 60_000 ||
+    config.timeoutMs > 600_000 ||
+    (config.maxOutputTokens !== undefined &&
+      (!Number.isSafeInteger(config.maxOutputTokens) ||
+        config.maxOutputTokens < 256 ||
+        config.maxOutputTokens > 65_536)) ||
+    (config.maxRequestBytes !== undefined &&
+      (!Number.isSafeInteger(config.maxRequestBytes) ||
+        config.maxRequestBytes < 65_536 ||
+        config.maxRequestBytes > 4_194_304)) ||
+    (config.contextChars !== undefined &&
+      (!Number.isSafeInteger(config.contextChars) ||
+        config.contextChars < 0 ||
+        config.contextChars > 2_000_000)) ||
     (config.streamUsage !== undefined && typeof config.streamUsage !== "boolean")
   ) {
     throw configurationError();
   }
-  return { ...config, baseUrl: baseUrl(config.baseUrl) };
+  const normalized = { ...config, baseUrl: baseUrl(config.baseUrl) };
+  // Keep defaults available to older hand-written test configs without changing
+  // their enumerable shape or the existing configuration contract.
+  for (const [key, value] of [
+    ["maxOutputTokens", 4096],
+    ["maxRequestBytes", MAX_REQUEST_BYTES],
+    ["contextChars", 0],
+    ["streamUsage", false],
+  ] as const) {
+    if (normalized[key] === undefined)
+      Object.defineProperty(normalized, key, { configurable: true, value });
+  }
+  return normalized;
 }
 
-export function readModelConfig(
+export function readProfileConfig(
+  prefix: string,
   env: Record<string, string | undefined> = process.env,
 ): ModelConfig | null {
-  const url = env.CONUO_MODEL_BASE_URL?.trim() ?? "";
-  const key = env.CONUO_MODEL_API_KEY?.trim() ?? "";
-  const model = env.CONUO_MODEL_NAME?.trim() ?? "";
-  const thinkingValue = env.CONUO_MODEL_THINKING_MODE?.trim();
+  const url = env[`${prefix}BASE_URL`]?.trim() ?? "";
+  const key = env[`${prefix}API_KEY`]?.trim() ?? "";
+  const model = env[`${prefix}NAME`]?.trim() ?? "";
+  const thinkingValue = env[`${prefix}THINKING_MODE`]?.trim();
   const thinkingMode = thinkingValue ? parseThinkingMode(thinkingValue) : undefined;
-  const streamUsage = parseStreamUsage(env.CONUO_MODEL_STREAM_USAGE?.trim() || "false");
+  const streamUsage = parseStreamUsage(env[`${prefix}STREAM_USAGE`]?.trim() || "false");
   if (!url && !key && !model) return null;
-  const jsonMode = env.CONUO_MODEL_JSON_MODE?.trim() || "false";
+  const jsonMode = env[`${prefix}JSON_MODE`]?.trim() || "false";
   const tokenLimitParameter =
-    env.CONUO_MODEL_TOKEN_LIMIT_PARAMETER?.trim() || "max_completion_tokens";
+    env[`${prefix}TOKEN_LIMIT_PARAMETER`]?.trim() || "max_completion_tokens";
   if (!url || !key || !model || !["true", "false"].includes(jsonMode)) throw configurationError();
+  const timeoutMs = parseBoundedInteger(env[`${prefix}TIMEOUT_MS`], 1_000, 600_000, 45_000);
+  const maxOutputTokens = parseBoundedInteger(env[`${prefix}MAX_OUTPUT_TOKENS`], 256, 65_536, 4096);
+  const maxRequestBytes = parseBoundedInteger(
+    env[`${prefix}MAX_REQUEST_BYTES`],
+    65_536,
+    4_194_304,
+    MAX_REQUEST_BYTES,
+  );
+  const contextChars = parseBoundedInteger(env[`${prefix}CONTEXT_CHARS`], 0, 2_000_000, 0);
   return validateConfig({
     baseUrl: url,
     apiKey: key,
@@ -134,9 +185,48 @@ export function readModelConfig(
     jsonMode: jsonMode === "true",
     ...(thinkingMode === undefined ? {} : { thinkingMode }),
     tokenLimitParameter: parseTokenLimitParameter(tokenLimitParameter),
-    timeoutMs: 45_000,
+    timeoutMs,
+    ...(env[`${prefix}MAX_OUTPUT_TOKENS`]?.trim() ? { maxOutputTokens } : {}),
+    ...(env[`${prefix}MAX_REQUEST_BYTES`]?.trim() ? { maxRequestBytes } : {}),
+    ...(env[`${prefix}CONTEXT_CHARS`]?.trim() ? { contextChars } : {}),
     streamUsage,
   });
+}
+
+export function readModelConfig(
+  env: Record<string, string | undefined> = process.env,
+): ModelConfig | null {
+  return readProfileConfig("CONUO_MODEL_", env);
+}
+
+export type ModelProfileName = "default" | "fast" | "reasoning" | "vision";
+const PROFILE_PREFIX: Record<Exclude<ModelProfileName, "default">, string> = {
+  fast: "CONUO_FAST_MODEL_",
+  reasoning: "CONUO_REASONING_MODEL_",
+  vision: "CONUO_VISION_MODEL_",
+};
+
+/** Falls back to the default profile when a dedicated profile is not configured. */
+export function readModelProfile(
+  name: ModelProfileName,
+  env: Record<string, string | undefined> = process.env,
+): { profile: ModelProfileName; config: ModelConfig } | null {
+  if (name === "default") {
+    const config = readModelConfig(env);
+    return config ? { profile: "default", config } : null;
+  }
+  if (name === "vision") {
+    const dedicated = readProfileConfig(PROFILE_PREFIX.vision, env);
+    const enabled = env.CONUO_VISION_MODEL_ENABLED?.trim() || "false";
+    if (enabled !== "true" && enabled !== "false") throw configurationError();
+    if (dedicated) return enabled === "true" ? { profile: "vision", config: dedicated } : null;
+    const legacy = readVisionModelConfig(env);
+    return legacy ? { profile: "default", config: legacy } : null;
+  }
+  const dedicated = readProfileConfig(PROFILE_PREFIX[name], env);
+  if (dedicated) return { profile: name, config: dedicated };
+  const fallback = readModelConfig(env);
+  return fallback ? { profile: "default", config: fallback } : null;
 }
 
 function tokenCount(value: unknown): number | undefined {
@@ -525,8 +615,8 @@ function generationOptions(config: ModelConfig) {
     store: false,
     n: 1,
     ...(config.tokenLimitParameter === "max_tokens"
-      ? { max_tokens: 4096 }
-      : { max_completion_tokens: 4096 }),
+      ? { max_tokens: config.maxOutputTokens ?? 4096 }
+      : { max_completion_tokens: config.maxOutputTokens ?? 4096 }),
     ...(config.jsonMode ? { response_format: { type: "json_object" } } : {}),
     ...(config.thinkingMode === undefined ? {} : { thinking: { type: config.thinkingMode } }),
   };
@@ -564,7 +654,7 @@ async function requestModel(
       ? { stream_options: { include_usage: true } }
       : {}),
   });
-  if (new TextEncoder().encode(body).length > MAX_REQUEST_BYTES)
+  if (new TextEncoder().encode(body).length > (validated.maxRequestBytes ?? MAX_REQUEST_BYTES))
     throw new ApiError(413, "MODEL_INPUT_TOO_LARGE", "本次资料过多，请缩小范围后重试。");
   return sendModelRequest(validated, body, signal, onDelta, observer);
 }
@@ -633,7 +723,10 @@ export function callVisionModel(
       stream: false,
       ...generationOptions(validated),
     });
-    if (new TextEncoder().encode(body).length > MAX_VISION_REQUEST_BYTES)
+    if (
+      new TextEncoder().encode(body).length >
+      Math.min(validated.maxRequestBytes ?? MAX_REQUEST_BYTES, MAX_VISION_REQUEST_BYTES)
+    )
       throw new ApiError(413, "MODEL_INPUT_TOO_LARGE", "区域图片过大，请缩小区域后重试。");
     return sendModelRequest(validated, body, signal, undefined, observer);
   } catch (error) {

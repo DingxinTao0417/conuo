@@ -9,6 +9,7 @@ import { ApiError } from "./api";
 const mock = vi.hoisted(() => ({
   taskRpc: vi.fn(),
   readModelConfig: vi.fn(),
+  readModelProfile: vi.fn(),
   callModel: vi.fn(),
   createRequestStore: vi.fn(),
   reserveRequest: vi.fn(),
@@ -17,6 +18,7 @@ const mock = vi.hoisted(() => ({
 
 vi.mock("@/lib/ai/model", () => ({
   readModelConfig: mock.readModelConfig,
+  readModelProfile: mock.readModelProfile,
   callModel: mock.callModel,
 }));
 vi.mock("@/lib/ai/requests", () => ({
@@ -112,6 +114,10 @@ function taskRpcWithContext(result: OrganizationResult | null = null) {
 
 beforeEach(() => {
   Object.values(mock).forEach((fn) => fn.mockReset());
+  mock.readModelProfile.mockImplementation(() => {
+    const config = mock.readModelConfig();
+    return config ? { profile: "default", config } : null;
+  });
   workspace = createDemoWorkspace();
   workspace.autoOrganize = true;
   const source = workspace.sources[0];
@@ -148,6 +154,7 @@ describe("runOrganizationTasks", () => {
             modelConfig.model,
             modelConfig.jsonMode,
             ...(semanticVersion ? [null] : []),
+            "default",
             contextDigest,
           ]),
         )
@@ -182,6 +189,7 @@ describe("runOrganizationTasks", () => {
               modelConfig.model,
               modelConfig.jsonMode,
               mode ?? null,
+              "default",
               contextDigest,
             ]),
           )

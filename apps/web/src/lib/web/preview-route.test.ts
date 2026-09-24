@@ -33,7 +33,11 @@ vi.mock("@/lib/web/preview-limit", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/web/preview-limit")>()),
   previewLimiter: { reserve: mock.reserve },
 }));
-vi.mock("@/lib/ai/model", () => ({ callModel: mock.model, readModelConfig: mock.model }));
+vi.mock("@/lib/ai/model", () => ({
+  callModel: mock.model,
+  readModelConfig: mock.model,
+  readModelProfile: mock.model,
+}));
 
 import { GET, POST } from "@/app/api/v1/web/preview/route";
 import { ApiError } from "@/lib/supabase/api";

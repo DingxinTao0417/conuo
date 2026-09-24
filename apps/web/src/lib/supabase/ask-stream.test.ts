@@ -19,6 +19,7 @@ const mock = vi.hoisted(() => ({
   read: vi.fn(),
   rpc: vi.fn(),
   readModelConfig: vi.fn(),
+  readModelProfile: vi.fn(),
   callModel: vi.fn(),
   callModelStream: vi.fn(),
   createRequestStore: vi.fn(),
@@ -55,6 +56,7 @@ vi.mock("./config", () => ({
 }));
 vi.mock("../ai/model", () => ({
   readModelConfig: mock.readModelConfig,
+  readModelProfile: mock.readModelProfile,
   callModel: mock.callModel,
   callModelStream: mock.callModelStream,
 }));
@@ -217,6 +219,10 @@ async function nextDraft(events: ReturnType<typeof readEvents>) {
 }
 beforeEach(() => {
   Object.values(mock).forEach((fn) => fn.mockReset());
+  mock.readModelProfile.mockImplementation(() => {
+    const config = mock.readModelConfig();
+    return config ? { profile: "default", config } : null;
+  });
   workspace = createDemoWorkspace();
   delete process.env.CONUO_FEATURE_AI_TRACES;
   currentUser = owner;

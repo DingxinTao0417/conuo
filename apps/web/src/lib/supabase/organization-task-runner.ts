@@ -10,7 +10,8 @@ import {
   validateOrganizationResult,
   ORGANIZATION_MODEL_CONTRACT_VERSION,
 } from "@/lib/ai/organization";
-import { callModel, readModelConfig } from "@/lib/ai/model";
+import { callModel, readModelProfile, type ModelProfileName } from "@/lib/ai/model";
+import { selectFastProfile } from "@/lib/ai/model-routing";
 import { createRequestStore, finishRequest, reserveRequest } from "@/lib/ai/requests";
 import { createTraceRecorder } from "@/lib/ai/traces";
 import { organizationRequestSchema, organizationResultSchema } from "@/lib/organization-schema";
@@ -161,6 +162,7 @@ async function processClaim(
     "completed" | "insufficient" | "failed" | "cancelled" | "cached" | "extractive" = "failed";
   let traceErrorCode: string | undefined;
   let traceModelName: string | undefined;
+  let traceModelProfile: ModelProfileName | undefined;
   try {
     const context = await rpc(
       store,
@@ -211,8 +213,13 @@ async function processClaim(
     // never supplies source text, pages, quotations or target note bodies.
     assertOrganizationScope(context.workspace, context.request);
     const grounding = buildOrganizationGrounding(context.workspace, context.request);
-    const config = readModelConfig();
-    if (!config)
+    const requestedProfile = process.env.CONUO_ORGANIZATION_MODEL_PROFILE?.trim() || "default";
+    if (requestedProfile !== "default" && requestedProfile !== "fast")
+      throw new ApiError(503, "MODEL_CONFIGURATION", "模型服务配置不完整或无效，请联系管理员。");
+    const selectedProfile =
+      requestedProfile === "fast" ? selectFastProfile() : readModelProfile("default");
+    const config = selectedProfile?.config;
+    if (!selectedProfile || !config)
       throw new ApiError(503, "MODEL_NOT_CONFIGURED", "尚未配置生成模型，暂不能生成整理建议。");
     const fingerprint = createHash("sha256")
       .update(
@@ -223,6 +230,7 @@ async function processClaim(
           config.model,
           config.jsonMode,
           config.thinkingMode ?? null,
+          selectedProfile.profile,
           context.contextDigest,
         ]),
       )
@@ -255,6 +263,7 @@ async function processClaim(
       traceOutcome = "completed";
     }
     traceModelName = config.model;
+    traceModelProfile = selectedProfile.profile;
     const stagedResult = await rpc(
       store,
       "stage_organization_job_result",
@@ -291,7 +300,10 @@ async function processClaim(
     if (published.state === "succeeded") summary.published += 1;
     else if (published.state === "cancelled") summary.cancelled += 1;
     else summary.capacityPending += 1;
-    void traceRecorder.finish(traceOutcome, { modelName: traceModelName });
+    void traceRecorder.finish(traceOutcome, {
+      modelProfile: traceModelProfile ?? "default",
+      modelName: traceModelName,
+    });
   } catch (error) {
     if (error instanceof ApiError) {
       traceErrorCode = error.code;
@@ -300,6 +312,7 @@ async function processClaim(
     }
     void traceRecorder?.finish(traceOutcome, {
       errorCode: traceErrorCode,
+      modelProfile: traceModelProfile ?? "default",
       modelName: traceModelName,
     });
     if (input.signal?.aborted || staged) return;

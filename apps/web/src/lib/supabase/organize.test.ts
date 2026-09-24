@@ -18,6 +18,7 @@ const mock = vi.hoisted(() => ({
   eq: vi.fn(),
   read: vi.fn(),
   readModelConfig: vi.fn(),
+  readModelProfile: vi.fn(),
   callModel: vi.fn(),
   createRequestStore: vi.fn(),
   reserveRequest: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock("./config", () => ({
 }));
 vi.mock("../ai/model", () => ({
   readModelConfig: mock.readModelConfig,
+  readModelProfile: mock.readModelProfile,
   callModel: mock.callModel,
 }));
 vi.mock("../ai/requests", () => ({
@@ -187,6 +189,10 @@ async function expectError(response: Response, status: number, code: string) {
 
 beforeEach(() => {
   Object.values(mock).forEach((fn) => fn.mockReset());
+  mock.readModelProfile.mockImplementation(() => {
+    const config = mock.readModelConfig();
+    return config ? { profile: "default", config } : null;
+  });
   workspace = createDemoWorkspace();
   workspace.autoOrganize = true;
   currentUser = owner;
@@ -689,6 +695,7 @@ describe("organization API account, evidence, and shared-ledger boundaries", () 
             config.model,
             config.jsonMode,
             ...(contract === "organization-v2" ? [null] : []),
+            "default",
             organizationContextKey(workspace, organizationInput),
           ]),
         )
@@ -717,6 +724,7 @@ describe("organization API account, evidence, and shared-ledger boundaries", () 
               config.model,
               config.jsonMode,
               mode ?? null,
+              "default",
               contextKey,
             ]),
           )

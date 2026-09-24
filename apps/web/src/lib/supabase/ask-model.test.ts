@@ -21,6 +21,7 @@ const mock = vi.hoisted(() => ({
   read: vi.fn(),
   rpc: vi.fn(),
   readModelConfig: vi.fn(),
+  readModelProfile: vi.fn(),
   callModel: vi.fn(),
   createRequestStore: vi.fn(),
   reserveRequest: vi.fn(),
@@ -59,6 +60,7 @@ vi.mock("./config", () => ({
 }));
 vi.mock("@/lib/ai/model", () => ({
   readModelConfig: mock.readModelConfig,
+  readModelProfile: mock.readModelProfile,
   callModel: mock.callModel,
 }));
 vi.mock("@/lib/ai/requests", () => ({
@@ -218,6 +220,10 @@ describe("generated answer route with canonical source and request-ledger bounda
   beforeEach(() => {
     vi.stubEnv("CONUO_FEATURE_RICH_ANSWERS", "off");
     Object.values(mock).forEach((fn) => fn.mockReset());
+    mock.readModelProfile.mockImplementation(() => {
+      const config = mock.readModelConfig();
+      return config ? { profile: "default", config } : null;
+    });
     workspace = createDemoWorkspace();
     workspaceRevision = 1;
     mock.embeddingConfig.mockReturnValue(null);
@@ -301,6 +307,7 @@ describe("generated answer route with canonical source and request-ledger bounda
             config.model,
             config.jsonMode,
             null,
+            "default",
             questionContextKey(workspace, question()),
             searchMode,
             embeddingFingerprint,

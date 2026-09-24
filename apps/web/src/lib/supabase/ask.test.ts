@@ -40,7 +40,11 @@ vi.mock("./server", () => ({
 vi.mock("./config", () => ({
   getSupabaseConfig: () => ({ url: "https://example.supabase.co", key: "public-test-key" }),
 }));
-vi.mock("@/lib/ai/model", () => ({ readModelConfig: () => null, callModel: vi.fn() }));
+vi.mock("@/lib/ai/model", () => ({
+  readModelConfig: () => null,
+  readModelProfile: () => null,
+  callModel: vi.fn(),
+}));
 import { POST } from "@/app/api/v1/ask/route";
 
 let workspace: WorkspaceData;

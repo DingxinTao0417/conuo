@@ -4,7 +4,8 @@ import { workspaceSchema } from "@/lib/supabase/validation";
 import { organizationRequestSchema } from "@/lib/organization-schema";
 import { organizationContextKey } from "@/lib/organization";
 import { snapshotKnowledgeNote } from "@/lib/knowledge-update";
-import { readModelConfig, callModel } from "@/lib/ai/model";
+import { callModel, readModelProfile, type ModelProfileName } from "@/lib/ai/model";
+import { selectFastProfile } from "@/lib/ai/model-routing";
 import { createRequestStore, reserveRequest, finishRequest } from "@/lib/ai/requests";
 import { createTraceRecorder } from "@/lib/ai/traces";
 import {
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
     "completed" | "insufficient" | "failed" | "cancelled" | "cached" | "extractive" = "failed";
   let traceErrorCode: string | undefined;
   let traceModelName: string | undefined;
+  let traceModelProfile: ModelProfileName | undefined;
   try {
     const { supabase, user } = await requireUser(request);
     const parsed = organizationRequestSchema.safeParse(await readJson(request, 50_000));
@@ -71,8 +73,13 @@ export async function POST(request: Request) {
     const compare = compareNote ? snapshotKnowledgeNote(compareNote) : undefined;
     if (input.kind === "relations" && !compare)
       throw new ApiError(404, "KNOWLEDGE_TARGET_UNAVAILABLE", "关系终点知识页不可用。");
-    const config = readModelConfig();
-    if (!config)
+    const requestedProfile = process.env.CONUO_ORGANIZATION_MODEL_PROFILE?.trim() || "default";
+    if (requestedProfile !== "default" && requestedProfile !== "fast")
+      throw new ApiError(503, "MODEL_CONFIGURATION", "模型服务配置不完整或无效，请联系管理员。");
+    const selectedProfile =
+      requestedProfile === "fast" ? selectFastProfile() : readModelProfile("default");
+    const config = selectedProfile?.config;
+    if (!selectedProfile || !config)
       throw new ApiError(
         503,
         "MODEL_NOT_CONFIGURED",
@@ -88,6 +95,7 @@ export async function POST(request: Request) {
           config.model,
           config.jsonMode,
           config.thinkingMode ?? null,
+          selectedProfile.profile,
           contextKey,
         ]),
       )
@@ -147,6 +155,7 @@ export async function POST(request: Request) {
       traceRecorder.mark("modelEnd");
     }
     traceModelName = config.model;
+    traceModelProfile = selectedProfile.profile;
     await assertCurrent();
     if (reservation) {
       await finishRequest(store, user.id, input.requestId, result);
@@ -154,7 +163,11 @@ export async function POST(request: Request) {
       // Also guard the time spent writing the shared ledger cache.
       await assertCurrent();
     }
-    if (traceRecorder) void traceRecorder.finish(traceOutcome, { modelName: traceModelName });
+    if (traceRecorder)
+      void traceRecorder.finish(traceOutcome, {
+        modelProfile: traceModelProfile ?? "default",
+        modelName: traceModelName,
+      });
     return json(result);
   } catch (error) {
     if (error instanceof ApiError) {
@@ -165,6 +178,7 @@ export async function POST(request: Request) {
     if (traceRecorder)
       void traceRecorder.finish(traceOutcome, {
         errorCode: traceErrorCode,
+        modelProfile: traceModelProfile ?? "default",
         modelName: traceModelName,
       });
     if (reservation) {

@@ -13,7 +13,8 @@ import {
   answerResultSchema,
   workspaceSchema,
 } from "@/lib/supabase/validation";
-import { readModelConfig, callModel, callModelStream } from "@/lib/ai/model";
+import { callModel, callModelStream, type ModelProfileName } from "@/lib/ai/model";
+import { selectAnswerProfile } from "@/lib/ai/model-routing";
 import {
   type AnswerFormat,
   GROUNDING_CONTRACT_VERSION,
@@ -198,7 +199,7 @@ function assertScope(workspace: WorkspaceData, question: AnswerRequest) {
 export async function GET(request: Request) {
   try {
     await requireUser(request);
-    if (!readModelConfig())
+    if (!selectAnswerProfile("standard"))
       return json({ mode: "extractive", message: "尚未配置生成模型，当前使用原文检索。" });
     const store = createRequestStore();
     const { error } = await store.from("ai_requests").select("request_id").limit(0);
@@ -249,11 +250,12 @@ export async function POST(request: Request) {
     "completed" | "insufficient" | "failed" | "cancelled" | "cached" | "extractive" = "failed";
   let traceErrorCode: string | undefined;
   let traceModelName: string | undefined;
+  let traceModelProfile: ModelProfileName | undefined;
   const finishTrace = () => {
     if (traceRecorder)
       void traceRecorder.finish(traceOutcome, {
         errorCode: traceErrorCode,
-        modelProfile: "default",
+        modelProfile: traceModelProfile ?? "default",
         modelName: traceModelName,
       });
   };
@@ -540,7 +542,8 @@ export async function POST(request: Request) {
                 .join("\n\n")}${formatNoteEvidenceExtracts(noteEvidence)}${coverage}`
             : `当前范围未找到可引用的原文证据，请调整关键词或缩小范围。${coverageNotices.length ? ` ${coverageNotices.join(" ")}` : ""}`,
         };
-        const config = readModelConfig();
+        const selectedProfile = selectAnswerProfile("standard");
+        const config = selectedProfile?.config;
         traceRecorder?.set({
           intent: classifyQuestionIntent(question.question),
           scope: question.scope,
@@ -554,11 +557,12 @@ export async function POST(request: Request) {
             chunkId: citation.chunkId,
           })),
         });
-        if (!config) {
+        if (!selectedProfile || !config) {
           traceOutcome = "extractive";
           return retrieved;
         }
         traceModelName = config.model;
+        traceModelProfile = selectedProfile.profile;
         const grounding = buildGrounding(initial, question, retrieved);
         if (!grounding.evidence.length) {
           traceOutcome = "insufficient";
@@ -576,6 +580,7 @@ export async function POST(request: Request) {
               config.model,
               config.jsonMode,
               config.thinkingMode ?? null,
+              selectedProfile.profile,
               contextKey,
               searchMode,
               readEmbeddingConfig()?.fingerprint ?? null,

@@ -8,7 +8,7 @@ import {
   visionStudyResultSchema,
   type VisionStudyRequest,
 } from "@/lib/vision-region-contract";
-import { callVisionModel, readVisionModelConfig } from "@/lib/ai/model";
+import { callVisionModel, readModelProfile, type ModelProfileName } from "@/lib/ai/model";
 import {
   VISION_STUDY_SEMANTICS_VERSION,
   assertVisionSource,
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   try {
     await requireUser(request);
     try {
-      if (!readVisionModelConfig())
+      if (!readModelProfile("vision"))
         return json({
           available: false,
           message: "尚未启用支持图片输入的模型，区域视觉学习暂不可用。",
@@ -99,6 +99,7 @@ export async function POST(request: Request) {
     "completed" | "insufficient" | "failed" | "cancelled" | "cached" | "extractive" = "failed";
   let traceErrorCode: string | undefined;
   let traceModelName: string | undefined;
+  let traceModelProfile: ModelProfileName | undefined;
   const failReservation = (error: unknown): Promise<void> => {
     if (reservationCleanup) return reservationCleanup;
     const pending = reservation;
@@ -150,8 +151,9 @@ export async function POST(request: Request) {
     const contextKey = visionSourceContextKey(initial, input);
     if (request.signal.aborted) throw cancelled();
 
-    const config = readVisionModelConfig();
-    if (!config)
+    const selectedProfile = readModelProfile("vision");
+    const config = selectedProfile?.config;
+    if (!selectedProfile || !config)
       throw new ApiError(
         503,
         "VISION_MODEL_NOT_CONFIGURED",
@@ -169,6 +171,7 @@ export async function POST(request: Request) {
           config.jsonMode,
           config.thinkingMode ?? null,
           config.tokenLimitParameter,
+          selectedProfile.profile,
           input.task,
           input.question ?? null,
           input.provenance,
@@ -236,13 +239,17 @@ export async function POST(request: Request) {
       traceOutcome = "completed";
     }
     traceModelName = config.model;
+    traceModelProfile = selectedProfile.profile;
     await assertCurrent();
     if (reservation) {
       await finishRequest(store, user.id, input.requestId, result);
       reservation = undefined;
       await assertCurrent();
     }
-    void traceRecorder?.finish(traceOutcome, { modelName: traceModelName });
+    void traceRecorder?.finish(traceOutcome, {
+      modelProfile: traceModelProfile ?? "default",
+      modelName: traceModelName,
+    });
     return json(result);
   } catch (error) {
     if (error instanceof ApiError) {
@@ -252,6 +259,7 @@ export async function POST(request: Request) {
     }
     void traceRecorder?.finish(traceOutcome, {
       errorCode: traceErrorCode,
+      modelProfile: traceModelProfile ?? "default",
       modelName: traceModelName,
     });
     await failReservation(error);
