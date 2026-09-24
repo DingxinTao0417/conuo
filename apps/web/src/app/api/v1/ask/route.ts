@@ -666,6 +666,8 @@ export async function POST(request: Request) {
           });
         if (longContext) traceRecorder?.set({ longContext: true });
         if (!grounding.evidence.length) {
+          if (reservation)
+            await failReservation(new ApiError(422, "MODEL_REQUEST_FAILED", "当前证据不足。"));
           traceOutcome = "insufficient";
           return grounding.fallback;
         }
