@@ -209,6 +209,7 @@ export function buildGrounding(
         queue.some(
           (canonical) =>
             canonical.sourceId === item.sourceId &&
+            canonical.versionId === item.versionId &&
             canonical.chunkId === item.chunkId &&
             canonical.quote === item.quote,
         ),
