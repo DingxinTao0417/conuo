@@ -26,6 +26,7 @@ export interface ModelUsage {
 export interface ModelObserver {
   onUsage?(usage: ModelUsage): void;
   onFirstDelta?(): void;
+  onReasoningDelta?(characters: number): void | Promise<void>;
 }
 
 type ModelMessage = { role: "system" | "user"; content: string };
@@ -463,6 +464,8 @@ async function readStreamResponse(
       await onDelta(delta.content);
       if (signal.aborted) throw cancelledError();
     }
+    if (typeof delta.reasoning_content === "string" && delta.reasoning_content)
+      await observer?.onReasoningDelta?.(delta.reasoning_content.length);
     if (choice.finish_reason === "stop") stopped = true;
   };
   const endLine = async () => {

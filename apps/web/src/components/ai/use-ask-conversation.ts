@@ -8,7 +8,11 @@ export type AskAnswerPhase = Extract<AnswerProgress, { type: "progress" }>["phas
 
 export interface AskRunHandlers {
   /** Sends the request the host has already bounded and validated. */
-  dispatch: (signal: AbortSignal, onProgress: OnAnswerProgress) => Promise<AnswerResult>;
+  dispatch: (
+    signal: AbortSignal,
+    onProgress: OnAnswerProgress,
+    depth: "standard" | "deep",
+  ) => Promise<AnswerResult>;
   /**
    * Whether the host still owns this request. A reader that has navigated to
    * another source, or a page whose evidence range has changed, answers false
@@ -36,6 +40,7 @@ export interface AskRunHandlers {
  */
 export function useAskConversation() {
   const [input, setInput] = useState("");
+  const [deepThinking, setDeepThinking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [answerDraft, setAnswerDraft] = useState<AnswerResult | null>(null);
@@ -89,6 +94,7 @@ export function useAskConversation() {
     setSelectedConversationId(null);
     setHistoryOpen(false);
     setInput("");
+    setDeepThinking(false);
     setError("");
     setSaveTargetMessageId(null);
     setKnowledgePageTargetId("");
@@ -101,6 +107,7 @@ export function useAskConversation() {
     manuallyStopped.current = null;
     replaceAnswerDraft(null);
     setInput("");
+    setDeepThinking(false);
     setBusy(false);
     setStopping(false);
     setAnswerPhase("retrieving");
@@ -136,16 +143,20 @@ export function useAskConversation() {
       setStopping(false);
       manuallyStopped.current = null;
       try {
-        const answer = await dispatch(requestController.signal, (event) => {
-          if (
-            requestController.signal.aborted ||
-            controller.current !== requestController ||
-            accepts?.() === false
-          )
-            return;
-          if (event.type === "draft") replaceAnswerDraft(event.answer);
-          else setAnswerPhase(event.phase);
-        });
+        const answer = await dispatch(
+          requestController.signal,
+          (event) => {
+            if (
+              requestController.signal.aborted ||
+              controller.current !== requestController ||
+              accepts?.() === false
+            )
+              return;
+            if (event.type === "draft") replaceAnswerDraft(event.answer);
+            else setAnswerPhase(event.phase);
+          },
+          deepThinking ? "deep" : "standard",
+        );
         if (requestController.signal.aborted) throw new DOMException("已停止", "AbortError");
         onAnswer(answer);
       } catch (cause) {
@@ -171,12 +182,14 @@ export function useAskConversation() {
         }
       }
     },
-    [replaceAnswerDraft],
+    [deepThinking, replaceAnswerDraft],
   );
 
   return {
     input,
     setInput,
+    deepThinking,
+    setDeepThinking,
     busy,
     stopping,
     answerDraft,

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ANSWER_STREAM_LIMITS, readAnswerResponse } from "./answer-stream";
+import { ANSWER_STREAM_LIMITS, answerStreamEventSchema, readAnswerResponse } from "./answer-stream";
 import type { AnswerResult } from "./types";
 
 const answer: AnswerResult = {
@@ -45,6 +45,11 @@ function buffered(text: string, split = false) {
 afterEach(() => vi.useRealTimers());
 
 describe("bounded answer SSE reader", () => {
+  it("accepts reasoning progress events", () => {
+    expect(
+      answerStreamEventSchema.safeParse({ type: "progress", phase: "reasoning" }).success,
+    ).toBe(true);
+  });
   it.each(["\n", "\r\n", "\r"])(
     "decodes UTF8 and %j boundaries across every byte",
     async (newline) => {

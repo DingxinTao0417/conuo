@@ -163,6 +163,8 @@ export default function AskPanel({
   const {
     input,
     setInput,
+    deepThinking,
+    setDeepThinking,
     busy,
     stopping,
     answerDraft,
@@ -752,6 +754,17 @@ export default function AskPanel({
                     </option>
                   ))}
                 </select>
+              </label>
+            )}
+            {process.env.NEXT_PUBLIC_CONUO_FEATURE_DEEP_THINKING === "on" && (
+              <label className="reader-depth-toggle" title="回答更慢，适合推导和比较类问题">
+                <input
+                  type="checkbox"
+                  checked={deepThinking}
+                  disabled={composerDisabled}
+                  onChange={(event) => setDeepThinking(event.target.checked)}
+                />
+                <span>深度思考</span>
               </label>
             )}
             {busy ? (

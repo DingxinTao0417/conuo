@@ -65,6 +65,19 @@
   font-weight: 500;
   padding: 2px 0;
 }
+.reader-depth-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: #77727f;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.reader-depth-toggle input {
+  accent-color: #4b3fe3;
+  margin: 0;
+}
 .reader-send {
   display: flex;
   align-items: center;

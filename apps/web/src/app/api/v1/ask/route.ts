@@ -54,7 +54,7 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /** Bounds even unresolved auth/database reads; losing promises cannot advance the request. */
 function preflightGuard(request: Request, deadlineAt: number) {
@@ -231,7 +231,9 @@ function hasFixedMultiSourceRange(question: AnswerRequest) {
 }
 
 export async function POST(request: Request) {
-  const deadlineAt = Date.now() + ANSWER_STREAM_LIMITS.durationMs;
+  const startedAt = Date.now();
+  const preflightDeadlineAt = startedAt + ANSWER_STREAM_LIMITS.durationMs;
+  let deadlineAt = preflightDeadlineAt;
   const streaming = request.headers
     .get("Accept")
     ?.split(",")
@@ -246,7 +248,7 @@ export async function POST(request: Request) {
     if (streaming && Date.now() >= deadlineAt)
       throw new ApiError(504, "ANSWER_STREAM_TIMEOUT", "回答耗时过长，已停止本次生成。");
   };
-  const preflight = streaming ? preflightGuard(request, deadlineAt) : undefined;
+  const preflight = streaming ? preflightGuard(request, preflightDeadlineAt) : undefined;
   const prepare = <T>(work: () => Promise<T>): Promise<T> =>
     preflight ? preflight.wait(work) : work();
   let reservation:
@@ -305,6 +307,15 @@ export async function POST(request: Request) {
     );
     if (!parsed.success) throw new ApiError(400, "INVALID_QUESTION", "请检查问题长度与资料范围。");
     const question = parsed.data;
+    const depth =
+      question.depth === "deep" && aiFeatureEnabled("DEEP_THINKING") ? "deep" : "standard";
+    deadlineAt = startedAt + (depth === "deep" ? 280_000 : ANSWER_STREAM_LIMITS.durationMs);
+    if (depth === "deep" && !streaming)
+      throw new ApiError(
+        400,
+        "DEEP_REQUIRES_STREAM",
+        "深度思考需要使用流式回答，请刷新页面后重试。",
+      );
     traceRecorder = createTraceRecorder("ask", user.id, question.requestId);
     traceRecorder.mark("retrievalStart");
     const load = async () => {
@@ -483,7 +494,7 @@ export async function POST(request: Request) {
           readEmbeddingConfig()
             ? "semantic"
             : "keyword";
-        const selectedProfile = selectAnswerProfile("standard");
+        const selectedProfile = selectAnswerProfile(depth);
         const config = selectedProfile?.config;
         const format: AnswerFormat = aiFeatureEnabled("RICH_ANSWERS") ? "rich" : "plain";
         const rerankEnabled = aiFeatureEnabled("RERANK");
@@ -534,6 +545,7 @@ export async function POST(request: Request) {
                 searchMode,
                 readEmbeddingConfig()?.fingerprint ?? null,
                 ...(rerankFingerprint === undefined ? [] : ["rerank:" + rerankFingerprint]),
+                "depth:" + depth,
               ]),
             )
             .digest("hex");
@@ -543,6 +555,7 @@ export async function POST(request: Request) {
             user.id,
             question.requestId!,
             rewriteFingerprint,
+            ...(depth === "deep" ? [{ ttlSeconds: 330 }] : []),
           );
           if (rewriteReservation.kind === "reserved")
             reservation = { store, ownerId: user.id, requestId: question.requestId! };
@@ -753,9 +766,11 @@ export async function POST(request: Request) {
                   searchMode,
                   readEmbeddingConfig()?.fingerprint ?? null,
                   ...(rerankFingerprint === undefined ? [] : ["rerank:" + rerankFingerprint]),
+                  "depth:" + depth,
                 ]),
               )
               .digest("hex"),
+            ...(depth === "deep" ? [{ ttlSeconds: 330 }] : []),
           ));
         if (saved.kind === "reserved" && !reservation)
           reservation = { store, ownerId: user.id, requestId: question.requestId };
@@ -776,6 +791,7 @@ export async function POST(request: Request) {
           const preview = send ? createGroundingPreview(grounding, { format }) : undefined;
           const messages = groundingMessages(grounding, question, { format });
           traceRecorder?.mark("modelStart");
+          let lastReasoningHeartbeat = 0;
           const raw = send
             ? await callModelStream(
                 config,
@@ -789,6 +805,16 @@ export async function POST(request: Request) {
                 {
                   onUsage: (usage) => traceRecorder?.addUsage(usage),
                   onFirstDelta: () => traceRecorder?.mark("firstDraft"),
+                  ...(depth === "deep"
+                    ? {
+                        onReasoningDelta: async () => {
+                          const now = Date.now();
+                          if (now - lastReasoningHeartbeat < 5_000) return;
+                          lastReasoningHeartbeat = now;
+                          await send({ type: "progress", phase: "reasoning" });
+                        },
+                      }
+                    : {}),
                 },
               )
             : await callModel(config, messages, signal, {

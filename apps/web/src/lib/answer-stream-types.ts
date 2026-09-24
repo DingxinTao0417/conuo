@@ -2,7 +2,7 @@ import type { AnswerResult } from "./types";
 
 /** Transient updates are never a saved answer. Only complete confirms the result. */
 export type AnswerProgress =
-  | { type: "progress"; phase: "retrieving" | "generating" | "validating" }
+  | { type: "progress"; phase: "retrieving" | "generating" | "validating" | "reasoning" }
   | { type: "draft"; answer: AnswerResult };
 
 export type AnswerStreamEvent =

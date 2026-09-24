@@ -1766,9 +1766,9 @@ export default function Reader(props: ReaderProps) {
     const readerIdentity = `${source.id}:${source.versionId}`;
     await runAsk({
       accepts: () => activeSourceId.current === readerIdentity,
-      dispatch: (signal, onProgress) =>
+      dispatch: (signal, onProgress, depth) =>
         onAsk(
-          answerRequestFromSnapshot(requestSnapshot, { question, requestId: attempt.id }),
+          answerRequestFromSnapshot(requestSnapshot, { question, requestId: attempt.id, depth }),
           signal,
           onProgress,
         ),

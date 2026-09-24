@@ -1030,6 +1030,7 @@ export const answerRequestSchema = z
   .object({
     requestId: id.optional(),
     question: z.string().trim().min(1).max(4000),
+    depth: z.enum(["standard", "deep"]).optional(),
     userContext: z
       .array(z.string().trim().min(1).max(ANSWER_USER_CONTEXT_ITEM_MAX_CHARS))
       .max(ANSWER_USER_CONTEXT_MAX_ITEMS)

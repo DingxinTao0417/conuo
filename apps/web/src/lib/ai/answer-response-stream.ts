@@ -130,10 +130,7 @@ export function answerStreamResponse(
       start(value) {
         controller = value;
         requestSignal.addEventListener("abort", abort, { once: true });
-        timer = setTimeout(
-          () => fail(timeout()),
-          Math.max(0, Math.min(ANSWER_STREAM_LIMITS.durationMs, deadlineAt - Date.now())),
-        );
+        timer = setTimeout(() => fail(timeout()), Math.max(0, deadlineAt - Date.now()));
         if (requestSignal.aborted) {
           abort();
           return;

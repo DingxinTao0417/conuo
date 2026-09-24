@@ -152,7 +152,8 @@ export default function NoteAskPanel({
     };
     await ask.run({
       accepts: () => activeIdentity.current === requestIdentity,
-      dispatch: (signal) => onAsk(request, signal),
+      dispatch: (signal, _onProgress, depth) =>
+        onAsk({ ...request, ...(depth === "deep" ? { depth } : {}) }, signal),
       onAnswer: (answer) => {
         if (activeIdentity.current !== requestIdentity) return;
         publish({

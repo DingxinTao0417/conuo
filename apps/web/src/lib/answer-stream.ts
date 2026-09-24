@@ -7,7 +7,7 @@ export const ANSWER_STREAM_LIMITS = Object.freeze({
   eventBytes: 512 * 1024,
   totalBytes: 16 * 1024 * 1024,
   events: 4096,
-  timeoutMs: 120_000,
+  timeoutMs: 310_000,
   idleTimeoutMs: 60_000,
 });
 export const streamedAnswerSchema = z
@@ -28,7 +28,7 @@ export const answerStreamEventSchema = z.discriminatedUnion("type", [
   z
     .object({
       type: z.literal("progress"),
-      phase: z.enum(["retrieving", "generating", "validating"]),
+      phase: z.enum(["retrieving", "generating", "validating", "reasoning"]),
     })
     .strict(),
   z.object({ type: z.literal("draft"), answer: streamedAnswerSchema }).strict(),

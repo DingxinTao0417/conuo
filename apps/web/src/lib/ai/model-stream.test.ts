@@ -72,6 +72,22 @@ describe("model SSE adapter", () => {
     });
   });
 
+  it("reports reasoning deltas without adding them to the answer", async () => {
+    fetchMock.mockResolvedValue(
+      sse(
+        frame(delta(undefined, { delta: { reasoning_content: "先推导" } })) +
+          frame(delta("结论")) +
+          stop +
+          done,
+      ),
+    );
+    const observer = { onReasoningDelta: vi.fn() };
+    await expect(callModelStream(config, messages, undefined, noop, observer)).resolves.toBe(
+      "结论",
+    );
+    expect(observer.onReasoningDelta).toHaveBeenCalledExactlyOnceWith(3);
+  });
+
   it("rejects a usage-only chunk when stream usage is disabled", async () => {
     fetchMock.mockResolvedValue(
       sse(

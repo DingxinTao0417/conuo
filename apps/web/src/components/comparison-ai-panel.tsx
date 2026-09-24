@@ -63,6 +63,7 @@ export interface ComparisonAskPanelProps {
 
 const phaseLabels: Record<Extract<AnswerProgress, { type: "progress" }>["phase"], string> = {
   retrieving: "正在检索两份资料…",
+  reasoning: "正在深入思考…",
   generating: "正在生成比较…",
   validating: "正在核对引用…",
 };

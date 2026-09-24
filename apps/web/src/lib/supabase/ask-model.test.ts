@@ -23,6 +23,7 @@ const mock = vi.hoisted(() => ({
   readModelConfig: vi.fn(),
   readModelProfile: vi.fn(),
   callModel: vi.fn(),
+  callModelStream: vi.fn(),
   createRequestStore: vi.fn(),
   reserveRequest: vi.fn(),
   finishRequest: vi.fn(),
@@ -64,6 +65,7 @@ vi.mock("@/lib/ai/model", () => ({
   readModelConfig: mock.readModelConfig,
   readModelProfile: mock.readModelProfile,
   callModel: mock.callModel,
+  callModelStream: mock.callModelStream,
 }));
 vi.mock("@/lib/ai/requests", () => ({
   createRequestStore: mock.createRequestStore,
@@ -166,10 +168,18 @@ function question(patch: Partial<AnswerRequest> = {}): AnswerRequest {
     ];
   return value;
 }
-function request(patch: Partial<AnswerRequest> = {}, signal?: AbortSignal) {
+function request(
+  patch: Partial<AnswerRequest> = {},
+  signal?: AbortSignal,
+  accept = "application/json",
+) {
   return new Request("http://localhost/api/v1/ask", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-Conuo-User": owner },
+    headers: {
+      "Content-Type": "application/json",
+      Accept: accept,
+      "X-Conuo-User": owner,
+    },
     body: JSON.stringify(question(patch)),
     signal,
   });
@@ -313,6 +323,20 @@ describe("generated answer route with canonical source and request-ledger bounda
       ) as EvidencePrompt;
       return generated(value.evidence[0].text);
     });
+    mock.callModelStream.mockImplementation(
+      async (
+        _config: unknown,
+        messages: ModelMessage[],
+        _signal: AbortSignal,
+        onDelta: (delta: string) => Promise<void>,
+      ) => {
+        const value = JSON.parse(
+          messages.find((message) => message.role === "user")!.content,
+        ) as EvidencePrompt;
+        await onDelta(generated(value.evidence[0].text));
+        return generated(value.evidence[0].text);
+      },
+    );
   });
 
   afterEach(() => {
@@ -355,6 +379,7 @@ describe("generated answer route with canonical source and request-ledger bounda
             questionContextKey(workspace, question()),
             searchMode,
             embeddingFingerprint,
+            "depth:standard",
           ]),
         )
         .digest("hex");
@@ -368,6 +393,53 @@ describe("generated answer route with canonical source and request-ledger bounda
     );
     expect(JSON.stringify(answer)).not.toContain(config.apiKey);
     expect(response.headers.get("Cache-Control")).toContain("no-store");
+  });
+
+  it("routes deep thinking through the reasoning profile and longer ledger TTL", async () => {
+    vi.stubEnv("CONUO_FEATURE_DEEP_THINKING", "on");
+    mock.readModelProfile.mockImplementation((profile: string) =>
+      profile === "reasoning" ? { profile, config } : { profile: "default", config },
+    );
+    const response = await POST(request({ depth: "deep" }, undefined, "text/event-stream"));
+    expect(response.status).toBe(200);
+    await response.text();
+    expect(mock.callModelStream).toHaveBeenCalledOnce();
+    expect(mock.readModelProfile).toHaveBeenCalledWith("reasoning");
+    expect(mock.reserveRequest.mock.calls[0][4]).toEqual({ ttlSeconds: 330 });
+    expect(mock.reserveRequest.mock.calls[0][3]).toEqual(expect.stringMatching(/^[a-f0-9]{64}$/));
+  });
+
+  it("requires SSE for deep thinking", async () => {
+    vi.stubEnv("CONUO_FEATURE_DEEP_THINKING", "on");
+    await expectError(await POST(request({ depth: "deep" })), 400, "DEEP_REQUIRES_STREAM");
+    expect(mock.callModel).not.toHaveBeenCalled();
+  });
+
+  it("throttles reasoning heartbeats to one progress event per five seconds", async () => {
+    vi.stubEnv("CONUO_FEATURE_DEEP_THINKING", "on");
+    mock.readModelProfile.mockImplementation((profile: string) =>
+      profile === "reasoning" ? { profile, config } : { profile: "default", config },
+    );
+    mock.callModelStream.mockImplementationOnce(
+      async (
+        _config: unknown,
+        messages: ModelMessage[],
+        _signal: AbortSignal,
+        onDelta: (delta: string) => Promise<void>,
+        observer: { onReasoningDelta?: () => Promise<void> },
+      ) => {
+        await observer.onReasoningDelta?.();
+        await observer.onReasoningDelta?.();
+        const value = JSON.parse(
+          messages.find((message) => message.role === "user")!.content,
+        ) as EvidencePrompt;
+        await onDelta(generated(value.evidence[0].text));
+        return generated(value.evidence[0].text);
+      },
+    );
+    const response = await POST(request({ depth: "deep" }, undefined, "text/event-stream"));
+    const body = await response.text();
+    expect(body.match(/"phase":"reasoning"/g)).toHaveLength(1);
   });
 
   it("uses the rich format only when the server switch is enabled", async () => {

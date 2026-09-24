@@ -34,6 +34,7 @@ export function sourceStatusLabel(source: Source) {
 
 export const answerPhases = {
   retrieving: "正在查找原文依据…",
+  reasoning: "正在深入思考…",
   generating: "正在整理回答…",
   validating: "正在核对引用并确认回答…",
 };

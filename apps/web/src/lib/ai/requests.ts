@@ -49,6 +49,7 @@ export async function reserveRequest(
   ownerId: string,
   requestId: string,
   fingerprint: string,
+  options: { ttlSeconds?: number } = {},
 ): Promise<{ kind: "reserved" } | { kind: "cached"; result: unknown }> {
   const daily = readAiDailyRequestLimit();
   const { data, error } = await store.rpc("reserve_ai_request", {
@@ -56,6 +57,7 @@ export async function reserveRequest(
     p_request_id: requestId,
     p_fingerprint: fingerprint,
     p_daily_limit: daily,
+    ...(Object.hasOwn(options, "ttlSeconds") ? { p_ttl_seconds: options.ttlSeconds } : {}),
   });
   if (error)
     throw new ApiError(
