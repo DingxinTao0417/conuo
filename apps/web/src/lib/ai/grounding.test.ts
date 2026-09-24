@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { buildGrounding, bindGeneratedAnswer, groundingMessages } from "./grounding";
+import { buildOrganizationGrounding } from "./organization";
 import { createDemoWorkspace } from "../seed";
 import { chunkText } from "../import";
+import { retrieveEvidence } from "../retrieval";
 import type { AnswerRequest, Note, WorkspaceData } from "../types";
+import type { OrganizationRequest } from "../organization-types";
 
 type AnswerRequestWithUserContext = AnswerRequest & { userContext?: string[] };
 
@@ -73,6 +76,151 @@ describe("bounded model grounding", () => {
     setText(data, 0, "Definition. Two vectors are orthogonal if their dot product is zero.");
     question.question = "这份资料的核心观点是什么？";
     expect(buildGrounding(data, question).evidence.length).toBeGreaterThan(0);
+  });
+  it("keeps late retrieval hits for targeted question wording", () => {
+    const { data, question } = fixture();
+    setText(
+      data,
+      0,
+      Array.from({ length: 40 }, (_, index) => `矩阵乘法背景第${index}段。`)
+        .concat("学习率过高时，梯度下降会在最优点附近来回震荡。")
+        .join("\n\n"),
+    );
+    const lateChunk = data.sources[0].chunks.at(-1)!;
+    for (const wording of ["学习率过高会怎样", "为什么学习率过高会震荡"]) {
+      const request = { ...question, question: wording };
+      const retrieved = retrieveEvidence(data, request);
+      expect(retrieved.citations.some((citation) => citation.chunkId === lateChunk.id)).toBe(true);
+      expect(
+        buildGrounding(data, request, retrieved).evidence.some(
+          (citation) => citation.chunkId === lateChunk.id,
+        ),
+      ).toBe(true);
+    }
+  });
+  it.each(["请解释学习率过高的影响", "举例说明学习率过高"])(
+    "keeps late evidence for targeted wording: %s",
+    (wording) => {
+      const { data, question } = fixture();
+      setText(
+        data,
+        0,
+        Array.from({ length: 40 }, (_, index) => `矩阵乘法背景第${index}段。`)
+          .concat("学习率过高时，梯度下降会在最优点附近来回震荡。")
+          .join("\n\n"),
+      );
+      const request = { ...question, question: wording };
+      const retrieved = retrieveEvidence(data, request);
+      const lateChunk = data.sources[0].chunks.at(-1)!;
+      expect(
+        buildGrounding(data, request, retrieved).evidence.some(
+          (citation) => citation.chunkId === lateChunk.id,
+        ),
+      ).toBe(true);
+    },
+  );
+  it("samples summary evidence across the document", () => {
+    const { data, question } = fixture();
+    setText(
+      data,
+      0,
+      Array.from({ length: 41 }, (_, index) => `第${index}段介绍资料背景与方法。`).join("\n\n"),
+    );
+    const context = buildGrounding(data, { ...question, question: "总结这份资料" });
+    const orders = context.evidence.map(
+      (citation) => data.sources[0].chunks.find((chunk) => chunk.id === citation.chunkId)!.order,
+    );
+    expect(orders).toContain(0);
+    expect(orders.some((order) => order >= 30)).toBe(true);
+  });
+  it("prioritizes a selection, its neighbors, and a retrieval hit", () => {
+    const { data, question } = fixture();
+    setText(
+      data,
+      0,
+      Array.from({ length: 40 }, (_, index) =>
+        index === 20
+          ? "选段位于第20段。"
+          : index === 35
+            ? "第35段包含目标词条。"
+            : `背景第${index}段。`,
+      ).join("\n\n"),
+    );
+    const request = {
+      ...question,
+      scope: "selection" as const,
+      question: "目标词条",
+      selection: "选段位于第20段",
+    };
+    const context = buildGrounding(data, request, retrieveEvidence(data, request));
+    const byOrder = (order: number) =>
+      data.sources[0].chunks.find((chunk) => chunk.order === order)!.id;
+    const evidenceIds = new Set(context.evidence.map((citation) => citation.chunkId));
+    expect(context.evidence[0]?.chunkId).toBe(byOrder(20));
+    expect([byOrder(19), byOrder(21)].some((id) => evidenceIds.has(id))).toBe(true);
+    expect(evidenceIds.has(byOrder(35))).toBe(true);
+    expect(evidenceIds.has(byOrder(0))).toBe(false);
+  });
+  it("includes every source in comparison evidence", () => {
+    const { data, question } = fixture();
+    setText(data, 0, "资料一讨论学习率与优化。\n\n资料一的结论。\n\n资料一的例子。");
+    setText(data, 1, "资料二讨论学习率与稳定性。\n\n资料二的结论。\n\n资料二的例子。");
+    const request = {
+      ...question,
+      scope: "sources" as const,
+      sourceId: undefined,
+      sourceIds: data.sources.map((source) => source.id),
+      question: "比较两份资料的异同",
+    };
+    const context = buildGrounding(data, request, retrieveEvidence(data, request));
+    expect(new Set(context.evidence.map((citation) => citation.sourceId))).toEqual(
+      new Set(data.sources.map((source) => source.id)),
+    );
+  });
+  it("samples a later passage for a cross-language unmatched question", () => {
+    const { data, question } = fixture();
+    setText(
+      data,
+      0,
+      Array.from({ length: 41 }, (_, index) => `English background paragraph ${index}.`).join(
+        "\n\n",
+      ),
+    );
+    const request = { ...question, question: "量子纠缠" };
+    const context = buildGrounding(data, request, retrieveEvidence(data, request));
+    const orders = context.evidence.map(
+      (citation) => data.sources[0].chunks.find((chunk) => chunk.id === citation.chunkId)!.order,
+    );
+    expect(orders.length).toBeGreaterThan(0);
+    expect(orders.some((order) => order >= 30)).toBe(true);
+  });
+  it("covers every selected source when organizing ten sources", () => {
+    const { data } = fixture();
+    const template = data.sources[0];
+    data.sources = Array.from({ length: 10 }, (_, index) => {
+      const source = structuredClone(template);
+      source.id = `organization-source-${index}`;
+      source.versionId = `organization-version-${index}`;
+      source.title = `整理资料 ${index}`;
+      source.text = `资料${index}的第一段内容。\n\n资料${index}的第二段内容。`;
+      source.chunks = chunkText(source.text, source.id, source.versionId);
+      return source;
+    });
+    const request: OrganizationRequest = {
+      requestId: "organization-test",
+      kind: "knowledge",
+      trigger: "manual",
+      spaceId: data.spaces[0].id,
+      sourceIds: data.sources.map((source) => source.id),
+      sourceVersions: data.sources.map(({ id: sourceId, versionId }) => ({
+        sourceId,
+        versionId,
+      })),
+    };
+    const grounding = buildOrganizationGrounding(data, request);
+    expect(new Set(grounding.evidence.map((citation) => citation.sourceId))).toEqual(
+      new Set(request.sourceIds),
+    );
   });
   it.each(["global", "source", "deleted", "archived", "unknown", "old-index"])(
     "excludes unusable context: %s",

@@ -18,13 +18,19 @@ import { ApiError } from "../supabase/api";
 import { normalizeUserQuestionContext } from "../answer-context";
 import { isCrossLibraryAnswerRequest } from "../cross-library-ask";
 import { sourceCoverageNotices } from "../source-coverage";
+import { classifyQuestionIntent } from "./question-intent";
+import {
+  adjacentCitations,
+  interleave,
+  stratifiedSample,
+  uniqueCitations,
+} from "./evidence-assembly";
 
 const MAX_CHUNKS = 12;
 const MAX_CONTEXT_CHARS = 24_000;
 const MAX_CHUNK_CHARS = 8_000;
-export const GROUNDING_CONTRACT_VERSION = "grounding-v6";
-const broadQuestion =
-  /总结|概括|梳理|要点|核心观点|主要(内容|观点|概念)|比较|对比|异同|解释|概念|例子|举例|为什么|怎么|summari[sz]e|summary|overview|compare|comparison|key points|explain|example/i;
+const SUMMARY_RETRIEVAL_SLOTS = 4;
+export const GROUNDING_CONTRACT_VERSION = "grounding-v7";
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 const compact = (value: string) => value.replace(/\s+/g, "");
 const hasHan = (value: string) => /[\u3400-\u9fff]/.test(value);
@@ -149,7 +155,7 @@ export function buildGrounding(
       })),
   );
   const candidateCount = queues.reduce((sum, list) => sum + list.length, 0);
-  let candidates: Citation[] = fallback.citations.filter((item) =>
+  const retrievalHits: Citation[] = fallback.citations.filter((item) =>
     queues.some((queue) =>
       queue.some(
         (canonical) =>
@@ -159,41 +165,52 @@ export function buildGrounding(
       ),
     ),
   );
-  // Cross-language questions (e.g. Chinese on an English PDF) often miss the
-  // keyword index entirely. Sample the document instead of returning “no evidence”.
-  // Unrelated same-language questions still stay empty.
-  const useOverview =
-    broadQuestion.test(request.question) ||
-    request.scope === "selection" ||
-    (!candidates.length &&
+  const intent = classifyQuestionIntent(request.question);
+  const nonEmptyQueues = queues.filter((queue) => queue.length > 0);
+  const perSource = Math.max(1, Math.ceil(MAX_CHUNKS / Math.max(1, nonEmptyQueues.length)));
+  const spread = () =>
+    interleave(nonEmptyQueues.map((queue) => stratifiedSample(queue, perSource)));
+  let candidates: Citation[];
+  let sampled = false;
+  if (request.scope === "selection") {
+    const quote = normalize(request.selection!);
+    const selectedChunks = nonEmptyQueues.flat().filter((item) => {
+      const text = normalize(item.quote);
+      if (text.includes(quote) || quote.includes(text)) return true;
+      const full = normalize(sources.find((source) => source.id === item.sourceId)!.text);
+      const selectionStart = full.indexOf(quote);
+      const chunkStart = full.indexOf(text);
+      return (
+        selectionStart >= 0 &&
+        chunkStart >= 0 &&
+        chunkStart < selectionStart + quote.length &&
+        selectionStart < chunkStart + text.length
+      );
+    });
+    candidates = uniqueCitations([
+      ...selectedChunks,
+      ...adjacentCitations(selectedChunks, nonEmptyQueues, 1),
+      ...retrievalHits,
+    ]);
+  } else if (intent === "comparison" && nonEmptyQueues.length > 1) {
+    const hitsBySource = nonEmptyQueues.map((queue) =>
+      retrievalHits.filter((hit) => hit.sourceId === queue[0]!.sourceId),
+    );
+    candidates = uniqueCitations([...interleave(hitsBySource), ...spread()]);
+    sampled = true;
+  } else if (intent === "summary") {
+    candidates = uniqueCitations([...retrievalHits.slice(0, SUMMARY_RETRIEVAL_SLOTS), ...spread()]);
+    sampled = true;
+  } else {
+    candidates = retrievalHits;
+    if (
+      !candidates.length &&
       !isCrossLibraryAnswerRequest(request) &&
       request.scope !== "space" &&
-      isCrossScriptQuestion(request.question, sources));
-  if (useOverview) {
-    // Round-robin prevents the first document from consuming the whole context.
-    candidates = [];
-    const count = Math.max(0, ...queues.map((list) => list.length));
-    for (let index = 0; index < count; index++)
-      for (const list of queues) if (list[index]) candidates.push(list[index]);
-    if (request.scope === "selection") {
-      const quote = normalize(request.selection!);
-      const selectedChunks = candidates.filter((item) => {
-        const text = normalize(item.quote);
-        if (text.includes(quote) || quote.includes(text)) return true;
-        const full = normalize(sources.find((source) => source.id === item.sourceId)!.text);
-        const selectionStart = full.indexOf(quote);
-        const chunkStart = full.indexOf(text);
-        return (
-          selectionStart >= 0 &&
-          chunkStart >= 0 &&
-          chunkStart < selectionStart + quote.length &&
-          selectionStart < chunkStart + text.length
-        );
-      });
-      candidates = [
-        ...selectedChunks,
-        ...candidates.filter((item) => !selectedChunks.includes(item)),
-      ];
+      isCrossScriptQuestion(request.question, sources)
+    ) {
+      candidates = spread();
+      sampled = true;
     }
   }
   const noteEvidence = selectedDocumentNoteEvidence(data, request);
@@ -232,6 +249,7 @@ export function buildGrounding(
         : "没有符合当前资料来源边界的我的笔记，本次未纳入笔记。"
       : "",
     ...sourceCoverageNotices(selected),
+    sampled ? "摘要、比较或跨语言问题按全文均匀抽取片段。" : "",
     omitted ? "本次使用选取的片段，未覆盖全部正文；总结和比较可能不完整。" : "",
   ]
     .filter(Boolean)
