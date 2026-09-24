@@ -21,6 +21,7 @@ import {
 } from "@/lib/ai/model";
 import { selectAnswerProfile, selectFastProfile } from "@/lib/ai/model-routing";
 import { findUnsupportedParagraphs, VERIFY_CONTRACT_VERSION } from "@/lib/ai/answer-verification";
+import { priorAnswerContext } from "@/lib/ai/answer-memory";
 import {
   type AnswerFormat,
   GROUNDING_CONTRACT_VERSION,
@@ -341,6 +342,10 @@ export async function POST(request: Request) {
     const loaded = await prepare(load);
     const initial = loaded.workspace;
     const initialRevision = loaded.revision;
+    const memoryEnabled = aiFeatureEnabled("ANSWER_MEMORY");
+    const priorMemory = memoryEnabled
+      ? priorAnswerContext(initial, question, selectedSources(initial, question))
+      : { answers: [], citations: [], key: null };
     const probeRevision = async (): Promise<number> => {
       const { data, error } = await supabase
         .from("workspaces")
@@ -555,6 +560,7 @@ export async function POST(request: Request) {
                 ...(rerankFingerprint === undefined ? [] : ["rerank:" + rerankFingerprint]),
                 "depth:" + depth,
                 ...(verifyEnabled ? [VERIFY_CONTRACT_VERSION] : []),
+                ...(memoryEnabled ? ["memory:" + priorMemory.key] : []),
               ]),
             )
             .digest("hex");
@@ -742,6 +748,7 @@ export async function POST(request: Request) {
           longContext ??
           buildGrounding(initial, question, retrieved, {
             neighborRadius,
+            ...(memoryEnabled ? { priorCitations: priorMemory.citations } : {}),
           });
         if (longContext) traceRecorder?.set({ longContext: true });
         if (!grounding.evidence.length) {
@@ -777,6 +784,7 @@ export async function POST(request: Request) {
                   ...(rerankFingerprint === undefined ? [] : ["rerank:" + rerankFingerprint]),
                   "depth:" + depth,
                   ...(verifyEnabled ? [VERIFY_CONTRACT_VERSION] : []),
+                  ...(memoryEnabled ? ["memory:" + priorMemory.key] : []),
                 ]),
               )
               .digest("hex"),
@@ -799,7 +807,10 @@ export async function POST(request: Request) {
           // Waiting for a downstream reader must not make the evidence check stale.
           await assertCurrent(signal);
           const preview = send ? createGroundingPreview(grounding, { format }) : undefined;
-          const messages = groundingMessages(grounding, question, { format });
+          const messages = groundingMessages(grounding, question, {
+            format,
+            ...(memoryEnabled ? { priorAnswers: priorMemory.answers } : {}),
+          });
           traceRecorder?.mark("modelStart");
           let lastReasoningHeartbeat = 0;
           const modelObserver: ModelObserver = {

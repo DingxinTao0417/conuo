@@ -1029,6 +1029,7 @@ export const saveRequestSchema = z
 export const answerRequestSchema = z
   .object({
     requestId: id.optional(),
+    conversationId: id.optional(),
     question: z.string().trim().min(1).max(4000),
     depth: z.enum(["standard", "deep"]).optional(),
     userContext: z

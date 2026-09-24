@@ -38,6 +38,7 @@ import "./comparison-ai-panel.css";
 export interface ComparisonAskInput {
   requestId: string;
   question: string;
+  conversationId?: string;
   /** Prior learner questions only; model responses never become question context. */
   userContext?: string[];
 }
@@ -369,6 +370,7 @@ export default function ComparisonAskPanel({
           {
             requestId: attempt.id,
             question,
+            conversationId: next.id,
             ...(userContext.length ? { userContext } : {}),
           },
           signal,

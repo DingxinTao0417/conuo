@@ -329,7 +329,7 @@ export default function CrossLibraryAskPanel({
     const signal = new AbortController();
     controller.current = signal;
     try {
-      const answer = await onAsk(request, signal.signal);
+      const answer = await onAsk({ ...request, conversationId: thread.id }, signal.signal);
       if (controller.current !== signal) return;
       if (signal.signal.aborted) {
         throw signal.signal.reason instanceof Error

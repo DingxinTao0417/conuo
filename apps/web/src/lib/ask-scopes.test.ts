@@ -149,6 +149,20 @@ describe("answer request contract per scope option", () => {
     });
   });
 
+  it("carries only the saved conversation identity outside the frozen scope snapshot", () => {
+    const request = answerRequestFromSnapshot(
+      {
+        scope: "document",
+        sourceId: source.id,
+        sourceIds: [],
+        spaceId,
+      },
+      { question: "继续说明", conversationId: "conversation-saved" },
+    );
+    expect(request.conversationId).toBe("conversation-saved");
+    expect(request).not.toHaveProperty("userContext");
+  });
+
   it("keeps the document and document-notes ranges pinned to one document", () => {
     for (const scope of ["document", "document-notes"] as const) {
       const request = readerSnapshot(scope);

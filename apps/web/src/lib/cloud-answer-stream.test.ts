@@ -10,6 +10,7 @@ vi.mock("./supabase/config", () => ({
 vi.mock("./supabase/client", () => ({ createClient: vi.fn() }));
 const fetchMock = vi.fn<typeof fetch>();
 const request: AnswerRequest = {
+  conversationId: "conversation-saved",
   scope: "document",
   spaceId: "space",
   sourceId: "source",

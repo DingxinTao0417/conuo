@@ -1768,7 +1768,12 @@ export default function Reader(props: ReaderProps) {
       accepts: () => activeSourceId.current === readerIdentity,
       dispatch: (signal, onProgress, depth) =>
         onAsk(
-          answerRequestFromSnapshot(requestSnapshot, { question, requestId: attempt.id, depth }),
+          answerRequestFromSnapshot(requestSnapshot, {
+            question,
+            requestId: attempt.id,
+            depth,
+            conversationId: next.id,
+          }),
           signal,
           onProgress,
         ),

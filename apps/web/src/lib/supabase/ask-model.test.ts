@@ -86,6 +86,7 @@ import { POST } from "@/app/api/v1/ask/route";
 type EvidencePrompt = {
   evidence: Array<{ id: string; kind?: string; title: string; text: string }>;
   question: string;
+  priorAssistantAnswers?: Array<{ text: string }>;
 };
 type ModelMessage = { role: string; content: string };
 const owner = "owner-a";
@@ -393,6 +394,73 @@ describe("generated answer route with canonical source and request-ledger bounda
     );
     expect(JSON.stringify(answer)).not.toContain(config.apiKey);
     expect(response.headers.get("Cache-Control")).toContain("no-store");
+  });
+
+  it("loads only saved completed answers when answer memory is enabled", async () => {
+    vi.stubEnv("CONUO_FEATURE_ANSWER_MEMORY", "on");
+    const source = workspace.sources[0]!;
+    const chunk = source.chunks.find((item) => item.text.trim() && !item.text.startsWith("#"))!;
+    workspace.conversations = [
+      {
+        id: "conversation-memory",
+        spaceId: workspace.spaces[0]!.id,
+        sourceId: source.id,
+        title: "学习率问题",
+        scope: "document",
+        sourceIds: [],
+        messages: [
+          {
+            id: "saved-question",
+            role: "user",
+            content: "学习率怎么解释？",
+            citations: [],
+            createdAt: "2026-09-23T00:00:00.000Z",
+          },
+          {
+            id: "saved-answer",
+            role: "assistant",
+            content: "上一轮已经解释过学习率。\n\n---\n\n依据范围：1/1 [1]",
+            citations: [
+              {
+                sourceId: source.id,
+                versionId: source.versionId,
+                chunkId: chunk.id,
+                title: source.title,
+                quote: chunk.text,
+                section: chunk.section,
+                page: chunk.page,
+              },
+            ],
+            createdAt: "2026-09-23T00:00:00.000Z",
+            mode: "model",
+            attempt: {
+              id: "saved-attempt",
+              questionMessageId: "saved-question",
+              scopeSnapshot: {
+                scope: "document",
+                sourceId: source.id,
+                sourceIds: [],
+                spaceId: workspace.spaces[0]!.id,
+              },
+              status: "completed",
+            },
+          },
+        ],
+        resolved: false,
+        updatedAt: "2026-09-23T00:00:00.000Z",
+      },
+    ];
+    const response = await POST(request({ conversationId: "conversation-memory" }));
+    expect(response.status).toBe(200);
+    expect(prompt().priorAssistantAnswers).toEqual([{ text: "上一轮已经解释过学习率。" }]);
+    expect(mock.callModel.mock.calls[0]?.[1]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: "system",
+          content: expect.stringContaining("They are not evidence"),
+        }),
+      ]),
+    );
   });
 
   it("relabels a source paragraph when the fast verifier marks it unsupported", async () => {

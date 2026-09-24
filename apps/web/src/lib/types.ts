@@ -253,7 +253,10 @@ export type Scope =
  * Frozen user-visible range and follow-up context used for one answer attempt.
  * A retry uses this snapshot instead of a later conversation-wide scope change.
  */
-export type AnswerScopeSnapshot = Omit<AnswerRequest, "requestId" | "question" | "depth">;
+export type AnswerScopeSnapshot = Omit<
+  AnswerRequest,
+  "requestId" | "question" | "depth" | "conversationId"
+>;
 export interface AnswerAttempt {
   /** Unique request ID for this try. It is never reused when retrying. */
   id: string;
@@ -329,6 +332,8 @@ export interface SourceVersionReference {
 }
 export interface AnswerRequest {
   requestId?: string;
+  /** Saved conversation identity used to load bounded server-side answer memory. */
+  conversationId?: string;
   question: string;
   depth?: "standard" | "deep";
   /** Bounded, prior user questions used only to resolve a follow-up's subject. */

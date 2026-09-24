@@ -11,7 +11,12 @@ import type { AnswerRequest, AnswerScopeSnapshot } from "./types";
  */
 export function answerRequestFromSnapshot(
   snapshot: AnswerScopeSnapshot,
-  input: { question: string; requestId?: string; depth?: AnswerRequest["depth"] },
+  input: {
+    question: string;
+    requestId?: string;
+    depth?: AnswerRequest["depth"];
+    conversationId?: string;
+  },
 ): AnswerRequest {
   const singleDocument =
     snapshot.scope === "selection" ||
@@ -19,6 +24,7 @@ export function answerRequestFromSnapshot(
     snapshot.scope === "document-notes";
   return {
     ...(input.requestId ? { requestId: input.requestId } : {}),
+    ...(input.conversationId ? { conversationId: input.conversationId } : {}),
     question: input.question,
     ...(input.depth ? { depth: input.depth } : {}),
     ...(snapshot.userContext?.length ? { userContext: [...snapshot.userContext] } : {}),
