@@ -21,7 +21,7 @@
 | 4    | WP-06  | 完成     | `a2e8bd1` | 260 个测试文件／4288 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有警告；本 WP 变更文件 Prettier 定向检查通过；仓库级 format:check 被既有 `._*` 文件和未涉及文件阻断 | `RICH_ANSWERS` 默认关闭；安全 Markdown、公式与 KaTeX；`grounding-v8`；未运行真实模型评测 |
 | 5    | WP-04  | 完成     | `d493348`、`0c1ffc1` | 262 个测试文件／4301 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有警告；本 WP 变更文件 Prettier 定向检查通过；仓库级 format:check 被既有 36 个 `._*` AppleDouble 文件阻断 | AI 请求 trace、provider usage、流式最终 usage 帧；30 天清理与 service_role RPC；默认关闭 |
 | 6    | WP-03  | 完成     | `3a81562` | 265 个测试文件／4310 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有警告；新增文件定向 Prettier 通过；仓库级 format:check 被既有 36 个 `._*` AppleDouble 文件阻断 | 回答反馈、显式内容附带、撤回和人工转评测流程；阶段 0 离线门槛通过 |
-| 7    | WP-07  | 完成     | `cb572a8` | 266 个测试文件／4323 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 变更文件 Prettier 定向检查通过；仓库级 format:check 被既有 36 个 `._*` AppleDouble 文件阻断 | 四档模型配置、问答／整理／后台整理／区域视觉路由档位指纹隔离；真实模型与部署未验收 |
+| 7    | WP-07  | 完成     | `73d41a3` | 266 个测试文件／4323 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 变更文件 Prettier 定向检查通过；仓库级 format:check 被既有 36 个 `._*` AppleDouble 文件阻断 | 四档模型配置、问答／整理／后台整理／区域视觉路由档位指纹隔离；真实模型与部署未验收 |
 | 8    | WP-09  | 未开始   |      |      |      |
 | 9    | WP-10  | 未开始   |      |      |      |
 | 10   | WP-11  | 未开始   |      |      | 子项 A → D → B → C 分提交 |
