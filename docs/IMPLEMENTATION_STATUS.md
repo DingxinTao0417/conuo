@@ -6,6 +6,14 @@
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
 
+## AI 增强 WP-08（2026-09-23，本地）
+
+- 范围：为问答请求增加可选 `depth`；深度请求在服务端开关打开且使用 SSE 时路由到 `reasoning` 档位，使用 280 秒服务端预算、300 秒 Route Handler 上限和 330 秒账本 TTL；默认开关仍关闭，普通请求边界保持不变。
+- 流式合同：模型 `reasoning_content` 只转换为最多每 5 秒一次的 `reasoning` 进度事件，不进入回答正文、草稿或保存快照；浏览器读取总时限调整为 310 秒。深度思考非流式请求返回 `DEEP_REQUIRES_STREAM`。
+- 变更：新增 `20260924000300_ai_request_ttl.sql`，并更新问答路由、模型观察器、SSE 合同、通用问答面板和模型配置说明；迁移只在本地 PGlite 测试执行。
+- 测试：WP-08 定向测试 4 个文件／159 项通过；typecheck 通过。R-15 全量结果将在本次工作包完成后记录。
+- 未验收边界：未打开 server/UI 深度开关，未配置 reasoning 供应商密钥，未执行远程迁移、部署或真实模型调用。
+
 ## AI 增强 WP-11-C（2026-09-23，本地）
 
 - 范围：新增默认关闭的可选重排服务适配器；`CONUO_FEATURE_RERANK=on` 且配置完整时，问答会在既有证据预算前对最多 40 条检索片段排序，再保留原有 12 条／24,000 字符预算。
