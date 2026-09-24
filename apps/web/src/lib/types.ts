@@ -242,6 +242,26 @@ export interface Note {
   updatedAt: string;
   deletedAt: string | null;
 }
+export interface GlossaryChunkReference {
+  sourceId: string;
+  versionId: string;
+  chunkId: string;
+}
+export interface GlossaryDefinition {
+  text: string;
+  chunkRefs: GlossaryChunkReference[];
+}
+export interface GlossaryTerm {
+  termId: string;
+  spaceId: string;
+  term: string;
+  aliases: string[];
+  definition: GlossaryDefinition;
+  status: "accepted" | "rejected";
+  origin: "ai" | "user";
+  createdAt: string;
+  updatedAt: string;
+}
 /**
  * `cross-library-sources` is deliberately distinct from an ordinary selected
  * source range. It is available only from the all-library workspace and always

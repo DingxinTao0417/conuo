@@ -68,6 +68,7 @@ import {
 } from "@/lib/ai/answer-response-stream";
 import type { OutlineItem } from "@/lib/source-outline";
 import { SUMMARY_CONTRACT_VERSION } from "@/lib/ai/source-summary";
+import { appendGlossaryAliases, glossaryTermSchema } from "@/lib/ai/glossary";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -381,6 +382,23 @@ function knowledgeNavigationCitations(data: WorkspaceData, question: AnswerReque
   }
 }
 
+async function readGlossaryTerms(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  spaceId: string,
+) {
+  if (spaceId === "inbox" || spaceId === "all") return [];
+  try {
+    const { data, error } = await supabase.rpc("list_glossary_terms", { p_space_id: spaceId });
+    if (error || !Array.isArray(data)) return [];
+    return data.flatMap((value: unknown) => {
+      const parsed = glossaryTermSchema.safeParse(value);
+      return parsed.success && parsed.data.status === "accepted" ? [parsed.data] : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
 export async function POST(request: Request) {
   const startedAt = Date.now();
   const preflightDeadlineAt = startedAt + ANSWER_STREAM_LIMITS.durationMs;
@@ -631,8 +649,10 @@ export async function POST(request: Request) {
             return retrieveEvidence(initial, question);
         }
         const searchData = { ...initial, sources: selectedSources(initial, question) };
+        const glossaryTerms = await readGlossaryTerms(supabase, question.spaceId);
+        const glossaryQuery = appendGlossaryAliases(answerRetrievalQuery(question), glossaryTerms);
         const searchRequest = {
-          query: answerRetrievalQuery(question),
+          query: glossaryQuery.query,
           scope: isCrossLibraryAnswerRequest(question)
             ? { kind: "all" as const }
             : question.spaceId === "inbox"
@@ -640,6 +660,9 @@ export async function POST(request: Request) {
               : { kind: "space" as const, spaceId: question.spaceId },
           limit: 100,
         };
+        const glossaryFingerprint = glossaryQuery.fingerprint
+          ? "glossary:" + glossaryQuery.fingerprint
+          : null;
         const navigationCitations = aiFeatureEnabled("KNOWLEDGE_NAVIGATION")
           ? knowledgeNavigationCitations(initial, question, searchRequest.query)
           : [];
@@ -741,6 +764,7 @@ export async function POST(request: Request) {
                 ...outlineFingerprint,
                 ...(summaryAvailable ? [SUMMARY_CONTRACT_VERSION, ...summaryFingerprint] : []),
                 ...(navigationFingerprint ? ["navigation:" + navigationFingerprint] : []),
+                ...(glossaryFingerprint ? [glossaryFingerprint] : []),
               ]),
             )
             .digest("hex");
@@ -983,6 +1007,7 @@ export async function POST(request: Request) {
                   ...outlineFingerprint,
                   ...(summaryAvailable ? [SUMMARY_CONTRACT_VERSION, ...summaryFingerprint] : []),
                   ...(navigationFingerprint ? ["navigation:" + navigationFingerprint] : []),
+                  ...(glossaryFingerprint ? [glossaryFingerprint] : []),
                 ]),
               )
               .digest("hex"),

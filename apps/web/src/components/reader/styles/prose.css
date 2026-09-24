@@ -2,6 +2,59 @@
   color: #404040;
   overflow-wrap: anywhere;
 }
+
+.reader-glossary-term {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--accent-violet);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  background: transparent;
+}
+
+.reader-glossary-term:focus {
+  outline: 2px solid var(--accent-violet);
+  outline-offset: 2px;
+}
+
+.reader-glossary-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+  padding: 16px;
+  border: 1px solid var(--accent-violet-border);
+  border-radius: 12px;
+  background: var(--accent-violet-soft);
+}
+
+.reader-glossary-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reader-glossary-card-heading span,
+.reader-glossary-stale {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.reader-glossary-card-heading h2 {
+  margin: 3px 0 0;
+}
+
+.reader-glossary-card p {
+  margin: 0;
+  line-height: 1.7;
+}
+
+.reader-glossary-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
 .reader-prose p {
   margin: 0 0 1.05em;
 }

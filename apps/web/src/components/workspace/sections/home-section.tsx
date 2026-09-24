@@ -9,6 +9,7 @@ import {
   Upload,
 } from "lucide-react";
 import { isCrossLibraryConversation } from "@/lib/cross-library-ask";
+import { buildLearningPath } from "@/lib/learning-path";
 import type { PrimaryLearningContinuation } from "@/lib/learning-continue";
 import { createDemoWorkspace } from "@/lib/seed";
 import type { Conversation, Note, Source, Space, WorkspaceData } from "@/lib/types";
@@ -65,6 +66,9 @@ export default function HomeSection({
   setSpaceToDeleteId,
   setModal,
 }: HomeSectionProps) {
+  const learningPath = activeSpace
+    ? buildLearningPath(data.notes, data.conceptRelations ?? [], activeSpace.id)
+    : null;
   return (
     <div className="home-workspace">
       <div className="page-heading">
@@ -161,6 +165,38 @@ export default function HomeSection({
           </div>
           <small>支持 PDF、DOCX、Markdown、TXT 和网页链接</small>
         </div>
+      )}
+      {activeSpace && learningPath?.hasPrerequisites && (
+        <section className="home-learning-path" aria-labelledby="home-learning-path-heading">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">按前置关系排列</p>
+              <h2 id="home-learning-path-heading">学习路径</h2>
+            </div>
+            {learningPath.hasCycle && (
+              <span className="home-learning-path-warning" role="status">
+                存在循环依赖，已按创建时间断开
+              </span>
+            )}
+          </div>
+          <ol className="home-learning-path-list">
+            {learningPath.items.map((item, index) => (
+              <li key={item.note.id}>
+                <span className="home-learning-path-index">{index + 1}</span>
+                <button type="button" onClick={() => openNote(item.note.id)}>
+                  <strong>{item.note.title || "未命名知识页"}</strong>
+                  {item.prerequisites.length > 0 && (
+                    <small>
+                      先学：
+                      {item.prerequisites.map((prerequisite) => prerequisite.title).join("、")}
+                    </small>
+                  )}
+                </button>
+                {item.cycle && <span className="home-learning-path-cycle">循环</span>}
+              </li>
+            ))}
+          </ol>
+        </section>
       )}
       <div className="home-columns">
         <section

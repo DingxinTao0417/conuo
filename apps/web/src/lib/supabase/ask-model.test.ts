@@ -328,6 +328,7 @@ describe("generated answer route with canonical source and request-ledger bounda
     }));
     mock.readModelConfig.mockReturnValue(config);
     mock.rpc.mockImplementation(async (name, args) => {
+      if (name === "list_glossary_terms") return { data: [], error: null };
       expect(name).toBe("search_source_chunks");
       const evidence = retrieveEvidence(workspace, {
         question: args.p_query,
@@ -695,6 +696,7 @@ describe("generated answer route with canonical source and request-ledger bounda
         };
       });
     mock.rpc.mockImplementation(async (name, args) => {
+      if (name === "list_glossary_terms") return { data: [], error: null };
       const sourceIds = args.p_source_ids as string[];
       if (name === "search_source_chunks") return { data: rows(sourceIds), error: null };
       if (name === "embedding_job_status")
@@ -805,7 +807,11 @@ describe("generated answer route with canonical source and request-ledger bounda
       const originalRpc = mock.rpc.getMockImplementation()!;
       const evidenceBefore = structuredClone(workspace.sources);
       const contextBefore = questionContextKey(workspace, question());
-      mock.rpc.mockImplementationOnce(async (...args) => {
+      let searchHandled = false;
+      mock.rpc.mockImplementation(async (...args) => {
+        if (args[0] === "list_glossary_terms") return { data: [], error: null };
+        if (searchHandled) return originalRpc(...args);
+        searchHandled = true;
         if (phase === "before-rpc-read") saveConcurrentQuestion();
         const result = await originalRpc(...args);
         if (phase === "after-rpc-read") saveConcurrentQuestion();
@@ -820,7 +826,9 @@ describe("generated answer route with canonical source and request-ledger bounda
       expect(questionContextKey(workspace, question())).toBe(contextBefore);
       expect(workspaceRevision).toBe(2);
       expect(workspace.conversations.at(-1)?.messages[0].role).toBe("user");
-      expect(mock.rpc).toHaveBeenCalledOnce();
+      expect(mock.rpc.mock.calls.filter(([name]) => name !== "list_glossary_terms")).toHaveLength(
+        1,
+      );
       expect(mock.reserveRequest).toHaveBeenCalledOnce();
       expect(mock.callModel).toHaveBeenCalledOnce();
       expect(mock.finishRequest).toHaveBeenCalledOnce();
@@ -832,7 +840,11 @@ describe("generated answer route with canonical source and request-ledger bounda
     async (kind) => {
       if (kind === "old") workspaceRevision = 2;
       const originalRpc = mock.rpc.getMockImplementation()!;
-      mock.rpc.mockImplementationOnce(async (...args) => {
+      let searchHandled = false;
+      mock.rpc.mockImplementation(async (...args) => {
+        if (args[0] === "list_glossary_terms") return { data: [], error: null };
+        if (searchHandled) return originalRpc(...args);
+        searchHandled = true;
         const result = await originalRpc(...args);
         const first = result.data[0];
         expect(first).toBeDefined();
@@ -871,6 +883,7 @@ describe("generated answer route with canonical source and request-ledger bounda
     const originalRpc = mock.rpc.getMockImplementation()!;
     let searches = 0;
     mock.rpc.mockImplementation(async (name, args) => {
+      if (name === "list_glossary_terms") return { data: [], error: null };
       if (name === "embedding_job_status") return { data: { jobs: [] }, error: null };
       searches += 1;
       if (searches === 2) saveConcurrentQuestion();
@@ -879,11 +892,9 @@ describe("generated answer route with canonical source and request-ledger bounda
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(((await response.json()) as AnswerResult).mode).toBe("model");
-    expect(mock.rpc.mock.calls.map(([name]) => name)).toEqual([
-      "search_source_chunks",
-      "embedding_job_status",
-      "search_source_chunks",
-    ]);
+    expect(
+      mock.rpc.mock.calls.filter(([name]) => name !== "list_glossary_terms").map(([name]) => name),
+    ).toEqual(["search_source_chunks", "embedding_job_status", "search_source_chunks"]);
     expect(mock.reserveEmbeddingUsage).not.toHaveBeenCalled();
     expect(mock.embedQuery).not.toHaveBeenCalled();
     expect(mock.reserveRequest).toHaveBeenCalledOnce();
@@ -893,7 +904,11 @@ describe("generated answer route with canonical source and request-ledger bounda
 
   it("does not treat a newer source AI revocation as a harmless conversation save", async () => {
     const originalRpc = mock.rpc.getMockImplementation()!;
-    mock.rpc.mockImplementationOnce(async (...args) => {
+    let searchHandled = false;
+    mock.rpc.mockImplementation(async (...args) => {
+      if (args[0] === "list_glossary_terms") return { data: [], error: null };
+      if (searchHandled) return originalRpc(...args);
+      searchHandled = true;
       const result = await originalRpc(...args);
       workspace = {
         ...workspace,
@@ -1358,10 +1373,11 @@ describe("generated answer route with canonical source and request-ledger bounda
     expect(response.status).toBe(200);
     expect(mock.reserveRequest).toHaveBeenCalledOnce();
     expect(mock.callModel).toHaveBeenCalledTimes(2);
-    expect(mock.rpc.mock.calls.map(([, args]) => args.p_query)).toEqual([
-      "学习率过高",
-      "learning rate too high",
-    ]);
+    expect(
+      mock.rpc.mock.calls
+        .filter(([name]) => name !== "list_glossary_terms")
+        .map(([, args]) => args.p_query),
+    ).toEqual(["学习率过高", "learning rate too high"]);
   });
 
   it("does not call the rewrite model when the rewritten request is cached", async () => {
@@ -1373,7 +1389,7 @@ describe("generated answer route with canonical source and request-ledger bounda
     expect(response.status).toBe(200);
     expect(mock.reserveRequest).toHaveBeenCalledOnce();
     expect(mock.callModel).not.toHaveBeenCalled();
-    expect(mock.rpc).not.toHaveBeenCalled();
+    expect(mock.rpc.mock.calls.filter(([name]) => name !== "list_glossary_terms")).toHaveLength(0);
   });
 
   it("falls back to the bounded original retrieval query when rewrite JSON is invalid", async () => {
@@ -1383,7 +1399,9 @@ describe("generated answer route with canonical source and request-ledger bounda
       request({ question: "为什么？", userContext: ["学习率过高会怎样？"] }),
     );
     expect(response.status).toBe(200);
-    expect(mock.rpc.mock.calls[0]?.[1].p_query).toBe("为什么？\n学习率过高会怎样？");
+    expect(mock.rpc.mock.calls.find(([name]) => name === "search_source_chunks")?.[1].p_query).toBe(
+      "为什么？\n学习率过高会怎样？",
+    );
     expect(mock.reserveRequest).toHaveBeenCalledOnce();
   });
 
@@ -1401,6 +1419,7 @@ describe("generated answer route with canonical source and request-ledger bounda
     });
     mock.rerank.mockResolvedValueOnce([1, 0]);
     mock.rpc.mockImplementation(async (name) => {
+      if (name === "list_glossary_terms") return { data: [], error: null };
       expect(name).toBe("search_source_chunks");
       return {
         data: chunks.map((chunk, index) => ({
@@ -1438,6 +1457,7 @@ describe("generated answer route with canonical source and request-ledger bounda
     });
     mock.rerank.mockRejectedValueOnce(new Error("provider unavailable"));
     mock.rpc.mockImplementation(async (name) => {
+      if (name === "list_glossary_terms") return { data: [], error: null };
       expect(name).toBe("search_source_chunks");
       return {
         data: chunks.map((chunk, index) => ({

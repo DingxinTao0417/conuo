@@ -42,6 +42,7 @@ import type {
   AnswerScopeSnapshot,
   Citation,
   Conversation,
+  GlossaryTerm,
   Message,
   Source,
 } from "@/lib/types";
@@ -131,6 +132,71 @@ import type {
   SelectionToolbarPosition,
 } from "./reader-types";
 import { sourceOutlineCache, type OutlineItem } from "@/lib/source-outline";
+
+function highlightGlossaryTerms(container: HTMLElement, terms: readonly GlossaryTerm[]) {
+  container.querySelectorAll("mark[data-glossary-term]").forEach((mark) => {
+    const parent = mark.parentNode;
+    if (!parent) return;
+    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+    mark.remove();
+  });
+  for (const term of terms.filter((item) => item.status === "accepted")) {
+    const variants = [term.term, ...term.aliases]
+      .map((value) => ({ value, normalized: value.normalize("NFKC").toLocaleLowerCase("zh-CN") }))
+      .filter((variant) => variant.normalized)
+      .sort((left, right) => right.normalized.length - left.normalized.length);
+    if (!variants.length) continue;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    let node: Text | null = null;
+    let offset = -1;
+    let matchLength = 0;
+    while (walker.nextNode()) {
+      const current = walker.currentNode as Text;
+      const parent = current.parentElement;
+      if (
+        !parent ||
+        parent.closest("mark,code,pre,a,button,.reader-image-placeholder") ||
+        !current.data.trim()
+      )
+        continue;
+      const normalizedText = current.data.normalize("NFKC").toLocaleLowerCase("zh-CN");
+      const match = variants
+        .map((variant) => ({ ...variant, index: normalizedText.indexOf(variant.normalized) }))
+        .filter((variant) => variant.index >= 0)
+        .sort(
+          (left, right) =>
+            left.index - right.index || right.normalized.length - left.normalized.length,
+        )[0];
+      if (match) {
+        node = current;
+        offset = match.index;
+        matchLength = match.value.length;
+        break;
+      }
+    }
+    if (!node || offset < 0) continue;
+    const mark = document.createElement("mark");
+    mark.className = "reader-glossary-term";
+    mark.dataset.glossaryTerm = term.termId;
+    mark.title = term.definition.text;
+    mark.setAttribute("role", "button");
+    mark.tabIndex = 0;
+    mark.setAttribute("aria-label", "术语：" + term.term + "。点击查看定义。");
+    const range = document.createRange();
+    range.setStart(node, offset);
+    range.setEnd(node, Math.min(node.data.length, offset + matchLength));
+    mark.appendChild(range.extractContents());
+    range.insertNode(mark);
+  }
+  return () => {
+    container.querySelectorAll("mark[data-glossary-term]").forEach((mark) => {
+      const parent = mark.parentNode;
+      if (!parent) return;
+      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      mark.remove();
+    });
+  };
+}
 
 export default function Reader(props: ReaderProps) {
   const {
@@ -272,6 +338,8 @@ export default function Reader(props: ReaderProps) {
   } | null>(null);
   const docxStructureKey = `${source.id}:${source.versionId}`;
   const docxBlocks = docxStructure?.key === docxStructureKey ? docxStructure.blocks : null;
+  const [glossaryTerms, setGlossaryTerms] = useState<GlossaryTerm[]>([]);
+  const [activeGlossaryTerm, setActiveGlossaryTerm] = useState<GlossaryTerm | null>(null);
   const [pdfOutlineItems, setPdfOutlineItems] = useState<OutlineItem[]>([]);
   const textContainer = useRef<HTMLDivElement>(null);
   const citationReturnButton = useRef<HTMLButtonElement>(null);
@@ -439,6 +507,54 @@ export default function Reader(props: ReaderProps) {
       disposed = true;
     };
   }, [docxStructureKey, source.blobKey, source.kind, source.text]);
+  useEffect(() => {
+    let disposed = false;
+    queueMicrotask(() => {
+      if (disposed) return;
+      setGlossaryTerms([]);
+      setActiveGlossaryTerm(null);
+    });
+    if (historical || !props.cloudUserId || props.saveState !== "cloud" || !space.id)
+      return () => {
+        disposed = true;
+      };
+    const controller = new AbortController();
+    void fetch("/api/v1/glossary?spaceId=" + encodeURIComponent(space.id), {
+      credentials: "include",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: { "X-Conuo-User": props.cloudUserId },
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((value: unknown) => {
+        if (
+          !value ||
+          typeof value !== "object" ||
+          !Array.isArray((value as { terms?: unknown }).terms)
+        )
+          return;
+        setGlossaryTerms(
+          (value as { terms: unknown[] }).terms.filter(
+            (term): term is GlossaryTerm =>
+              !!term &&
+              typeof term === "object" &&
+              (term as { status?: unknown }).status === "accepted",
+          ),
+        );
+      })
+      .catch(() => {
+        // Glossary navigation is optional and never blocks source reading.
+      });
+    return () => {
+      disposed = true;
+      controller.abort();
+    };
+  }, [historical, props.cloudUserId, props.saveState, space.id]);
+  useEffect(() => {
+    const prose = textContainer.current?.querySelector<HTMLElement>("[data-reader-text]");
+    if (!prose || !glossaryTerms.length) return;
+    return highlightGlossaryTerms(prose, glossaryTerms);
+  }, [glossaryTerms, source.id, source.versionId, docxBlocks, showText, renderRevision]);
   useEffect(() => {
     const currentSource = sourceRef.current;
     if (
@@ -2517,6 +2633,28 @@ export default function Reader(props: ReaderProps) {
                     data-reader-text="true"
                     data-reader-source-id={source.id}
                     data-reader-source-version={source.versionId}
+                    onClick={(event) => {
+                      const target = (event.target as HTMLElement).closest<HTMLElement>(
+                        "mark[data-glossary-term]",
+                      );
+                      if (!target) return;
+                      const term = glossaryTerms.find(
+                        (item) => item.termId === target.dataset.glossaryTerm,
+                      );
+                      if (term) setActiveGlossaryTerm(term);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      const target = (event.target as HTMLElement).closest<HTMLElement>(
+                        "mark[data-glossary-term]",
+                      );
+                      if (!target) return;
+                      event.preventDefault();
+                      const term = glossaryTerms.find(
+                        (item) => item.termId === target.dataset.glossaryTerm,
+                      );
+                      if (term) setActiveGlossaryTerm(term);
+                    }}
                     {...(article
                       ? { "data-markdown-start": 0, "data-markdown-end": source.text.length }
                       : {})}
@@ -2557,6 +2695,67 @@ export default function Reader(props: ReaderProps) {
                       </a>
                     )}
                   </div>
+                )}
+                {activeGlossaryTerm && (
+                  <aside className="reader-glossary-card" role="dialog" aria-label="术语定义">
+                    <div className="reader-glossary-card-heading">
+                      <div>
+                        <span>术语</span>
+                        <h2>{activeGlossaryTerm.term}</h2>
+                      </div>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        aria-label="关闭术语定义"
+                        onClick={() => setActiveGlossaryTerm(null)}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <p>{activeGlossaryTerm.definition.text}</p>
+                    <div className="reader-glossary-card-actions">
+                      {activeGlossaryTerm.definition.chunkRefs.map((ref) => {
+                        const targetSource = sources.find(
+                          (item) => item.id === ref.sourceId && !item.deletedAt,
+                        );
+                        const chunk = targetSource?.chunks.find(
+                          (item) =>
+                            item.id === ref.chunkId &&
+                            item.versionId === ref.versionId &&
+                            item.sourceId === ref.sourceId,
+                        );
+                        if (!targetSource || targetSource.versionId !== ref.versionId || !chunk)
+                          return (
+                            <span
+                              className="reader-glossary-stale"
+                              key={ref.sourceId + ":" + ref.versionId + ":" + ref.chunkId}
+                            >
+                              原文版本已变化
+                            </span>
+                          );
+                        return (
+                          <button
+                            type="button"
+                            className="text-button"
+                            key={ref.sourceId + ":" + ref.versionId + ":" + ref.chunkId}
+                            onClick={() =>
+                              onOpenSource(targetSource.id, targetSource.versionId, {
+                                sourceId: targetSource.id,
+                                versionId: targetSource.versionId,
+                                chunkId: chunk.id,
+                                title: targetSource.title,
+                                quote: chunk.text,
+                                section: chunk.section,
+                                page: chunk.page,
+                              })
+                            }
+                          >
+                            查看原文 · {targetSource.title}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </aside>
                 )}
               </article>
             )}

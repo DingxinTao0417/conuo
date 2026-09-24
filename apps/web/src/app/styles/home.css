@@ -77,6 +77,77 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
 }
+
+.home-learning-path {
+  display: grid;
+  gap: 14px;
+  margin: 24px 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--bg);
+}
+
+.home-learning-path .section-heading {
+  align-items: flex-start;
+}
+
+.home-learning-path .section-heading h2 {
+  margin: 2px 0 0;
+}
+
+.home-learning-path-warning,
+.home-learning-path-cycle {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.home-learning-path-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-learning-path-list li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.home-learning-path-list button {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.home-learning-path-list button:hover {
+  background: var(--bg-secondary);
+}
+
+.home-learning-path-list small {
+  color: var(--muted);
+}
+
+.home-learning-path-index {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
 .home-panel {
   --panel-accent: var(--accent-amber);
   --panel-tint: var(--accent-amber-soft);

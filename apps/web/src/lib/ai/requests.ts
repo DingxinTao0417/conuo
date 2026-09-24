@@ -6,6 +6,7 @@ import { getSupabaseConfig } from "../supabase/config";
 import type { AnswerResult } from "../types";
 import type { OrganizationResult } from "../organization-types";
 import type { VisionStudyResult } from "../vision-region-contract";
+import type { GlossarySuggestionResult } from "./glossary";
 import {
   AI_DAILY_REQUEST_LIMIT_MIN,
   AI_DAILY_REQUEST_LIMIT_MAX,
@@ -97,7 +98,7 @@ export async function finishRequest(
   store: Store,
   ownerId: string,
   requestId: string,
-  result?: AnswerResult | OrganizationResult | VisionStudyResult,
+  result?: AnswerResult | OrganizationResult | VisionStudyResult | GlossarySuggestionResult,
   errorCode?: string,
 ) {
   // Never write the service-role table directly: the database-side completion

@@ -239,21 +239,24 @@ beforeEach(() => {
     data: { data: structuredClone(workspace), revision: cloudRevision },
     error: null,
   }));
-  mock.rpc.mockImplementation(async (_name, args) => ({
-    data: retrieveEvidence(workspace, {
-      question: args.p_query,
-      scope: "sources",
-      sourceIds: args.p_source_ids,
-      spaceId: args.p_space_id,
-    }).citations.map((citation) => ({
-      source_id: citation.sourceId,
-      version_id: citation.versionId,
-      chunk_id: citation.chunkId,
-      score: 1,
-      workspace_revision: 1,
-    })),
-    error: null,
-  }));
+  mock.rpc.mockImplementation(async (name, args) => {
+    if (name === "list_glossary_terms") return { data: [], error: null };
+    return {
+      data: retrieveEvidence(workspace, {
+        question: args.p_query,
+        scope: "sources",
+        sourceIds: args.p_source_ids,
+        spaceId: args.p_space_id,
+      }).citations.map((citation) => ({
+        source_id: citation.sourceId,
+        version_id: citation.versionId,
+        chunk_id: citation.chunkId,
+        score: 1,
+        workspace_revision: 1,
+      })),
+      error: null,
+    };
+  });
   mock.readModelConfig.mockReturnValue(config);
   mock.createRequestStore.mockReturnValue(store);
   mock.reserveRequest.mockResolvedValue({ kind: "reserved" });
@@ -341,7 +344,8 @@ describe("authenticated generated-answer SSE route", () => {
         reads.push({ revision, conversations: workspace.conversations.length });
         return { data: { data: structuredClone(workspace), revision }, error: null };
       });
-      mock.rpc.mockImplementation(async (_name, args) => {
+      mock.rpc.mockImplementation(async (name, args) => {
+        if (name === "list_glossary_terms") return { data: [], error: null };
         if (stage === "before-rpc-result") {
           workspace = appendQuestionConversation(workspace);
           revision = 2;
@@ -371,7 +375,9 @@ describe("authenticated generated-answer SSE route", () => {
       expect(reads.slice(1).every((read) => read.revision === 2 && read.conversations === 1)).toBe(
         true,
       );
-      expect(mock.rpc).toHaveBeenCalledOnce();
+      expect(mock.rpc.mock.calls.filter(([name]) => name !== "list_glossary_terms")).toHaveLength(
+        1,
+      );
       expect(mock.reserveRequest).toHaveBeenCalledOnce();
       expect(mock.callModelStream).toHaveBeenCalledOnce();
       expect(mock.callModel).not.toHaveBeenCalled();
@@ -394,7 +400,8 @@ describe("authenticated generated-answer SSE route", () => {
         data: { data: structuredClone(workspace), revision },
         error: null,
       }));
-      mock.rpc.mockImplementation(async (_name, args) => {
+      mock.rpc.mockImplementation(async (name, args) => {
+        if (name === "list_glossary_terms") return { data: [], error: null };
         workspace = appendQuestionConversation(workspace);
         revision = 2;
         const rows = indexedRows(workspace, mode === "future" ? 3 : 1, args);
@@ -445,7 +452,8 @@ describe("authenticated generated-answer SSE route", () => {
         }
         return { data: { data: structuredClone(workspace), revision }, error: null };
       });
-      mock.rpc.mockImplementation(async (_name, args) => {
+      mock.rpc.mockImplementation(async (name, args) => {
+        if (name === "list_glossary_terms") return { data: [], error: null };
         const rows = indexedRows(workspace, revision, args);
         expect(rows.length).toBeGreaterThan(0);
         rpcReturned = true;
