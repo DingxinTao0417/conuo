@@ -6,6 +6,14 @@
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
 
+## AI 增强 WP-17（2026-09-24，本地）
+
+- 范围：资料整理使用 WP-16 当前版本的全书摘要代表性原文，并把章节摘要作为不可引用的导航提示；没有摘要的资料继续使用 WP-01 的均匀取样，混合选集不缩小用户范围。
+- 证据与预算：服务端只把规范原文切块绑定为 `organizationCitations`；当所用模型的 `maxRequestBytes` 至少为 524288 时，最多使用 24 段／36,000 字符，否则保持 12 段／24,000 字符。摘要创建时间追加到交互式和后台整理指纹，整理输出仍是 `organization-v2` 的四种结构，语义合同升至 `organization-v3`。
+- 读取与边界：用户路由经 `read_source_summaries` 读取摘要，后台 worker 按 WP-17 要求尝试由 service role 直接读取当前版本摘要；摘要开关关闭、摘要不存在或读取失败时沿用原整理路径。当前 WP-16 迁移同时撤销了 `source_version_summaries` 对 `service_role` 的表权限，这与后台直接查询要求冲突，需人工决定最小只读授权或手册允许的服务端读取契约后解除阻塞。章节摘要标记为不可信导航数据，不能进入可见引用。
+- 测试：新增无摘要回退、跨资料代表性证据、章节导航隔离、交互式路由指纹和后台 worker 读取回归；本地定向测试通过。
+- 未验收边界：真实模型下的整理质量和 WP-16 `summary` 类别人工覆盖率仍待评审；后台 service role 直接查询的表权限冲突待人工决定；未打开 staging 开关，未执行远程迁移、operations 脚本、部署或供应商调用。
+
 ## AI 增强 WP-15（2026-09-24，本地）
 
 - 范围：新增按资料版本保存的 `source_outlines` 派生表、owner-scoped `save_source_outline`／`read_source_outlines` RPC 与目录 API；严格限制目录项、方法、标题、层级和页码，历史版本清理会级联删除目录。
