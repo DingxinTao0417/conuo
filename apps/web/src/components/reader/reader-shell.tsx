@@ -130,6 +130,7 @@ import type {
   RegionCaptureStart,
   SelectionToolbarPosition,
 } from "./reader-types";
+import type { OutlineItem } from "@/lib/source-outline";
 
 export default function Reader(props: ReaderProps) {
   const {
@@ -271,6 +272,7 @@ export default function Reader(props: ReaderProps) {
   } | null>(null);
   const docxStructureKey = `${source.id}:${source.versionId}`;
   const docxBlocks = docxStructure?.key === docxStructureKey ? docxStructure.blocks : null;
+  const [pdfOutlineItems, setPdfOutlineItems] = useState<OutlineItem[]>([]);
   const textContainer = useRef<HTMLDivElement>(null);
   const citationReturnButton = useRef<HTMLButtonElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -400,7 +402,10 @@ export default function Reader(props: ReaderProps) {
   const sourceAnnotations = annotations.filter(
     (item) => item.sourceId === source.id && item.versionId === source.versionId,
   );
-  const outlineItems = useMemo(() => deriveReaderOutline(source, docxBlocks), [source, docxBlocks]);
+  const outlineItems = useMemo(
+    () => deriveReaderOutline(source, docxBlocks, pdfOutlineItems),
+    [source, docxBlocks, pdfOutlineItems],
+  );
   const messages = conversation?.messages || [];
   const scopedSources =
     scope === "space"
@@ -532,6 +537,7 @@ export default function Reader(props: ReaderProps) {
     setNativeSelectionPage(undefined);
     locatedReaderTarget.current = null;
     setPages(source.pageCount || 1);
+    setPdfOutlineItems([]);
     setZoom(100);
     setShowText(false);
     regionCaptureStartRef.current = null;
@@ -1904,6 +1910,11 @@ export default function Reader(props: ReaderProps) {
   }
 
   function jumpToOutlineItem(item: ReaderOutlineItem) {
+    if (item.kind === "pdf-outline" && item.page) {
+      changePage(item.page);
+      closePanel();
+      return;
+    }
     const container = textContainer.current;
     if (!container) return;
     let target: HTMLElement | null = null;
@@ -2360,6 +2371,8 @@ export default function Reader(props: ReaderProps) {
                 key={`${source.id}:${source.versionId}`}
                 source={source}
                 cloudUserId={props.cloudUserId}
+                cloudSaveConfirmed={props.saveState === "cloud" && !historical}
+                onOutline={setPdfOutlineItems}
                 page={page}
                 readingMode={pdfReadingMode}
                 navigationRequest={pdfNavigationRequest}

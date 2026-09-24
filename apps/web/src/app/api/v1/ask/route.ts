@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { z } from "zod";
 import {
   formatNoteEvidenceExtracts,
   resolveAnswerNoteEvidence,
@@ -59,6 +60,7 @@ import {
   ANSWER_STREAM_LIMITS,
   type AnswerStreamSink,
 } from "@/lib/ai/answer-response-stream";
+import type { OutlineItem } from "@/lib/source-outline";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -236,6 +238,52 @@ export async function GET(request: Request) {
 
 function hasFixedMultiSourceRange(question: AnswerRequest) {
   return question.scope === "sources" || isCrossLibraryAnswerRequest(question);
+}
+
+const outlineItemSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    level: z.number().int().min(1).max(6),
+    page: z.number().int().min(1).max(100_000).optional(),
+  })
+  .strict();
+const outlineRowSchema = z
+  .object({
+    sourceId: z.string(),
+    versionId: z.string(),
+    method: z.enum(["pdf-outline", "heading-heuristic", "docx-headings", "markdown-headings"]),
+    items: z.array(outlineItemSchema).max(1_000),
+    updatedAt: z.string(),
+  })
+  .strict();
+
+async function readSourceOutlines(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  sources: WorkspaceData["sources"],
+) {
+  const paginated = sources
+    .filter((source) => source.chunks.some((chunk) => chunk.page !== undefined))
+    .slice(0, 20);
+  if (!paginated.length) return { outlines: new Map<string, OutlineItem[]>(), fingerprint: null };
+  try {
+    const { data, error } = await supabase.rpc("read_source_outlines", {
+      p_refs: paginated.map((source) => ({ sourceId: source.id, versionId: source.versionId })),
+    });
+    if (error || !Array.isArray(data))
+      return { outlines: new Map<string, OutlineItem[]>(), fingerprint: null };
+    const rows = data.flatMap((value: unknown) => {
+      const parsed = outlineRowSchema.safeParse(value);
+      return parsed.success ? [parsed.data] : [];
+    });
+    const outlines = new Map<string, OutlineItem[]>();
+    for (const row of rows) outlines.set(`${row.sourceId}:${row.versionId}`, row.items);
+    const fingerprint = rows
+      .map((row) => [`${row.sourceId}:${row.versionId}`, row.updatedAt])
+      .sort(([left], [right]) => left.localeCompare(right));
+    return { outlines, fingerprint: fingerprint.length ? JSON.stringify(fingerprint) : null };
+  } catch {
+    return { outlines: new Map<string, OutlineItem[]>(), fingerprint: null };
+  }
 }
 
 export async function POST(request: Request) {
@@ -509,6 +557,12 @@ export async function POST(request: Request) {
         const selectedProfile = selectAnswerProfile(depth);
         const config = selectedProfile?.config;
         const format: AnswerFormat = aiFeatureEnabled("RICH_ANSWERS") ? "rich" : "plain";
+        const sourceOutlines = config
+          ? await readSourceOutlines(supabase, selectedSources(initial, question))
+          : { outlines: new Map<string, OutlineItem[]>(), fingerprint: null };
+        const outlineFingerprint = sourceOutlines.fingerprint
+          ? [`outlines:${sourceOutlines.fingerprint}`]
+          : [];
         const verifyEnabled = aiFeatureEnabled("ANSWER_VERIFY");
         const rerankEnabled = aiFeatureEnabled("RERANK");
         let rerankConfig = null;
@@ -561,6 +615,7 @@ export async function POST(request: Request) {
                 "depth:" + depth,
                 ...(verifyEnabled ? [VERIFY_CONTRACT_VERSION] : []),
                 ...(memoryEnabled ? ["memory:" + priorMemory.key] : []),
+                ...outlineFingerprint,
               ]),
             )
             .digest("hex");
@@ -736,7 +791,9 @@ export async function POST(request: Request) {
         traceModelProfile = selectedProfile.profile;
         const fullDocument =
           aiFeatureEnabled("LONG_CONTEXT") && (config.contextChars ?? 0) > 0
-            ? buildFullDocumentGrounding(initial, question, config.contextChars!)
+            ? buildFullDocumentGrounding(initial, question, config.contextChars!, {
+                ...(sourceOutlines.outlines.size ? { outlines: sourceOutlines.outlines } : {}),
+              })
             : null;
         const longContext =
           fullDocument &&
@@ -749,6 +806,7 @@ export async function POST(request: Request) {
           buildGrounding(initial, question, retrieved, {
             neighborRadius,
             ...(memoryEnabled ? { priorCitations: priorMemory.citations } : {}),
+            ...(sourceOutlines.outlines.size ? { outlines: sourceOutlines.outlines } : {}),
           });
         if (longContext) traceRecorder?.set({ longContext: true });
         if (!grounding.evidence.length) {
@@ -785,6 +843,7 @@ export async function POST(request: Request) {
                   "depth:" + depth,
                   ...(verifyEnabled ? [VERIFY_CONTRACT_VERSION] : []),
                   ...(memoryEnabled ? ["memory:" + priorMemory.key] : []),
+                  ...outlineFingerprint,
                 ]),
               )
               .digest("hex"),

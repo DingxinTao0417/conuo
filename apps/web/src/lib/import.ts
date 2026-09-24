@@ -7,6 +7,7 @@ import {
 } from "./docx-structure";
 import type { Chunk, Source, SourceKind } from "./types";
 import { MAX_WEB_TEXT, normalizeWebUrl } from "./web-types";
+import { sourceOutlineCache, type OutlineItem } from "./source-outline";
 
 const MAX_FILE_BYTES = 30 * 1024 * 1024;
 const CHUNK_SIZE = 1200;
@@ -159,6 +160,7 @@ async function extractPdf(source: Source, bytes: ArrayBuffer, signal?: AbortSign
     source.parsedPages = 0;
     const texts: string[] = [];
     const missedPages: number[] = [];
+    const headingLines: Array<{ title: string; size: number; page: number }> = [];
     for (let number = 1; number <= pdf.numPages; number++) {
       throwIfAborted(signal);
       try {
@@ -167,10 +169,28 @@ async function extractPdf(source: Source, bytes: ArrayBuffer, signal?: AbortSign
         const content = await page.getTextContent();
         throwIfAborted(signal);
         let text = "";
+        let line = "";
+        let lineSize = 0;
+        const finishLine = () => {
+          const title = line.trim();
+          if (title) headingLines.push({ title, size: lineSize, page: number });
+          line = "";
+          lineSize = 0;
+        };
         for (const item of content.items) {
           if (!("str" in item)) continue;
-          text += item.str + (item.hasEOL ? "\n" : " ");
+          const value = typeof item.str === "string" ? item.str : "";
+          text += value + (item.hasEOL ? "\n" : " ");
+          const transform = Array.isArray(item.transform) ? item.transform : [];
+          const size =
+            typeof transform[2] === "number" && typeof transform[3] === "number"
+              ? Math.hypot(transform[2], transform[3])
+              : 0;
+          line += value + (item.hasEOL ? "" : " ");
+          lineSize = Math.max(lineSize, size);
+          if (item.hasEOL) finishLine();
         }
+        finishLine();
         text = normalizeText(text);
         if (text) {
           source.parsedPages += 1;
@@ -190,6 +210,34 @@ async function extractPdf(source: Source, bytes: ArrayBuffer, signal?: AbortSign
         if (signal?.aborted) throw cause;
         missedPages.push(number);
       }
+    }
+    const sizes = headingLines
+      .map((item) => item.size)
+      .filter((size) => size > 0)
+      .sort((a, b) => a - b);
+    if (sizes.length) {
+      const middle = Math.floor(sizes.length / 2);
+      const median = sizes.length % 2 ? sizes[middle]! : (sizes[middle - 1]! + sizes[middle]!) / 2;
+      const candidates = headingLines.filter(
+        (item) =>
+          item.size >= median * 1.3 &&
+          item.title.length >= 2 &&
+          item.title.length <= 60 &&
+          !/[。，；,.;]$/u.test(item.title),
+      );
+      const fontSizes = [...new Set(candidates.map((item) => item.size))]
+        .sort((a, b) => b - a)
+        .slice(0, 3);
+      const headings: OutlineItem[] = candidates.slice(0, 300).map((item) => {
+        const rank = fontSizes.indexOf(item.size);
+        return {
+          title: item.title.slice(0, 200),
+          level: rank < 0 ? 3 : Math.min(3, rank + 1),
+          page: item.page,
+        };
+      });
+      if (headings.length)
+        sourceOutlineCache.set(source, { method: "heading-heuristic", items: headings });
     }
     source.text = texts.join("\n\n");
     if (source.parsedPages === 0) {
@@ -298,6 +346,15 @@ export async function parseImportSource(
       }
       source.chunks = chunkText(source.text, source.id, source.versionId);
       if (docxBlocks) {
+        const headings = docxBlocks
+          .filter((block) => block.type === "heading")
+          .slice(0, 300)
+          .map((block) => ({
+            title: block.text.trim().slice(0, 200),
+            level: Math.max(1, Math.min(6, block.level)),
+          }));
+        if (headings.length)
+          sourceOutlineCache.set(source, { method: "docx-headings", items: headings });
         const tables = docxTableEvidenceRanges(source.text, docxBlocks, CHUNK_SIZE);
         if (tables.messages.length)
           source.error = [source.error, ...tables.messages].filter(Boolean).join(" ");
@@ -333,6 +390,19 @@ export async function parseImportSource(
             };
           });
         } else source.chunks = applyDocxSections(source.chunks, source.text, docxBlocks);
+      }
+      if (source.kind === "markdown") {
+        const headings: OutlineItem[] = source.text
+          .split("\n")
+          .flatMap((line) => {
+            const match = line.match(/^(#{1,6})\s+(.+?)\s*$/u);
+            return match
+              ? [{ title: match[2]!.trim().slice(0, 200), level: match[1]!.length }]
+              : [];
+          })
+          .slice(0, 300);
+        if (headings.length)
+          sourceOutlineCache.set(source, { method: "markdown-headings", items: headings });
       }
       if (!source.chunks.length) {
         source.status = "failed";

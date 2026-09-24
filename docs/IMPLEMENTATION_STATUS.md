@@ -6,6 +6,14 @@
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
 
+## AI 增强 WP-15（2026-09-24，本地）
+
+- 范围：新增按资料版本保存的 `source_outlines` 派生表、owner-scoped `save_source_outline`／`read_source_outlines` RPC 与目录 API；严格限制目录项、方法、标题、层级和页码，历史版本清理会级联删除目录。
+- 解析与阅读器：PDF.js 书签按层级展开并解析页码；没有书签的新 PDF 按相对字号识别最多 300 个标题，Markdown／DOCX 结构生成对应目录。当前版本且云端保存确认后，阅读器才读取／回填目录，目录项支持按页跳转，目录失败不阻断 PDF 阅读。
+- 问答：服务端读取所选资料的目录，证据 JSON 保留 `section`／`page`，页码能对应目录时增加 `sectionPath`；`GROUNDING_CONTRACT_VERSION` 升至 `grounding-v10`，目录更新时间进入请求指纹。
+- 测试：新增目录解析、标题识别、SQL owner／匿名／非法 item／版本级联、路由 schema 与问答 sectionPath 回归；Web R-15 为 279 个测试文件／4412 项通过、2 项跳过，typecheck 通过，lint 0 错误并保留 1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过。
+- 未验收边界：未运行真实 PDF 云端浏览器验收，未执行远程迁移、部署或真实模型调用；仓库级 `format:check` 被既有 `._*` AppleDouble 文件阻断。
+
 ## AI 增强 WP-13（2026-09-24，本地）
 
 - 范围：问答请求增加可选 `conversationId`；`ANSWER_MEMORY` 打开时服务端从同空间、同范围的已保存会话读取最近 2 条已完成模型回答。文本只作为非证据上下文，当前版本和当前范围内重新校验通过的历史引用才可加入本次 evidence。

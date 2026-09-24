@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { chunkText, importFile, makeWebSource, prepareImportFile } from "./import";
+import { sourceOutlineCache } from "./source-outline";
 
 const mocks = vi.hoisted(() => ({
   putBlob: vi.fn(),
-  pages: [] as (string | Error)[],
+  pages: [] as (string | Error | { str: string; hasEOL?: boolean; transform?: number[] })[],
   destroy: vi.fn(),
   loadError: null as Error | null,
 }));
@@ -18,8 +19,9 @@ vi.mock("pdfjs-dist", () => ({
           getPage: async (number: number) => {
             const value = mocks.pages[number - 1];
             if (value instanceof Error) throw value;
+            const item = typeof value === "string" ? { str: value, hasEOL: true } : value;
             return {
-              getTextContent: async () => ({ items: [{ str: value, hasEOL: true }] }),
+              getTextContent: async () => ({ items: [item] }),
               cleanup: vi.fn(),
             };
           },
@@ -118,6 +120,25 @@ describe("file import", () => {
       unavailablePageRanges: [{ start: 2, end: 3 }],
     });
     expect(mocks.destroy).toHaveBeenCalledOnce();
+  });
+
+  it("recognizes PDF heading lines from relative font sizes", async () => {
+    mocks.pages = [
+      { str: "普通正文。", hasEOL: true, transform: [1, 0, 10, 1, 0, 0] },
+      { str: "普通正文。", hasEOL: true, transform: [1, 0, 10, 1, 0, 0] },
+      { str: "普通正文。", hasEOL: true, transform: [1, 0, 10, 1, 0, 0] },
+      { str: "普通正文。", hasEOL: true, transform: [1, 0, 10, 1, 0, 0] },
+      { str: "第一章 梯度下降", hasEOL: true, transform: [1, 0, 20, 1, 0, 0] },
+      { str: "1.1 学习率", hasEOL: true, transform: [1, 0, 15, 1, 0, 0] },
+    ];
+    const source = await importFile(new File(["%PDF-test"], "headings.pdf"), "space-a");
+    expect(sourceOutlineCache.get(source)).toEqual({
+      method: "heading-heuristic",
+      items: [
+        { title: "第一章 梯度下降", level: 1, page: 5 },
+        { title: "1.1 学习率", level: 2, page: 6 },
+      ],
+    });
   });
 
   it("keeps scanned PDFs available while excluding them from searchable text", async () => {

@@ -26,12 +26,13 @@ import {
   uniqueCitations,
 } from "./evidence-assembly";
 import { sanitizeAnswerMarkdown, withLabel, withReferences } from "./answer-markdown";
+import { sectionPathForPage, type OutlineItem } from "../source-outline";
 
 const MAX_CHUNKS = 12;
 const MAX_CONTEXT_CHARS = 24_000;
 const MAX_CHUNK_CHARS = 8_000;
 const SUMMARY_RETRIEVAL_SLOTS = 4;
-export const GROUNDING_CONTRACT_VERSION = "grounding-v9";
+export const GROUNDING_CONTRACT_VERSION = "grounding-v10";
 export type AnswerFormat = "plain" | "rich";
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 const compact = (value: string) => value.replace(/\s+/g, "");
@@ -105,6 +106,7 @@ export interface Grounding {
   coverage: string;
   fallback: AnswerResult;
   layout: "retrieval" | "full-document";
+  outlines?: Map<string, OutlineItem[]>;
 }
 
 function canonicalCitations(sources: Source[]): Citation[][] {
@@ -161,7 +163,11 @@ export function buildGrounding(
   data: WorkspaceData,
   request: AnswerRequest,
   retrieved?: AnswerResult,
-  options: { neighborRadius?: 0 | 1; priorCitations?: Citation[] } = {},
+  options: {
+    neighborRadius?: 0 | 1;
+    priorCitations?: Citation[];
+    outlines?: Map<string, OutlineItem[]>;
+  } = {},
 ): Grounding {
   const fallback = retrieved ?? retrieveEvidence(data, request);
   const empty = {
@@ -170,6 +176,7 @@ export function buildGrounding(
     coverage: "",
     fallback,
     layout: "retrieval" as const,
+    ...(options.outlines ? { outlines: options.outlines } : {}),
   };
   if (!data.aiEnabled || !request.question.trim()) return empty;
   // The explicit cross-library scope has its own per-source active-space
@@ -313,6 +320,7 @@ export function buildGrounding(
         content:
           "当前可用片段超过单次模型处理上限，请缩小资料范围或重新分块后提问。本次未调用生成模型。",
       },
+      ...(options.outlines ? { outlines: options.outlines } : {}),
     };
   const omitted = candidateCount > evidence.length || represented.size < selected.length;
   const coverage = [
@@ -328,7 +336,14 @@ export function buildGrounding(
   ]
     .filter(Boolean)
     .join(" ");
-  return { evidence, noteEvidence, coverage, fallback, layout: "retrieval" };
+  return {
+    evidence,
+    noteEvidence,
+    coverage,
+    fallback,
+    layout: "retrieval",
+    ...(options.outlines ? { outlines: options.outlines } : {}),
+  };
 }
 
 /** Builds complete canonical document evidence when the selected text fits the model budget. */
@@ -336,6 +351,7 @@ export function buildFullDocumentGrounding(
   data: WorkspaceData,
   request: AnswerRequest,
   budgetChars: number,
+  options: { outlines?: Map<string, OutlineItem[]> } = {},
 ): Grounding | null {
   if (
     !data.aiEnabled ||
@@ -386,7 +402,33 @@ export function buildFullDocumentGrounding(
   ]
     .filter(Boolean)
     .join(" ");
-  return { evidence, noteEvidence, coverage, fallback, layout: "full-document" };
+  return {
+    evidence,
+    noteEvidence,
+    coverage,
+    fallback,
+    layout: "full-document",
+    ...(options.outlines ? { outlines: options.outlines } : {}),
+  };
+}
+
+function evidenceJson(citation: Citation, id: string, outlines?: Map<string, OutlineItem[]>) {
+  const path =
+    citation.page !== undefined
+      ? sectionPathForPage(
+          outlines?.get(`${citation.sourceId}:${citation.versionId}`) ?? [],
+          citation.page,
+        )
+      : null;
+  return {
+    id,
+    kind: "original_source" as const,
+    title: citation.title,
+    section: citation.section,
+    page: citation.page,
+    text: citation.quote,
+    ...(path ? { sectionPath: path } : {}),
+  };
 }
 
 export function groundingMessages(
@@ -438,14 +480,9 @@ export function groundingMessages(
       {
         role: "user",
         content: JSON.stringify({
-          evidence: grounding.evidence.map((citation, index) => ({
-            id: `e${index + 1}`,
-            kind: "original_source",
-            title: citation.title,
-            section: citation.section,
-            page: citation.page,
-            text: citation.quote,
-          })),
+          evidence: grounding.evidence.map((citation, index) =>
+            evidenceJson(citation, `e${index + 1}`, grounding.outlines),
+          ),
         }),
       },
       {
@@ -484,14 +521,9 @@ export function groundingMessages(
         selection: request.scope === "selection" ? request.selection : undefined,
         coverage: grounding.coverage,
         evidence: [
-          ...grounding.evidence.map((citation, index) => ({
-            id: `e${index + 1}`,
-            kind: "original_source",
-            title: citation.title,
-            section: citation.section,
-            page: citation.page,
-            text: citation.quote,
-          })),
+          ...grounding.evidence.map((citation, index) =>
+            evidenceJson(citation, `e${index + 1}`, grounding.outlines),
+          ),
           ...grounding.noteEvidence.map((evidence, index) => ({
             id: `n${index + 1}`,
             kind: "personal_note",

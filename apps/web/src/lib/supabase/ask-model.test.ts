@@ -360,7 +360,7 @@ describe("generated answer route with canonical source and request-ledger bounda
       "question-attempt-1",
       expect.stringMatching(/^[a-f0-9]{64}$/),
     );
-    expect(GROUNDING_CONTRACT_VERSION).toBe("grounding-v9");
+    expect(GROUNDING_CONTRACT_VERSION).toBe("grounding-v10");
     const actualFingerprint = mock.reserveRequest.mock.calls[0][3];
     const embeddingFingerprint = readEmbeddingConfig()?.fingerprint ?? null;
     const searchMode = workspace.semanticSearch && embeddingFingerprint ? "semantic" : "keyword";

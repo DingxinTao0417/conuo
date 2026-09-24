@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { PDFDocumentProxy, RenderTask, TextLayer } from "pdfjs-dist";
 import type { Source } from "@/lib/types";
+import { readPdfOutline, sourceOutlineCache, type OutlineItem } from "@/lib/source-outline";
 import { AlertCircle, LoaderCircle } from "lucide-react";
 import PdfRegionSelector from "./pdf-region-selector";
 import type { PdfCaptureLimits, PdfCaptureResult, PdfCaptureSelection } from "./pdf-capture";
@@ -38,6 +39,8 @@ interface Props {
   navigationRequest?: number;
   scrollContainerRef?: RefObject<HTMLDivElement | null>;
   onVisiblePageChange?: (page: number) => void;
+  cloudSaveConfirmed?: boolean;
+  onOutline?: (items: OutlineItem[]) => void;
 }
 
 interface PdfReaderFrame {
@@ -367,13 +370,15 @@ export default function PdfReader({
   navigationRequest = 0,
   scrollContainerRef,
   onVisiblePageChange,
+  cloudSaveConfirmed = false,
+  onOutline,
 }: Props) {
   const wrapper = useRef<HTMLDivElement>(null);
   const pageNodes = useRef(new Map<number, HTMLDivElement>());
-  const callbacks = useRef({ getSourceBlob, onPages, onRendered, onVisiblePageChange });
+  const callbacks = useRef({ getSourceBlob, onPages, onRendered, onVisiblePageChange, onOutline });
   const requestedPage = useRef(page);
   useLayoutEffect(() => {
-    callbacks.current = { getSourceBlob, onPages, onRendered, onVisiblePageChange };
+    callbacks.current = { getSourceBlob, onPages, onRendered, onVisiblePageChange, onOutline };
     requestedPage.current = page;
   });
   const [loaded, setLoaded] = useState<{
@@ -397,8 +402,7 @@ export default function PdfReader({
     pages: Record<number, InkPreviewEntry>;
   }>({ key: "", pages: {} });
   const inkPreviewKey = `${cloudUserId ?? ""}:${source.id}:${source.versionId}`;
-  const inkPreviewPages =
-    inkPreviewState.key === inkPreviewKey ? inkPreviewState.pages : {};
+  const inkPreviewPages = inkPreviewState.key === inkPreviewKey ? inkPreviewState.pages : {};
   const [layoutRevision, setLayoutRevision] = useState(0);
   const sizes = useRef(new Map<number, string>());
   const position = useRef({ page, fraction: 0 });
@@ -478,6 +482,76 @@ export default function PdfReader({
       stopPolling();
     };
   }, [cloudUserId, inkPreviewKey, source.id, source.kind, source.versionId]);
+
+  useEffect(() => {
+    if (source.kind !== "pdf") return;
+    let disposed = false;
+    void (async () => {
+      const cached = sourceOutlineCache.get(source);
+      if (cached && !disposed) callbacks.current.onOutline?.(cached.items);
+      let saved: OutlineItem[] = [];
+      if (cloudUserId && cloudSaveConfirmed) {
+        try {
+          const response = await fetch(
+            `/api/v1/sources/${encodeURIComponent(source.id)}/versions/${encodeURIComponent(source.versionId)}/outline`,
+            {
+              credentials: "include",
+              headers: { Accept: "application/json", "X-Conuo-User": cloudUserId },
+            },
+          );
+          if (response.ok) {
+            const payload: unknown = await response.json().catch(() => null);
+            if (
+              payload &&
+              typeof payload === "object" &&
+              Array.isArray((payload as { items?: unknown }).items)
+            )
+              saved = (payload as { items: OutlineItem[] }).items;
+          }
+        } catch {
+          // A missing derived-navigation read must not block the original reader.
+        }
+      }
+      if (disposed) return;
+      if (saved.length) {
+        sourceOutlineCache.set(source, { method: "pdf-outline", items: saved });
+        callbacks.current.onOutline?.(saved);
+        return;
+      }
+      if (!pdf) return;
+      const outline = await readPdfOutline(pdf);
+      if (disposed) return;
+      const next = outline.length ? outline : (cached?.items ?? []);
+      if (next.length) {
+        sourceOutlineCache.set(source, {
+          method: outline.length ? "pdf-outline" : (cached?.method ?? "pdf-outline"),
+          items: next,
+        });
+        callbacks.current.onOutline?.(next);
+        if (cloudUserId && cloudSaveConfirmed) {
+          try {
+            await fetch(
+              `/api/v1/sources/${encodeURIComponent(source.id)}/versions/${encodeURIComponent(source.versionId)}/outline`,
+              {
+                method: "PUT",
+                credentials: "include",
+                headers: { "Content-Type": "application/json", "X-Conuo-User": cloudUserId },
+                body: JSON.stringify({
+                  method: outline.length ? "pdf-outline" : (cached?.method ?? "pdf-outline"),
+                  items: next,
+                }),
+              },
+            );
+          } catch {
+            // Outline persistence is derived navigation and must not block reading.
+          }
+        }
+      }
+    })();
+    return () => {
+      disposed = true;
+    };
+  }, [cloudSaveConfirmed, cloudUserId, pdf, source, source.id, source.kind, source.versionId]);
 
   useEffect(() => {
     if (!wrapper.current) return;

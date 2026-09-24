@@ -3,6 +3,7 @@ import remarkParse from "remark-parse";
 import { unified } from "unified";
 import type { DocxBlock } from "@/lib/docx-structure";
 import type { Source } from "@/lib/types";
+import type { OutlineItem } from "@/lib/source-outline";
 
 const markdownOutlineParser = unified().use(remarkParse).use(remarkGfm);
 const GENERIC_CHUNK_SECTIONS = new Set(["正文"]);
@@ -27,7 +28,8 @@ export interface ReaderOutlineItem {
   level: number;
   /** Exact saved text used to locate the item in the normalized reader DOM. */
   locator: string;
-  kind: "markdown-heading" | "docx-heading" | "chunk-section";
+  kind: "markdown-heading" | "docx-heading" | "chunk-section" | "pdf-outline";
+  page?: number;
   /** Exact source-text offset for Markdown headings, never inferred from prose. */
   sourceOffset?: number;
   /** Lets the reader distinguish repeated visible Markdown headings. */
@@ -162,8 +164,17 @@ function docxHeadings(blocks: DocxBlock[]): ReaderOutlineItem[] {
 export function deriveReaderOutline(
   source: Source,
   docxBlocks?: DocxBlock[] | null,
+  pdfItems?: OutlineItem[] | null,
 ): ReaderOutlineItem[] {
-  if (source.kind === "pdf") return [];
+  if (source.kind === "pdf")
+    return (pdfItems ?? []).map((item, index) => ({
+      id: `pdf:${index}`,
+      title: item.title,
+      level: item.level,
+      locator: item.title,
+      kind: "pdf-outline" as const,
+      page: item.page,
+    }));
   if (source.kind === "docx" && docxBlocks) {
     const headings = docxHeadings(docxBlocks);
     if (headings.length) return headings;

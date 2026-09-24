@@ -111,6 +111,32 @@ describe("bounded model grounding", () => {
     expect(grounding?.coverage).toContain("依据范围：已提供 1 份资料的全部");
   });
 
+  it("adds a section path to evidence JSON when a saved outline covers its page", () => {
+    const { data, question } = fixture();
+    const source = data.sources[0]!;
+    source.chunks.forEach((chunk) => {
+      chunk.page = 4;
+    });
+    const key = `${source.id}:${source.versionId}`;
+    const grounding = buildGrounding(data, question, undefined, {
+      outlines: new Map([[key, [{ title: "第一章", level: 1, page: 1 }]]]),
+    });
+    const prompt = JSON.parse(groundingMessages(grounding, question)[1]!.content);
+    expect(prompt.evidence[0]).toMatchObject({
+      section: expect.any(String),
+      page: 4,
+      sectionPath: "第一章",
+    });
+  });
+
+  it("keeps evidence JSON unchanged when no outline is available", () => {
+    const { data, question } = fixture();
+    const prompt = JSON.parse(
+      groundingMessages(buildGrounding(data, question), question)[1]!.content,
+    );
+    expect(prompt.evidence[0]).not.toHaveProperty("sectionPath");
+  });
+
   it("falls back when full-document evidence exceeds its budget or source cap", () => {
     const { data, question } = fixture();
     setText(data, 0, "一".repeat(1_300));
