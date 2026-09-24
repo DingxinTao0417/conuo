@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { z } from "zod";
 import { workspaceSchema } from "./supabase/validation";
 import type { PreparedBackup } from "./backup-types";
+import { learningBackupSchema } from "./learning/schema";
 import type { Source, SourceVersion, WorkspaceData } from "./types";
 
 export const BACKUP_LIMITS = Object.freeze({
@@ -467,6 +468,14 @@ export async function readWorkspaceBackup(
   const parsed = workspaceSchema.safeParse(parseJson(await required("workspace.json")));
   if (!parsed.success) throw bad("工作区结构或数据版本不受支持，未恢复任何内容。");
   const data = parsed.data;
+  let learning: PreparedBackup["learning"];
+  if (byPath.has("learning.json")) {
+    const parsedLearning = learningBackupSchema.safeParse(
+      parseJson(await required("learning.json")),
+    );
+    if (!parsedLearning.success) throw bad("学习数据结构或版本不受支持，未恢复任何内容。");
+    learning = parsedLearning.data;
+  }
   validateIdentities(data);
   const mapped = mappingSchema.safeParse(parseJson(await required("source-mapping.json")));
   if (!mapped.success || mapped.data.length !== data.sources.length)
@@ -629,5 +638,5 @@ export async function readWorkspaceBackup(
   const fingerprint = await digest(bytes, options.signal);
   options.onProgress?.({ phase: "ready", completed: entries.length, total: entries.length });
   check(options.signal);
-  return { data, originals, missingOriginals, fingerprint, warnings };
+  return { data, originals, missingOriginals, fingerprint, warnings, learning };
 }

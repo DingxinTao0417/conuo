@@ -4,6 +4,13 @@
 
 本项目已有可运行的 Web 工作台，支持导入、阅读与版本历史、笔记与知识审核、普通搜索、原始资料问答、PDF 区域截图学习及个人 ZIP 备份恢复。当前已使用自编 QA 资料完成真实 DeepSeek 问答、回答另存笔记、截图解读／提问／出题、资料分析、跨资料主题生成与人工接受，并确认相关笔记和知识正文的云端保存及刷新恢复；知识页也已基于固定原始依据收到流式问答成功终态，知识页正文本身不充当证据。2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级资料整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、六条主要业务冲突接口，以及孤立上传、带数据历史版本、资料、Storage 和账号 Auth 删除主链路均已通过；一次性 signup/recovery token 的确认与密码更新、真实等待后的过期 signup token、受控邮箱的真实注册确认邮件及同浏览器 PKCE、Chrome／Edge 跨一小时持久会话自动刷新也已通过。三条清理 Cron 已在未手工调用 cleanup API 的情况下达到主自然调度预期终态；被遗弃租约和可重试故障的韧性阶段仍待下一次自然调度。项目所有者于 `2026-09-21` 确认物理双设备同步矩阵及真实找回密码邮件的同浏览器完整链路均无异常；跨浏览器邮件点击仍待验收。原生产数据库未升级，生产网页代码与 schema 仍可能不一致。本轮已提交并推送 `staging`；可变域名的当前版本由 `/api/health` 返回 Vercel 环境、Git 分支和完整 SHA，首次探针验证为 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。 **完整 M0 仍未验收。**
 
+## AI 增强 WP-22（2026-09-24，本地）
+
+- 范围：新增 `learning_items`、`review_states`、`review_logs`、`learning_settings` 四张规范化表及 owner-scoped RPC；所有表启用 RLS、撤销直接权限，写入经过账号注销闸门。
+- 学习 API：新增题目列表／保存、状态／软删除、到期队列、复习记录和设置路由；`CONUO_FEATURE_LEARNING` 默认关闭，关闭时返回 `LEARNING_DISABLED`。服务端用 `ts-fsrs@5.4.2` 计算卡片与下次复习时间，并用版本号保护并发复习。
+- 删除与备份：资料和历史版本清理触发器移除题目引用并保留 `sourcePurged` 标记；可选 `learning.json` 与 ZIP 读取支持保留题目、日志和设置，格式说明见 [导出格式](EXPORT_FORMAT.md)。
+- 测试：新增 FSRS、schema、学习路由、学习 SQL 隔离／额度／暂停／版本冲突／软删除／引用清理和备份回环测试；未执行远程迁移、operations 脚本、部署或真实模型调用，开关保持关闭。
+
 ## AI 增强 WP-20（2026-09-24，本地）
 
 - 范围：新增浏览器驱动的 PDF.js 逐页 OCR 流程、`ocr-vlm-v1` 视觉识别路由、私有 `conuo_private.ocr_usage` 页额度及 `reserve_ocr_pages` RPC；识别结果只在当前请求返回，用户确认后才保存派生 PDF 版本。

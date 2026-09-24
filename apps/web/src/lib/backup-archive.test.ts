@@ -4,9 +4,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import JSZip from "jszip";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BACKUP_LIMITS, readWorkspaceBackup } from "./backup-archive";
-import { buildWorkspaceArchive } from "./export";
+import { buildWorkspaceArchive, buildWorkspaceArchiveResult } from "./export";
 import { makeWebSource } from "./import";
 import type { Citation, Source, SourceVersion, WorkspaceData } from "./types";
+import type { LearningBackup } from "./learning/types";
 
 const mocks = vi.hoisted(() => ({ getBlob: vi.fn() }));
 vi.mock("./local-store", () => ({ getBlob: mocks.getBlob }));
@@ -260,6 +261,21 @@ afterEach(() => {
 });
 
 describe("strict portable workspace ZIP reader", () => {
+  it("round trips the optional learning.json archive alongside the workspace", async () => {
+    const { data, originals } = fixture();
+    const learning: LearningBackup = {
+      schemaVersion: 1,
+      items: [],
+      reviewLogs: [],
+      settings: { dailyNewLimit: 20, desiredRetention: 0.9, paused: false },
+    };
+    const archive = await buildWorkspaceArchiveResult(data, {
+      learning,
+      resolveBlob: async (source) => (source.blobKey ? originals.get(source.blobKey) : undefined),
+    });
+    const restored = await readWorkspaceBackup(asBlob(archive.bytes));
+    expect(restored.learning).toEqual(learning);
+  });
   it("roundtrips current/history originals, web text/links, historical citations, notes, annotations and conversations", async () => {
     const f = fixture();
     const snapshot = structuredClone(f.data);

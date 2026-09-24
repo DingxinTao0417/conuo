@@ -13,6 +13,7 @@ import { knowledgeNoteKey } from "./knowledge-update";
 import { relationAvailabilityReason, relationLabels } from "./concept-relations";
 import { getSourceVersion } from "./source-versions";
 import { prepareWorkspaceExport, type WorkspaceExportScope } from "./export-scope";
+import type { LearningBackup } from "./learning/types";
 
 export type ResolveExportBlob = (
   source: Source,
@@ -55,6 +56,7 @@ export interface BuildWorkspaceArchiveOptions {
   scope?: WorkspaceExportScope;
   /** Throw to abort the entire export after account or reviewed-scope drift. */
   assertCanContinue?: () => void;
+  learning?: LearningBackup;
 }
 
 export interface WorkspaceArchiveResult {
@@ -171,6 +173,7 @@ export async function buildWorkspaceArchiveResult(
     "Conuo 可恢复草稿导出\n\nrecoverable-drafts.json 保存资料删除与离线批注编辑冲突中保留的人工文字。note 是用户新增的批注文字，quote 与 page 只提供原文上下文；记录本身不会自动恢复资料。\n\nresolved-recoverable-drafts.json 保存已处理草稿的追加式标记，不含草稿正文。备份恢复会同时重映射标记的 sourceId、annotationId 与稳定 id，保留阻止较旧设备重新生成已处理草稿的语义。\n",
   );
   zip.file("relations.json", JSON.stringify(snapshot.conceptRelations ?? [], null, 2));
+  if (options.learning) zip.file("learning.json", JSON.stringify(options.learning, null, 2));
   const mapping: (SourceExport & { versions: SourceExport[] })[] = [];
   const versionFiles = new Map<string, SourceExport>();
   const versionKey = (sourceId: string, versionId: string) => JSON.stringify([sourceId, versionId]);

@@ -31,6 +31,40 @@
 
 同一导出操作阻止重复确认。账号、会话 token、本机缓存模式、工作区可读状态或组件生命周期变化会使继续检查失败；每次原件读取、归档构建、进度发布以及最终触发浏览器下载前都检查当前上下文。旧操作的迟到结果、进度和错误不发布到新账号界面，上下文失效不能降级为普通原件缺失后继续下载。读取失败等正常导出错误保留已选范围，供用户核对后重试。
 
+## 学习数据
+
+启用学习数据导出时，ZIP 根目录增加 `learning.json`。该文件与 `workspace.json` 分开，避免把题目、复习状态和作答历史写入 3 MiB 工作区快照；没有学习数据时可以省略该文件。
+
+```json
+{
+  "schemaVersion": 1,
+  "items": [{
+    "itemId": "题目 ID",
+    "spaceId": "知识库 ID",
+    "kind": "recall",
+    "prompt": "题干",
+    "choices": null,
+    "answer": { "text": "参考答案" },
+    "explanation": null,
+    "citations": [],
+    "origin": "user",
+    "originRef": null,
+    "conceptKey": null,
+    "hints": [],
+    "status": "active",
+    "card": {},
+    "dueAt": "2026-09-24T12:00:00.000Z",
+    "version": 0,
+    "reps": 0,
+    "lapses": 0
+  }],
+  "reviewLogs": [],
+  "settings": { "dailyNewLimit": 20, "desiredRetention": 0.9, "paused": false }
+}
+```
+
+题目保留创建时的规范引用快照、来源标记和复习卡片；`reviewLogs` 保留评分、批改快照和耗时。恢复备份时每个题目与作答记录都分配新的 `itemId`、`logId`，并把引用中的资料与版本身份按新增副本的映射重写；无法映射的引用保留为历史不可用记录，不绑定到当前版本。恢复不会继续排队的 AI 任务或复习任务，学习设置按备份值写入新副本。
+
 ## 笔记与知识页
 
 `note-mapping.json` 列出每份笔记或知识页的当前内容、引用和全部已保存历史版本的文件路径。已保存为知识页的待审核草稿与已接受知识页都会导出，分别保留 `kind`、`status` 和删除状态；它们与差异面板中尚未应用的审核勾选和改写不同。

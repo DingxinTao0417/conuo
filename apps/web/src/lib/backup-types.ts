@@ -1,4 +1,5 @@
 import type { WorkspaceData } from "./types";
+import type { LearningBackup } from "./learning/types";
 
 export interface MissingBackupOriginal {
   sourceId: string;
@@ -15,6 +16,7 @@ export interface PreparedBackup {
   missingOriginals: MissingBackupOriginal[];
   fingerprint: string;
   warnings?: string[];
+  learning?: LearningBackup;
 }
 
 export interface RestorePlan {

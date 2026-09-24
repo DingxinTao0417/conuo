@@ -3855,6 +3855,9 @@ A. 新增环境变量　B. 新增数据库对象　C. 契约版本变更　D. �
 | `EMBEDDING_PROVIDER_REJECTED`  | 502  | Embedding 服务拒绝请求（配置或输入问题） |
 | `OCR_DAILY_LIMIT`              | 429  | 当日识别页数用完                         |
 | `LEARNING_DISABLED`            | 404  | 学习功能未开启                           |
+| `INVALID_LEARNING_REQUEST`     | 400  | 学习题目、复习记录或设置格式无效         |
+| `LEARNING_REVIEW_CONFLICT`     | 409  | 复习状态版本已被其他请求更新             |
+| `LEARNING_ITEM_NOT_FOUND`      | 404  | 学习题目不存在或已删除                   |
 | `LEARNING_SOURCE_UNAVAILABLE`  | 409  | 题目依据的资料已删除、换版或关闭 AI      |
 | `AI_DAILY_TOKEN_LIMIT`         | 429  | 当日 token 用量用完                      |
 | `SOURCE_BODY_QUOTA`            | 413  | 正文字符配额不足（WP-21）                |
