@@ -5,8 +5,8 @@
 | 项         | 值                                      |
 | ---------- | --------------------------------------- |
 | 分支       | `feat/ai-enhancement`（本地，未推送）   |
-| 下一个 WP  | WP-04                                   |
-| 当前阶段   | 阶段 0/1：WP-06 已完成，待开始 WP-04    |
+| 下一个 WP  | WP-03                                   |
+| 当前阶段   | 阶段 0/1：WP-04 已完成，待开始 WP-03    |
 | 更新日期   | 2026-09-23                              |
 
 ## 工作包状态
@@ -19,7 +19,7 @@
 | 2    | WP-02  | 完成     | `7e06567` | 258 个测试文件／4269 项通过；模型评测 1 个文件跳过；typecheck 通过；lint 0 错误、1 条既有警告；本 WP 变更文件 Prettier 定向检查通过；仓库级 format:check 被既有 `._*` 文件和 12 个未涉及文件阻断 | 76 条自编用例、15 类覆盖；`grounding-v7` 总体和各类命中率 1.0；隔离违规 0；真实模型评测未运行 |
 | 3    | WP-05  | 完成     | `046898e` | 258 个测试文件／4272 项通过；typecheck 通过；lint 0 错误、1 条既有警告；本 WP 变更文件 Prettier 定向检查通过；仓库级 format:check 被既有 `._*` 文件和未涉及文件阻断 | revision-only 探针；版本稳定时复用快照，变化时完整重载；无功能开关 |
 | 4    | WP-06  | 完成     | `a2e8bd1` | 260 个测试文件／4288 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有警告；本 WP 变更文件 Prettier 定向检查通过；仓库级 format:check 被既有 `._*` 文件和未涉及文件阻断 | `RICH_ANSWERS` 默认关闭；安全 Markdown、公式与 KaTeX；`grounding-v8`；未运行真实模型评测 |
-| 5    | WP-04  | 未开始   |      |      |      |
+| 5    | WP-04  | 完成     | `d493348` | 262 个测试文件／4301 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有警告；本 WP 变更文件 Prettier 定向检查通过；仓库级 format:check 被既有 36 个 `._*` AppleDouble 文件阻断 | AI 请求 trace、provider usage、流式最终 usage 帧；30 天清理与 service_role RPC；默认关闭 |
 | 6    | WP-03  | 未开始   |      |      | 完成后跑阶段 0 本地门槛 |
 | 7    | WP-07  | 未开始   |      |      |      |
 | 8    | WP-09  | 未开始   |      |      |      |
@@ -79,6 +79,7 @@
 - 2026-09-23：完成 WP-02。新增本地离线检索评测、真实模型评测入口、严格数据集 schema、报告写入和服务端功能开关；基线为 `grounding-v7` 总体及各类别 1.0，隔离违规 0。真实模型评测未启用，未访问外部网络。下一项为 WP-05。
 - 2026-09-23：完成 WP-05。问答流新增 revision-only 探针，版本稳定时复用已加载快照，版本变化时只触发一次完整重载；已核对工作区写入版本递增前提，未访问外部网络。下一项为 WP-06。
 - 2026-09-23：完成 WP-06。新增 `RICH_ANSWERS` 默认关闭的安全 Markdown／公式回答、服务端兜底净化、流式格式一致性和阅读器 KaTeX 渲染；`GROUNDING_CONTRACT_VERSION` 升至 `grounding-v8`，未运行真实模型评测。下一项为 WP-04。
+- 2026-09-23：完成 WP-04。新增 AI 请求 metadata trace、provider token usage 解析与流式最终 usage 帧；trace 默认关闭，写入仅经 service_role RPC，指标白名单、证据引用上限和 30 天清理均有本地 SQL／路由测试。未访问外部模型、未执行迁移或部署。下一项为 WP-03。
 
 ## WP-02 自查
 
@@ -101,3 +102,11 @@
 - [x] 服务端只允许手册规定的 Markdown 子集；禁止节点、内部引用标记和正文 `[n]` 使用转义纯文本兜底，引用仍由服务端绑定。
 - [x] 流式预览、最终绑定、阅读器公式解析和引用扫描使用一致的格式选项；KaTeX 禁止受信任 HTML 与外部资源。
 - [x] 未修改保存 schema、移动端合同、迁移、远程资源、供应商密钥、staging 开关或本手册决策。
+
+## WP-04 自查
+
+- [x] `AI_TRACES` 默认关闭；关闭时模型请求体保持原样，`streamUsage` 默认 `false` 且不进入请求指纹。
+- [x] 非流式与流式模型适配器解析 prompt/completion/total、reasoning 和 cache usage；流式只在显式开启时接受最终空 choices usage 帧，并通知首个 delta。
+- [x] trace 只写 route、结果、模型元数据、检索／证据 ID、延迟和 token 计数；未知指标丢弃，证据引用最多 40 条，RPC 超时不影响主请求。
+- [x] 新迁移启用 RLS、撤销私有表直接权限，仅 `service_role` 可执行写入 RPC；写入时清理 30 天前记录，metrics 上限 16 KiB。
+- [x] 已覆盖 ask 的 completed/cached/extractive/cancelled 结果及 organize、organization-job、vision 的 observer 接入；未修改既有迁移、远程数据库、供应商密钥或部署资源。

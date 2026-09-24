@@ -34,6 +34,14 @@
 - 测试：新增服务端净化、提示词、流式预览和阅读器 jsdom 回归，并覆盖开关关闭／开启及请求指纹隔离。Web 全量测试 260 个文件／4288 项通过、2 项跳过；typecheck 通过；lint 0 错误、保留 1 条既有 `_result` 警告；本 WP 变更文件定向 Prettier 通过。仓库级 `format:check` 仍被既有 `._*` 文件及未涉及文件阻断。
 - 未验收边界：未执行真实模型公式评测、部署或 staging 开关；未修改保存格式、移动端合同、数据库迁移或远程资源。
 
+## AI 增强 WP-04（2026-09-23，本地）
+
+- 范围：新增 `AI_TRACES` 默认关闭的 AI 请求 metadata trace，覆盖 ask、organize、organization-job 和 vision；记录 route、结果、模型名、检索／证据 ID、延迟及 provider token usage，不记录问题、提示词、回答或正文。
+- 模型适配器：读取 OpenAI-compatible usage 的 prompt/completion/total、reasoning 和 cache 字段；`CONUO_MODEL_STREAM_USAGE=true` 时发送 `stream_options.include_usage` 并接受最终空 choices usage 帧，默认关闭时请求体保持原样。
+- 数据边界：新增 `conuo_private.ai_request_traces` 迁移及 `public.record_ai_trace` service-role RPC；启用 RLS，禁止直接表访问，metrics 限 16 KiB，证据引用最多 40 条，写入时清理 30 天前记录；trace RPC 1 秒超时不影响业务请求。
+- 配置：新增 `CONUO_MODEL_STREAM_USAGE=false` 示例及模型配置文档说明；未创建密钥，未执行远程迁移、部署或真实模型调用。
+- 本地验证：Web 全量测试 262 个文件／4301 项通过、2 项跳过；typecheck 通过；ESLint 0 错误、保留 1 条既有 `_result` 警告；本 WP 变更文件定向 Prettier 通过。仓库级 `format:check` 被既有 36 个 `._*` AppleDouble 文件阻断。
+
 ## iPadOS P1 云端闭环增量（2026-09-22，本地）
 
 移动端补齐 P1 两个云端闭环并全部本地验证：正文阅读位置按语义锚点节流回写 `readPage/lastReadAt`，回答完成后追加保存云端 `conversations`（Web 合同兼容、requestId 幂等、AI 面板可核对最近 3 轮），两者均遵循「结果未知先读回」的 CAS 规则；异常矩阵沿用既有 request-identity / draft-recovery 边界。P2 前置草案见[选型证据](IPADOS_P2_SELECTION.md)，其旧选型不作为当前实现合同；WP0 最新状态见下节。
