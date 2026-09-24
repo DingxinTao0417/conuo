@@ -20,8 +20,20 @@
     "space": "ml",
     "aiAllowed": true
   },
-  { "doc": "lr-a", "file": "lr-view-a.md", "kind": "markdown", "space": "ml", "aiAllowed": true },
-  { "doc": "lr-b", "file": "lr-view-b.md", "kind": "markdown", "space": "ml", "aiAllowed": false },
+  {
+    "doc": "lr-view-a",
+    "file": "lr-view-a.md",
+    "kind": "markdown",
+    "space": "ml",
+    "aiAllowed": true
+  },
+  {
+    "doc": "lr-view-b",
+    "file": "lr-view-b.md",
+    "kind": "markdown",
+    "space": "ml",
+    "aiAllowed": false
+  },
   {
     "doc": "private",
     "file": "injection.md",
