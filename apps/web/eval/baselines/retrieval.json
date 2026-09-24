@@ -1,0 +1,21 @@
+{
+  "contract": "grounding-v7",
+  "overall": 1,
+  "categories": {
+    "single-early": 1,
+    "single-middle": 1,
+    "single-late": 1,
+    "cross-doc": 1,
+    "comparison": 1,
+    "summary": 1,
+    "no-answer": 1,
+    "conflict": 1,
+    "partial-parse": 1,
+    "cross-language": 1,
+    "follow-up": 1,
+    "selection": 1,
+    "injection": 1,
+    "isolation": 1,
+    "formula": 1
+  }
+}

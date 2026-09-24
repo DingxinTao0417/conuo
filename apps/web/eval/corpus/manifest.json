@@ -1,0 +1,39 @@
+[
+  {
+    "doc": "ml",
+    "file": "ml-optimization.md",
+    "kind": "markdown",
+    "space": "ml",
+    "aiAllowed": true
+  },
+  {
+    "doc": "calculus",
+    "file": "calculus-derivative.md",
+    "kind": "markdown",
+    "space": "ml",
+    "aiAllowed": true
+  },
+  {
+    "doc": "la-en",
+    "file": "linear-algebra-en.md",
+    "kind": "markdown",
+    "space": "ml",
+    "aiAllowed": true
+  },
+  { "doc": "lr-a", "file": "lr-view-a.md", "kind": "markdown", "space": "ml", "aiAllowed": true },
+  { "doc": "lr-b", "file": "lr-view-b.md", "kind": "markdown", "space": "ml", "aiAllowed": false },
+  {
+    "doc": "private",
+    "file": "injection.md",
+    "kind": "markdown",
+    "space": "other",
+    "aiAllowed": true
+  },
+  {
+    "doc": "scan",
+    "file": "scanned-partial.pages.txt",
+    "kind": "pdf",
+    "space": "ml",
+    "aiAllowed": true
+  }
+]

@@ -13,6 +13,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "eval:retrieval": "vitest run eval/retrieval.eval.test.ts",
+    "eval:model": "CONUO_EVAL_MODEL=1 vitest run eval/model.eval.test.ts",
     "format": "prettier --write src scripts *.json *.mjs *.ts",
     "format:check": "prettier --check src scripts *.json *.mjs *.ts"
   },
