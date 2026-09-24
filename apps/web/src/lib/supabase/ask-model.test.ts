@@ -1074,6 +1074,46 @@ describe("generated answer route with canonical source and request-ledger bounda
     expect(mock.finishRequest).not.toHaveBeenCalled();
   });
 
+  it("rewrites follow-up queries, fuses each search, and reserves the ledger once", async () => {
+    vi.stubEnv("CONUO_FEATURE_QUERY_REWRITE", "on");
+    mock.callModel.mockImplementationOnce(async () =>
+      JSON.stringify({ query: "学习率过高", alternates: ["learning rate too high"] }),
+    );
+    const response = await POST(
+      request({ question: "为什么？", userContext: ["学习率过高会怎样？"] }),
+    );
+    expect(response.status).toBe(200);
+    expect(mock.reserveRequest).toHaveBeenCalledOnce();
+    expect(mock.callModel).toHaveBeenCalledTimes(2);
+    expect(mock.rpc.mock.calls.map(([, args]) => args.p_query)).toEqual([
+      "学习率过高",
+      "learning rate too high",
+    ]);
+  });
+
+  it("does not call the rewrite model when the rewritten request is cached", async () => {
+    vi.stubEnv("CONUO_FEATURE_QUERY_REWRITE", "on");
+    mock.reserveRequest.mockResolvedValueOnce({ kind: "cached", result: validAnswer() });
+    const response = await POST(
+      request({ question: "为什么？", userContext: ["学习率过高会怎样？"] }),
+    );
+    expect(response.status).toBe(200);
+    expect(mock.reserveRequest).toHaveBeenCalledOnce();
+    expect(mock.callModel).not.toHaveBeenCalled();
+    expect(mock.rpc).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the bounded original retrieval query when rewrite JSON is invalid", async () => {
+    vi.stubEnv("CONUO_FEATURE_QUERY_REWRITE", "on");
+    mock.callModel.mockResolvedValueOnce("not-json");
+    const response = await POST(
+      request({ question: "为什么？", userContext: ["学习率过高会怎样？"] }),
+    );
+    expect(response.status).toBe(200);
+    expect(mock.rpc.mock.calls[0]?.[1].p_query).toBe("为什么？\n学习率过高会怎样？");
+    expect(mock.reserveRequest).toHaveBeenCalledOnce();
+  });
+
   it("rechecks source permission before disclosing a cached result", async () => {
     const cached = validAnswer();
     const reserve = deferred<{ kind: "cached"; result: AnswerResult }>();

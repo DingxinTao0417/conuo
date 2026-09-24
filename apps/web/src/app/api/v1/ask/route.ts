@@ -14,7 +14,7 @@ import {
   workspaceSchema,
 } from "@/lib/supabase/validation";
 import { callModel, callModelStream, type ModelProfileName } from "@/lib/ai/model";
-import { selectAnswerProfile } from "@/lib/ai/model-routing";
+import { selectAnswerProfile, selectFastProfile } from "@/lib/ai/model-routing";
 import {
   type AnswerFormat,
   GROUNDING_CONTRACT_VERSION,
@@ -27,7 +27,7 @@ import { aiFeatureEnabled } from "@/lib/ai/features";
 import { createGroundingPreview } from "@/lib/ai/grounding-stream";
 import { createRequestStore, reserveRequest, finishRequest } from "@/lib/ai/requests";
 import { questionContextKey } from "@/lib/question-context";
-import { answerRetrievalQuery } from "@/lib/answer-context";
+import { answerRetrievalQuery, normalizeUserQuestionContext } from "@/lib/answer-context";
 import { extractiveCitationMarker } from "@/lib/citation-markers";
 import { sourceCoverageNotices } from "@/lib/source-coverage";
 import {
@@ -35,8 +35,14 @@ import {
   validateCrossLibraryAnswerRequest,
 } from "@/lib/cross-library-ask";
 import type { AnswerRequest, AnswerResult, WorkspaceData } from "@/lib/types";
-import { indexedCitations, indexedSourceCandidates } from "@/lib/server-search";
+import { fuseCandidates, indexedCitations, indexedSourceCandidates } from "@/lib/server-search";
 import { readEmbeddingConfig } from "@/lib/ai/embeddings";
+import {
+  REWRITE_CONTRACT_VERSION,
+  documentLanguage,
+  needsRewrite,
+  rewriteQuery,
+} from "@/lib/ai/query-rewrite";
 import { createTraceRecorder } from "@/lib/ai/traces";
 import { classifyQuestionIntent } from "@/lib/ai/question-intent";
 import {
@@ -476,40 +482,113 @@ export async function POST(request: Request) {
           readEmbeddingConfig()
             ? "semantic"
             : "keyword";
-        let candidates;
-        try {
-          candidates = await indexedSourceCandidates(
-            supabase,
-            searchData,
-            initialRevision,
-            searchRequest,
-            true,
-            {
-              mode: searchMode,
-              ownerId: user.id,
-              signal,
-              assertCurrent: assertSearchCurrent,
-              validateSnapshotRevision,
-            },
+        const selectedProfile = selectAnswerProfile("standard");
+        const config = selectedProfile?.config;
+        const format: AnswerFormat = aiFeatureEnabled("RICH_ANSWERS") ? "rich" : "plain";
+        const rewriteRequested =
+          aiFeatureEnabled("QUERY_REWRITE") &&
+          needsRewrite(question.question, question.userContext, searchData.sources);
+        const fastProfile = rewriteRequested ? selectFastProfile() : null;
+        let rewriteReservation:
+          { kind: "reserved" } | { kind: "cached"; result: unknown } | undefined;
+        const canRewrite = Boolean(config && fastProfile?.config && question.requestId);
+        if (canRewrite) {
+          const rewriteFingerprint = createHash("sha256")
+            .update(
+              JSON.stringify([
+                GROUNDING_CONTRACT_VERSION,
+                REWRITE_CONTRACT_VERSION,
+                format,
+                config!.baseUrl,
+                config!.model,
+                config!.jsonMode,
+                config!.thinkingMode ?? null,
+                selectedProfile!.profile,
+                fastProfile!.profile,
+                fastProfile!.config.baseUrl,
+                fastProfile!.config.model,
+                "neighbor:" + neighborRadius,
+                contextKey,
+                searchMode,
+                readEmbeddingConfig()?.fingerprint ?? null,
+              ]),
+            )
+            .digest("hex");
+          const store = createRequestStore();
+          rewriteReservation = await reserveRequest(
+            store,
+            user.id,
+            question.requestId!,
+            rewriteFingerprint,
           );
+          if (rewriteReservation.kind === "reserved")
+            reservation = { store, ownerId: user.id, requestId: question.requestId! };
+          await assertCurrent(signal);
+          if (rewriteReservation.kind === "cached") {
+            const cached = answerResultSchema.safeParse(rewriteReservation.result);
+            if (!cached.success || cached.data.mode !== "model")
+              throw new ApiError(
+                503,
+                "INVALID_SAVED_ANSWER",
+                "已保存回答无法读取，请重新发起问题。",
+              );
+            await assertAnswer(cached.data, signal);
+            traceOutcome = "cached";
+            return cached.data;
+          }
+        }
+        let retrievalQueries = [searchRequest.query];
+        let rewriteUsed = false;
+        if (canRewrite) {
+          const rewritten = await rewriteQuery(
+            fastProfile!.config,
+            {
+              question: question.question,
+              priorUserQuestions: normalizeUserQuestionContext(question.userContext),
+              documentLanguage: documentLanguage(searchData.sources),
+            },
+            signal,
+          );
+          if (rewritten) {
+            retrievalQueries = [rewritten.query, ...rewritten.alternates]
+              .map((query) => query.trim())
+              .filter((query, index, all) => query.length > 0 && all.indexOf(query) === index);
+            rewriteUsed = true;
+          }
+        }
+        traceRecorder?.set({ rewrite: rewriteUsed });
+        const retrieveLists = async (mode: "keyword" | "semantic") => {
+          const lists = [];
+          for (const query of retrievalQueries) {
+            lists.push(
+              await indexedSourceCandidates(
+                supabase,
+                searchData,
+                initialRevision,
+                { ...searchRequest, query },
+                true,
+                {
+                  mode,
+                  ownerId: user.id,
+                  signal,
+                  assertCurrent: assertSearchCurrent,
+                  validateSnapshotRevision,
+                },
+              ),
+            );
+          }
+          return lists;
+        };
+        let candidateLists;
+        try {
+          candidateLists = await retrieveLists(searchMode);
         } catch (error) {
           if (!(error instanceof ApiError) || error.code !== "SEMANTIC_NOT_READY") throw error;
           searchMode = "keyword";
-          candidates = await indexedSourceCandidates(
-            supabase,
-            searchData,
-            initialRevision,
-            searchRequest,
-            true,
-            {
-              mode: "keyword",
-              ownerId: user.id,
-              signal,
-              assertCurrent: assertSearchCurrent,
-              validateSnapshotRevision,
-            },
-          );
+          candidateLists = await retrieveLists("keyword");
         }
+        const candidates =
+          candidateLists.length === 1 ? candidateLists[0]! : fuseCandidates(candidateLists);
         await assertSearchCurrent();
         traceRecorder?.mark("retrievalEnd");
         let evidenceCharacters = 0;
@@ -551,8 +630,6 @@ export async function POST(request: Request) {
                 .join("\n\n")}${formatNoteEvidenceExtracts(noteEvidence)}${coverage}`
             : `当前范围未找到可引用的原文证据，请调整关键词或缩小范围。${coverageNotices.length ? ` ${coverageNotices.join(" ")}` : ""}`,
         };
-        const selectedProfile = selectAnswerProfile("standard");
-        const config = selectedProfile?.config;
         traceRecorder?.set({
           intent: classifyQuestionIntent(question.question),
           scope: question.scope,
@@ -592,30 +669,35 @@ export async function POST(request: Request) {
           traceOutcome = "insufficient";
           return grounding.fallback;
         }
-        const format: AnswerFormat = aiFeatureEnabled("RICH_ANSWERS") ? "rich" : "plain";
         if (!question.requestId)
           throw new ApiError(400, "REQUEST_ID_REQUIRED", "请刷新页面后重新发起问题。");
-        const fingerprint = createHash("sha256")
-          .update(
-            JSON.stringify([
-              GROUNDING_CONTRACT_VERSION,
-              format,
-              config.baseUrl,
-              config.model,
-              config.jsonMode,
-              config.thinkingMode ?? null,
-              selectedProfile.profile,
-              grounding.layout,
-              "neighbor:" + neighborRadius,
-              contextKey,
-              searchMode,
-              readEmbeddingConfig()?.fingerprint ?? null,
-            ]),
-          )
-          .digest("hex");
-        const store = createRequestStore();
-        const saved = await reserveRequest(store, user.id, question.requestId, fingerprint);
-        if (saved.kind === "reserved")
+        const store = reservation?.store ?? createRequestStore();
+        const saved =
+          rewriteReservation ??
+          (await reserveRequest(
+            store,
+            user.id,
+            question.requestId,
+            createHash("sha256")
+              .update(
+                JSON.stringify([
+                  GROUNDING_CONTRACT_VERSION,
+                  format,
+                  config.baseUrl,
+                  config.model,
+                  config.jsonMode,
+                  config.thinkingMode ?? null,
+                  selectedProfile.profile,
+                  grounding.layout,
+                  "neighbor:" + neighborRadius,
+                  contextKey,
+                  searchMode,
+                  readEmbeddingConfig()?.fingerprint ?? null,
+                ]),
+              )
+              .digest("hex"),
+          ));
+        if (saved.kind === "reserved" && !reservation)
           reservation = { store, ownerId: user.id, requestId: question.requestId };
 
         // Reservations can wait on another request. Revalidate before disclosure.

@@ -24,6 +24,18 @@ const rowsSchema = z
   .max(100);
 export type SearchMode = "keyword" | "semantic";
 
+/** Reciprocal-rank fusion for multiple independent retrieval queries. */
+export function fuseCandidates(lists: readonly (readonly SearchCandidate[])[]): SearchCandidate[] {
+  const merged = new Map<string, SearchCandidate>();
+  for (const list of lists)
+    list.forEach((candidate, index) => {
+      const key = JSON.stringify([candidate.objectId, candidate.blockId]);
+      const score = (merged.get(key)?.score || 0) + 1 / (60 + index + 1);
+      merged.set(key, { ...candidate, score });
+    });
+  return [...merged.values()].sort((a, b) => b.score - a.score);
+}
+
 export async function indexedSourceCandidates(
   client: Client,
   data: WorkspaceData,
@@ -196,14 +208,7 @@ export async function indexedSourceCandidates(
     );
   const semanticRows = await parse(semantic.data);
   // Reciprocal rank fusion avoids treating unrelated lexical/cosine scores as comparable.
-  const merged = new Map<string, SearchCandidate>();
-  for (const list of [keyword, semanticRows])
-    list.forEach((candidate, index) => {
-      const key = JSON.stringify([candidate.objectId, candidate.blockId]);
-      const score = (merged.get(key)?.score || 0) + 1 / (60 + index + 1);
-      merged.set(key, { ...candidate, score });
-    });
-  return [...merged.values()].sort((a, b) => b.score - a.score);
+  return fuseCandidates([keyword, semanticRows]);
 }
 
 export function noteSearchCandidates(
