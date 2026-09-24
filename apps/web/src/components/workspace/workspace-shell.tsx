@@ -146,6 +146,7 @@ import KnowledgeSection from "./sections/knowledge-section";
 import LibrarySection from "./sections/library-section";
 import NotesSection from "./sections/notes-section";
 import QuestionsSection from "./sections/questions-section";
+import PracticeSection from "./sections/practice-section";
 import SettingsSection from "./sections/settings/settings-section";
 import TrashSection from "./sections/trash-section";
 import {
@@ -526,7 +527,7 @@ export default function Workspace({
     !currentSource &&
     !currentNote &&
     !comparisonRoute &&
-    (["home", "library", "knowledge", "questions"] as Section[]).includes(section),
+    (["home", "library", "knowledge", "questions", "practice"] as Section[]).includes(section),
   );
   const libraryTitle = isCollectionHome
     ? "资料库"
@@ -3161,6 +3162,9 @@ export default function Workspace({
                 openConversation={openConversation}
                 openSource={openSource}
               />
+            )}
+            {section === "practice" && user && (
+              <PracticeSection data={data} spaceId={spaceId} user={user} />
             )}
             {section === "trash" && (
               <TrashSection

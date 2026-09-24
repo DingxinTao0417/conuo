@@ -11,6 +11,7 @@ export const scopedWorkspaceSections = [
   "knowledge",
   "organize",
   "questions",
+  "practice",
 ] as const;
 
 export type ScopedWorkspaceSection = (typeof scopedWorkspaceSections)[number];

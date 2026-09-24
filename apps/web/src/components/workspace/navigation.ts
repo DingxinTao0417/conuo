@@ -8,6 +8,7 @@ export type Section =
   | "knowledge"
   | "organize"
   | "questions"
+  | "practice"
   | "tasks"
   | "trash"
   | "settings";
@@ -18,6 +19,7 @@ export const spaceTabs = [
   ["library", "资料"],
   ["knowledge", "知识"],
   ["questions", "问答"],
+  ["practice", "练习"],
 ] as const;
 export type SpaceTab = (typeof spaceTabs)[number][0];
 
@@ -67,6 +69,7 @@ export const labels: Record<Section, string> = {
   knowledge: "知识页",
   organize: "AI 整理",
   questions: "我的问答",
+  practice: "练习",
   tasks: "任务中心",
   trash: "回收站",
   settings: "账号与设置",

@@ -11,6 +11,13 @@
 - 删除与备份：资料和历史版本清理触发器移除题目引用并保留 `sourcePurged` 标记；可选 `learning.json` 与 ZIP 读取支持保留题目、日志和设置，格式说明见 [导出格式](EXPORT_FORMAT.md)。
 - 测试：新增 FSRS、schema、学习路由、学习 SQL 隔离／额度／暂停／版本冲突／软删除／引用清理和备份回环测试；未执行远程迁移、operations 脚本、部署或真实模型调用，开关保持关闭。
 
+## AI 增强 WP-23（2026-09-24，本地）
+
+- 范围：新增 `practice-v1`、`grading-v1`、`explain-v1` 严格模型合同与证据绑定；出题、批改、分级提示和“我来解释”四条学习路由均复用 `ai_requests` 账本，模型结果只允许引用服务端当前原文切块。
+- 生成与反馈：出题返回不自动保存的草稿；批改在当前工作区逐条检查题目引用和 AI 权限，失效时返回 `LEARNING_SOURCE_UNAVAILABLE` 并保留自评边界；提示缓存优先、模型提示禁止包含完整答案；解释反馈分为 covered、missing、possiblyWrong、cannotJudge 四类。
+- 界面：学习空间新增“练习”标签，支持为当前资料生成草稿、逐题加入复习、查看题目并暂停或归档；默认学习开关关闭时不调用模型或账本。
+- 测试：R-15 全量 300 个测试文件／4481 项通过、2 项跳过；typecheck 通过；lint 0 错误并保留 1 条既有 `_result` 警告；WP-23 改动文件定向 Prettier 通过。仓库级 `format:check` 仍被既有 36 个 `._*` AppleDouble 文件阻断；未执行远程迁移、operations 脚本、部署或真实模型调用。
+
 ## AI 增强 WP-20（2026-09-24，本地）
 
 - 范围：新增浏览器驱动的 PDF.js 逐页 OCR 流程、`ocr-vlm-v1` 视觉识别路由、私有 `conuo_private.ocr_usage` 页额度及 `reserve_ocr_pages` RPC；识别结果只在当前请求返回，用户确认后才保存派生 PDF 版本。

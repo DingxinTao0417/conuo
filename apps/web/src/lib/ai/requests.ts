@@ -7,6 +7,8 @@ import type { AnswerResult } from "../types";
 import type { OrganizationResult } from "../organization-types";
 import type { VisionStudyResult } from "../vision-region-contract";
 import type { GlossarySuggestionResult } from "./glossary";
+import type { PracticeResult } from "./practice";
+import type { GradeResult, HintResult, ExplainFeedbackResult } from "./grading";
 import {
   AI_DAILY_REQUEST_LIMIT_MIN,
   AI_DAILY_REQUEST_LIMIT_MAX,
@@ -98,7 +100,15 @@ export async function finishRequest(
   store: Store,
   ownerId: string,
   requestId: string,
-  result?: AnswerResult | OrganizationResult | VisionStudyResult | GlossarySuggestionResult,
+  result?:
+    | AnswerResult
+    | OrganizationResult
+    | VisionStudyResult
+    | GlossarySuggestionResult
+    | PracticeResult
+    | GradeResult
+    | HintResult
+    | ExplainFeedbackResult,
   errorCode?: string,
 ) {
   // Never write the service-role table directly: the database-side completion
