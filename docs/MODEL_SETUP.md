@@ -17,6 +17,7 @@ Conuo 提供服务端 Chat Completions 适配器，供问答、资料整理和 P
 | `CONUO_MODEL_JSON_MODE`             | 默认 `false`。仅确认该模型支持 JSON mode 后设置为 `true`。不接受 `1`、`yes` 等其他值。                                                         |
 | `CONUO_MODEL_TOKEN_LIMIT_PARAMETER` | 输出 token 上限的字段名：`max_completion_tokens`（默认）或 `max_tokens`。仅按供应商文档选择，程序不会为同一次请求混用或重试两种字段。          |
 | `CONUO_MODEL_THINKING_MODE`         | 可选、仅服务端。空值省略供应商扩展字段；`enabled`／`disabled` 发送 `thinking: {type: ...}`。仅在供应商明确支持该字段时填写，非法值会阻止调用。 |
+| `CONUO_MODEL_STREAM_USAGE`          | 默认 `false`。设为 `true` 时在流式请求中要求供应商发送最终 usage 帧，用于 AI 请求追踪；仅接受 `true`／`false`。                                |
 | `SUPABASE_SECRET_KEY`               | 现有 Supabase 项目的服务端 secret key，用于受限的模型请求与额度账本操作。旧项目可改用 `SUPABASE_SERVICE_ROLE_KEY`，二者只填一个。              |
 | `CONUO_AI_DAILY_REQUEST_LIMIT`      | 每个账号每天可预占的模型请求次数，默认 `50`；允许 `1` 至 `500` 的整数，按 UTC 日期计数。                                                       |
 
@@ -47,6 +48,7 @@ CONUO_MODEL_VISION_ENABLED=true
 CONUO_MODEL_JSON_MODE=true
 CONUO_MODEL_TOKEN_LIMIT_PARAMETER=max_tokens
 CONUO_MODEL_THINKING_MODE=disabled
+CONUO_MODEL_STREAM_USAGE=false
 ```
 
 按 2026-09-15 的 [DeepSeek Chat Completions 文档](https://api-docs.deepseek.com/api/create-chat-completion/)，`deepseek-flash` 默认启用思考模式。本轮整理请求在现有 4096 token 上限出现 `length` 截断，开发配置显式使用 `disabled` 以给结构化最终结果保留预算；未提高 token 上限或加入自动重试。该模式同时用于文本、流式和图片请求，并参与请求指纹，不能把旧模式缓存当作新模式结果。其他供应商不一定支持此扩展，保持空值时维持原有请求协议。

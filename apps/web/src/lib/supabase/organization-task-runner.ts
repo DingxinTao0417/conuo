@@ -12,6 +12,7 @@ import {
 } from "@/lib/ai/organization";
 import { callModel, readModelConfig } from "@/lib/ai/model";
 import { createRequestStore, finishRequest, reserveRequest } from "@/lib/ai/requests";
+import { createTraceRecorder } from "@/lib/ai/traces";
 import { organizationRequestSchema, organizationResultSchema } from "@/lib/organization-schema";
 import { ApiError } from "@/lib/supabase/api";
 import { workspaceSchema } from "@/lib/supabase/validation";
@@ -155,6 +156,11 @@ async function processClaim(
   summary: OrganizationTaskRunnerSummary,
 ) {
   let staged = false;
+  let traceRecorder: ReturnType<typeof createTraceRecorder> | undefined;
+  let traceOutcome:
+    "completed" | "insufficient" | "failed" | "cancelled" | "cached" | "extractive" = "failed";
+  let traceErrorCode: string | undefined;
+  let traceModelName: string | undefined;
   try {
     const context = await rpc(
       store,
@@ -171,6 +177,8 @@ async function processClaim(
     )
       throw new ApiError(503, "ORGANIZATION_PROCESSOR_INVALID", "后台整理任务内容无效。");
 
+    traceRecorder = createTraceRecorder("organization-job", job.ownerId, context.request.requestId);
+
     if (context.result) {
       const published = await rpc(
         store,
@@ -182,12 +190,22 @@ async function processClaim(
       if (published.state === "succeeded") summary.published += 1;
       else if (published.state === "cancelled") summary.cancelled += 1;
       else summary.capacityPending += 1;
+      traceOutcome = "cached";
+      void traceRecorder.finish(traceOutcome);
       return;
     }
 
-    if (input.signal?.aborted) return;
+    if (input.signal?.aborted) {
+      traceOutcome = "cancelled";
+      void traceRecorder.finish(traceOutcome);
+      return;
+    }
     await heartbeat(store, job.ownerId, job.jobId, job.leaseToken, input.leaseSeconds);
-    if (input.signal?.aborted) return;
+    if (input.signal?.aborted) {
+      traceOutcome = "cancelled";
+      void traceRecorder.finish(traceOutcome);
+      return;
+    }
 
     // All evidence is rebuilt from the worker-read current snapshot. The caller
     // never supplies source text, pages, quotations or target note bodies.
@@ -220,14 +238,23 @@ async function processClaim(
     // scope before a provider call so an old worker never discloses evidence.
     await heartbeat(store, job.ownerId, job.jobId, job.leaseToken, input.leaseSeconds);
     if (input.signal?.aborted) return;
-    const result =
-      reserved.kind === "cached"
-        ? validateOrganizationResult(reserved.result, grounding, context.request)
-        : bindOrganizationResult(
-            await callModel(config, organizationMessages(grounding, context.request), input.signal),
-            grounding,
-            context.request,
-          );
+    let result;
+    if (reserved.kind === "cached") {
+      traceOutcome = "cached";
+      result = validateOrganizationResult(reserved.result, grounding, context.request);
+    } else {
+      traceRecorder.mark("modelStart");
+      result = bindOrganizationResult(
+        await callModel(config, organizationMessages(grounding, context.request), input.signal, {
+          onUsage: (usage) => traceRecorder?.addUsage(usage),
+        }),
+        grounding,
+        context.request,
+      );
+      traceRecorder.mark("modelEnd");
+      traceOutcome = "completed";
+    }
+    traceModelName = config.model;
     const stagedResult = await rpc(
       store,
       "stage_organization_job_result",
@@ -264,7 +291,17 @@ async function processClaim(
     if (published.state === "succeeded") summary.published += 1;
     else if (published.state === "cancelled") summary.cancelled += 1;
     else summary.capacityPending += 1;
+    void traceRecorder.finish(traceOutcome, { modelName: traceModelName });
   } catch (error) {
+    if (error instanceof ApiError) {
+      traceErrorCode = error.code;
+      if (error.code === "REQUEST_CANCELLED" || error.code === "MODEL_CANCELLED")
+        traceOutcome = "cancelled";
+    }
+    void traceRecorder?.finish(traceOutcome, {
+      errorCode: traceErrorCode,
+      modelName: traceModelName,
+    });
     if (input.signal?.aborted || staged) return;
     try {
       const failed = await rpc(

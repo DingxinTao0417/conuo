@@ -6,6 +6,7 @@ import { organizationContextKey } from "@/lib/organization";
 import { snapshotKnowledgeNote } from "@/lib/knowledge-update";
 import { readModelConfig, callModel } from "@/lib/ai/model";
 import { createRequestStore, reserveRequest, finishRequest } from "@/lib/ai/requests";
+import { createTraceRecorder } from "@/lib/ai/traces";
 import {
   assertOrganizationScope,
   buildOrganizationGrounding,
@@ -24,12 +25,18 @@ export async function POST(request: Request) {
   let reservation:
     | { store: ReturnType<typeof createRequestStore>; ownerId: string; requestId: string }
     | undefined;
+  let traceRecorder: ReturnType<typeof createTraceRecorder> | undefined;
+  let traceOutcome:
+    "completed" | "insufficient" | "failed" | "cancelled" | "cached" | "extractive" = "failed";
+  let traceErrorCode: string | undefined;
+  let traceModelName: string | undefined;
   try {
     const { supabase, user } = await requireUser(request);
     const parsed = organizationRequestSchema.safeParse(await readJson(request, 50_000));
     if (!parsed.success)
       throw new ApiError(400, "INVALID_ORGANIZATION", "请检查整理方式、资料范围和版本。");
     const input = parsed.data;
+    traceRecorder = createTraceRecorder("organize", user.id, input.requestId);
     const load = async () => {
       const { data, error } = await supabase
         .from("workspaces")
@@ -118,20 +125,28 @@ export async function POST(request: Request) {
     };
     // A reservation may wait on another worker. Recheck before disclosing evidence.
     await assertCurrent();
-    const result =
-      saved.kind === "cached"
-        ? validateOrganizationResult(saved.result, grounding, input, target, compare)
-        : bindOrganizationResult(
-            await callModel(
-              config,
-              organizationMessages(grounding, input, target, compare),
-              request.signal,
-            ),
-            grounding,
-            input,
-            target,
-            compare,
-          );
+    let result;
+    if (saved.kind === "cached") {
+      traceOutcome = "cached";
+      result = validateOrganizationResult(saved.result, grounding, input, target, compare);
+    } else {
+      traceRecorder.mark("modelStart");
+      result = bindOrganizationResult(
+        await callModel(
+          config,
+          organizationMessages(grounding, input, target, compare),
+          request.signal,
+          { onUsage: (usage) => traceRecorder?.addUsage(usage) },
+        ),
+        grounding,
+        input,
+        target,
+        compare,
+      );
+      traceOutcome = "completed";
+      traceRecorder.mark("modelEnd");
+    }
+    traceModelName = config.model;
     await assertCurrent();
     if (reservation) {
       await finishRequest(store, user.id, input.requestId, result);
@@ -139,8 +154,19 @@ export async function POST(request: Request) {
       // Also guard the time spent writing the shared ledger cache.
       await assertCurrent();
     }
+    if (traceRecorder) void traceRecorder.finish(traceOutcome, { modelName: traceModelName });
     return json(result);
   } catch (error) {
+    if (error instanceof ApiError) {
+      traceErrorCode = error.code;
+      if (error.code === "REQUEST_CANCELLED" || error.code === "MODEL_CANCELLED")
+        traceOutcome = "cancelled";
+    }
+    if (traceRecorder)
+      void traceRecorder.finish(traceOutcome, {
+        errorCode: traceErrorCode,
+        modelName: traceModelName,
+      });
     if (reservation) {
       try {
         await finishRequest(

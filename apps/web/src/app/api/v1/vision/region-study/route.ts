@@ -18,6 +18,8 @@ import {
   visionStudyMessages,
 } from "@/lib/ai/vision-region";
 import { createRequestStore, finishRequest, reserveRequest } from "@/lib/ai/requests";
+import { createTraceRecorder } from "@/lib/ai/traces";
+import { aiFeatureEnabled } from "@/lib/ai/features";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -92,6 +94,11 @@ export async function POST(request: Request) {
       }
     | undefined;
   let reservationCleanup: Promise<void> | undefined;
+  let traceRecorder: ReturnType<typeof createTraceRecorder> | undefined;
+  let traceOutcome:
+    "completed" | "insufficient" | "failed" | "cancelled" | "cached" | "extractive" = "failed";
+  let traceErrorCode: string | undefined;
+  let traceModelName: string | undefined;
   const failReservation = (error: unknown): Promise<void> => {
     if (reservationCleanup) return reservationCleanup;
     const pending = reservation;
@@ -136,6 +143,7 @@ export async function POST(request: Request) {
     if (!parsed.success)
       throw new ApiError(400, "INVALID_VISION_REQUEST", "请重新截取区域并检查学习任务。");
     const input: VisionStudyRequest = parsed.data;
+    traceRecorder = createTraceRecorder("vision", user.id, input.requestId);
     const image = validateVisionImage(input.image);
     const initial = await loadWorkspace(supabase, user.id);
     assertVisionSource(initial, input);
@@ -206,23 +214,46 @@ export async function POST(request: Request) {
           "已保存的区域视觉学习结果无法读取，请重新发起请求。",
         );
       result = cached.data;
+      traceOutcome = "cached";
     } else {
-      const raw = await callVisionModel(
-        config,
-        visionStudyMessages(input),
-        { mimeType: image.mimeType, base64: image.base64 },
-        request.signal,
-      );
+      traceRecorder.mark("modelStart");
+      const raw = aiFeatureEnabled("AI_TRACES")
+        ? await callVisionModel(
+            config,
+            visionStudyMessages(input),
+            { mimeType: image.mimeType, base64: image.base64 },
+            request.signal,
+            { onUsage: (usage) => traceRecorder?.addUsage(usage) },
+          )
+        : await callVisionModel(
+            config,
+            visionStudyMessages(input),
+            { mimeType: image.mimeType, base64: image.base64 },
+            request.signal,
+          );
       result = bindVisionStudyResult(raw, input);
+      traceRecorder.mark("modelEnd");
+      traceOutcome = "completed";
     }
+    traceModelName = config.model;
     await assertCurrent();
     if (reservation) {
       await finishRequest(store, user.id, input.requestId, result);
       reservation = undefined;
       await assertCurrent();
     }
+    void traceRecorder?.finish(traceOutcome, { modelName: traceModelName });
     return json(result);
   } catch (error) {
+    if (error instanceof ApiError) {
+      traceErrorCode = error.code;
+      if (error.code === "REQUEST_CANCELLED" || error.code === "MODEL_CANCELLED")
+        traceOutcome = "cancelled";
+    }
+    void traceRecorder?.finish(traceOutcome, {
+      errorCode: traceErrorCode,
+      modelName: traceModelName,
+    });
     await failReservation(error);
     return failure(error);
   }

@@ -9,6 +9,7 @@ const config: ModelConfig = {
   jsonMode: false,
   tokenLimitParameter: "max_completion_tokens",
   timeoutMs: 45_000,
+  streamUsage: false,
 };
 const messages = [{ role: "user" as const, content: "Explain evidence." }];
 const encoder = new TextEncoder();
@@ -43,6 +44,48 @@ afterEach(() => {
 });
 
 describe("model SSE adapter", () => {
+  it("includes usage options and accepts the final usage-only chunk", async () => {
+    fetchMock.mockResolvedValue(
+      sse(
+        frame(delta("answer")) +
+          stop +
+          frame({
+            object: "chat.completion.chunk",
+            choices: [],
+            usage: { prompt_tokens: 12, completion_tokens: 7, total_tokens: 19 },
+          }) +
+          done,
+      ),
+    );
+    const observer = { onUsage: vi.fn(), onFirstDelta: vi.fn() };
+    await expect(
+      callModelStream({ ...config, streamUsage: true }, messages, undefined, noop, observer),
+    ).resolves.toBe("answer");
+    expect(observer.onFirstDelta).toHaveBeenCalledOnce();
+    expect(observer.onUsage).toHaveBeenCalledExactlyOnceWith({
+      promptTokens: 12,
+      completionTokens: 7,
+      totalTokens: 19,
+    });
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toMatchObject({
+      stream_options: { include_usage: true },
+    });
+  });
+
+  it("rejects a usage-only chunk when stream usage is disabled", async () => {
+    fetchMock.mockResolvedValue(
+      sse(
+        frame(delta("answer")) +
+          stop +
+          frame({ object: "chat.completion.chunk", choices: [], usage: { total_tokens: 1 } }) +
+          done,
+      ),
+    );
+    await expect(callModelStream(config, messages, undefined, noop)).rejects.toMatchObject({
+      code: "MODEL_RESPONSE",
+    });
+  });
+
   it.each([undefined, "enabled", "disabled"] as const)(
     "sends optional thinking mode %s and completes exactly one bounded stream",
     async (thinkingMode) => {

@@ -35,6 +35,7 @@ import {
 import type { AnswerRequest, AnswerResult, WorkspaceData } from "@/lib/types";
 import { indexedCitations, indexedSourceCandidates } from "@/lib/server-search";
 import { readEmbeddingConfig } from "@/lib/ai/embeddings";
+import { createTraceRecorder } from "@/lib/ai/traces";
 import {
   answerStreamResponse,
   ANSWER_STREAM_LIMITS,
@@ -242,6 +243,19 @@ export async function POST(request: Request) {
     | { store: ReturnType<typeof createRequestStore>; ownerId: string; requestId: string }
     | undefined;
   let reservationCleanup: Promise<void> | undefined;
+  let traceRecorder: ReturnType<typeof createTraceRecorder> | undefined;
+  let traceOutcome:
+    "completed" | "insufficient" | "failed" | "cancelled" | "cached" | "extractive" = "failed";
+  let traceErrorCode: string | undefined;
+  let traceModelName: string | undefined;
+  const finishTrace = () => {
+    if (traceRecorder)
+      void traceRecorder.finish(traceOutcome, {
+        errorCode: traceErrorCode,
+        modelProfile: "default",
+        modelName: traceModelName,
+      });
+  };
   const failReservation = (error: unknown): Promise<void> => {
     if (reservationCleanup) return reservationCleanup;
     const pending = reservation;
@@ -280,6 +294,8 @@ export async function POST(request: Request) {
     );
     if (!parsed.success) throw new ApiError(400, "INVALID_QUESTION", "请检查问题长度与资料范围。");
     const question = parsed.data;
+    traceRecorder = createTraceRecorder("ask", user.id, question.requestId);
+    traceRecorder.mark("retrievalStart");
     const load = async () => {
       const { data, error } = await supabase
         .from("workspaces")
@@ -388,7 +404,10 @@ export async function POST(request: Request) {
     const run = async (signal: AbortSignal, send?: AnswerStreamSink): Promise<AnswerResult> => {
       try {
         await send?.({ type: "progress", phase: "retrieving" });
-        if (!initial.aiEnabled) return retrieveEvidence(initial, question);
+        if (!initial.aiEnabled) {
+          traceOutcome = "extractive";
+          return retrieveEvidence(initial, question);
+        }
         const currentSearchSnapshot = async () => {
           if (signal.aborted)
             throw new ApiError(499, "REQUEST_CANCELLED", "回答已停止，问题已保留。");
@@ -482,6 +501,7 @@ export async function POST(request: Request) {
           );
         }
         await assertSearchCurrent();
+        traceRecorder?.mark("retrievalEnd");
         let evidenceCharacters = 0;
         const citations = indexedCitations(initial, question, candidates)
           .filter((citation) => {
@@ -520,9 +540,28 @@ export async function POST(request: Request) {
             : `当前范围未找到可引用的原文证据，请调整关键词或缩小范围。${coverageNotices.length ? ` ${coverageNotices.join(" ")}` : ""}`,
         };
         const config = readModelConfig();
-        if (!config) return retrieved;
+        traceRecorder?.set({
+          scope: question.scope,
+          searchMode,
+          sourceCount: selectedSources(initial, question).length,
+          candidateCount: candidates.length,
+          evidenceCount: extractiveCitations.length,
+          evidenceRefs: extractiveCitations.map((citation) => ({
+            sourceId: citation.sourceId,
+            versionId: citation.versionId,
+            chunkId: citation.chunkId,
+          })),
+        });
+        if (!config) {
+          traceOutcome = "extractive";
+          return retrieved;
+        }
+        traceModelName = config.model;
         const grounding = buildGrounding(initial, question, retrieved);
-        if (!grounding.evidence.length) return grounding.fallback;
+        if (!grounding.evidence.length) {
+          traceOutcome = "insufficient";
+          return grounding.fallback;
+        }
         const format: AnswerFormat = aiFeatureEnabled("RICH_ANSWERS") ? "rich" : "plain";
         if (!question.requestId)
           throw new ApiError(400, "REQUEST_ID_REQUIRED", "请刷新页面后重新发起问题。");
@@ -554,21 +593,36 @@ export async function POST(request: Request) {
           if (!cached.success || cached.data.mode !== "model")
             throw new ApiError(503, "INVALID_SAVED_ANSWER", "已保存回答无法读取，请重新发起问题。");
           answer = cached.data;
+          traceOutcome = "cached";
         } else {
           await send?.({ type: "progress", phase: "generating" });
           // Waiting for a downstream reader must not make the evidence check stale.
           await assertCurrent(signal);
           const preview = send ? createGroundingPreview(grounding, { format }) : undefined;
           const messages = groundingMessages(grounding, question, { format });
+          traceRecorder?.mark("modelStart");
           const raw = send
-            ? await callModelStream(config, messages, signal, async (delta) => {
-                const draft = preview!.push(delta);
-                if (draft)
-                  await send({ type: "draft", answer: draft }, () => assertAnswer(draft, signal));
-              })
-            : await callModel(config, messages, signal);
+            ? await callModelStream(
+                config,
+                messages,
+                signal,
+                async (delta) => {
+                  const draft = preview!.push(delta);
+                  if (draft)
+                    await send({ type: "draft", answer: draft }, () => assertAnswer(draft, signal));
+                },
+                {
+                  onUsage: (usage) => traceRecorder?.addUsage(usage),
+                  onFirstDelta: () => traceRecorder?.mark("firstDraft"),
+                },
+              )
+            : await callModel(config, messages, signal, {
+                onUsage: (usage) => traceRecorder?.addUsage(usage),
+              });
+          traceRecorder?.mark("modelEnd");
           await send?.({ type: "progress", phase: "validating" });
           answer = bindGeneratedAnswer(raw, grounding, { format });
+          traceOutcome = "completed";
         }
         await assertAnswer(answer, signal);
         if (reservation) {
@@ -579,6 +633,11 @@ export async function POST(request: Request) {
         }
         return answer;
       } catch (error) {
+        if (error instanceof ApiError) {
+          traceErrorCode = error.code;
+          if (error.code === "REQUEST_CANCELLED" || error.code === "MODEL_CANCELLED")
+            traceOutcome = "cancelled";
+        }
         // Start an idempotent terminal write, including when a late reservation
         // resolves after cancellation. The caller publishes the original error
         // without waiting for this bounded best-effort cleanup.
@@ -591,14 +650,26 @@ export async function POST(request: Request) {
       return answerStreamResponse(
         request.signal,
         async (signal, send) => {
-          const answer = await run(signal, send);
-          await send({ type: "complete", answer }, () => assertAnswer(answer, signal));
+          try {
+            const answer = await run(signal, send);
+            await send({ type: "complete", answer }, () => assertAnswer(answer, signal));
+          } finally {
+            finishTrace();
+          }
         },
         failReservation,
         deadlineAt,
       );
-    return json(await run(request.signal));
+    const answer = await run(request.signal);
+    finishTrace();
+    return json(answer);
   } catch (error) {
+    if (error instanceof ApiError) {
+      traceErrorCode = error.code;
+      if (error.code === "REQUEST_CANCELLED" || error.code === "MODEL_CANCELLED")
+        traceOutcome = "cancelled";
+    }
+    finishTrace();
     preflight?.dispose(error);
     // A failed reservation stays non-replayable even if the best-effort
     // terminal write outlives this response. Do not let that write mask the

@@ -9,6 +9,20 @@ export interface ModelConfig {
   thinkingMode?: "enabled" | "disabled";
   tokenLimitParameter: "max_completion_tokens" | "max_tokens";
   timeoutMs: number;
+  streamUsage?: boolean;
+}
+
+export interface ModelUsage {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  reasoningTokens?: number;
+  cacheHitTokens?: number;
+}
+
+export interface ModelObserver {
+  onUsage?(usage: ModelUsage): void;
+  onFirstDelta?(): void;
 }
 
 type ModelMessage = { role: "system" | "user"; content: string };
@@ -37,6 +51,11 @@ function parseTokenLimitParameter(value: string): ModelConfig["tokenLimitParamet
 function parseThinkingMode(value: string): ModelConfig["thinkingMode"] {
   if (value === "enabled" || value === "disabled") return value;
   throw configurationError();
+}
+
+function parseStreamUsage(value: string): boolean {
+  if (value !== "true" && value !== "false") throw configurationError();
+  return value === "true";
 }
 
 function baseUrl(value: string): string {
@@ -86,7 +105,8 @@ function validateConfig(config: ModelConfig): ModelConfig {
       config.tokenLimitParameter !== "max_tokens") ||
     !Number.isInteger(config.timeoutMs) ||
     config.timeoutMs < 1 ||
-    config.timeoutMs > 60_000
+    config.timeoutMs > 60_000 ||
+    (config.streamUsage !== undefined && typeof config.streamUsage !== "boolean")
   ) {
     throw configurationError();
   }
@@ -101,6 +121,7 @@ export function readModelConfig(
   const model = env.CONUO_MODEL_NAME?.trim() ?? "";
   const thinkingValue = env.CONUO_MODEL_THINKING_MODE?.trim();
   const thinkingMode = thinkingValue ? parseThinkingMode(thinkingValue) : undefined;
+  const streamUsage = parseStreamUsage(env.CONUO_MODEL_STREAM_USAGE?.trim() || "false");
   if (!url && !key && !model) return null;
   const jsonMode = env.CONUO_MODEL_JSON_MODE?.trim() || "false";
   const tokenLimitParameter =
@@ -114,7 +135,32 @@ export function readModelConfig(
     ...(thinkingMode === undefined ? {} : { thinkingMode }),
     tokenLimitParameter: parseTokenLimitParameter(tokenLimitParameter),
     timeoutMs: 45_000,
+    streamUsage,
   });
+}
+
+function tokenCount(value: unknown): number | undefined {
+  return Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= 100_000_000
+    ? (value as number)
+    : undefined;
+}
+
+export function readModelUsage(value: unknown): ModelUsage | undefined {
+  if (!isRecord(value) || !isRecord(value.usage)) return undefined;
+  const usage = value.usage;
+  const completionDetails = isRecord(usage.completion_tokens_details)
+    ? usage.completion_tokens_details
+    : {};
+  const promptDetails = isRecord(usage.prompt_tokens_details) ? usage.prompt_tokens_details : {};
+  const result: ModelUsage = {
+    promptTokens: tokenCount(usage.prompt_tokens),
+    completionTokens: tokenCount(usage.completion_tokens),
+    totalTokens: tokenCount(usage.total_tokens),
+    reasoningTokens: tokenCount(completionDetails.reasoning_tokens),
+    cacheHitTokens:
+      tokenCount(usage.prompt_cache_hit_tokens) ?? tokenCount(promptDetails.cached_tokens),
+  };
+  return Object.values(result).some((item) => item !== undefined) ? result : undefined;
 }
 
 /**
@@ -237,6 +283,8 @@ async function readStreamResponse(
   response: Response,
   signal: AbortSignal,
   onDelta: (delta: string) => Promise<void>,
+  streamUsage: boolean,
+  observer?: ModelObserver,
 ): Promise<string> {
   const mime = response.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase();
   const advertised = response.headers.get("Content-Length");
@@ -260,6 +308,7 @@ async function readStreamResponse(
   let text = "";
   let stopped = false;
   let done = false;
+  let usage: ModelUsage | undefined;
 
   const dispatch = async () => {
     if (!data.length) {
@@ -278,20 +327,23 @@ async function readStreamResponse(
       done = true;
       return;
     }
-    if (stopped) throw responseError();
     let value: unknown;
     try {
       value = JSON.parse(payload);
     } catch {
       throw responseError();
     }
+    const parsedUsage = readModelUsage(value);
+    if (parsedUsage) usage = parsedUsage;
     if (
       !isRecord(value) ||
       value.object !== "chat.completion.chunk" ||
       !Array.isArray(value.choices) ||
-      value.choices.length !== 1
+      (value.choices.length !== 1 && !(streamUsage && value.choices.length === 0 && parsedUsage))
     )
       throw responseError();
+    if (value.choices.length === 0) return;
+    if (stopped) throw responseError();
     const choice: unknown = value.choices[0];
     if (!isRecord(choice) || choice.index !== 0 || !isRecord(choice.delta)) throw responseError();
     const delta = choice.delta;
@@ -316,6 +368,7 @@ async function readStreamResponse(
       if (text.length + delta.content.length > 32_000) throw responseError();
       text += delta.content;
       if (signal.aborted) throw cancelledError();
+      if (!text.slice(0, text.length - delta.content.length)) observer?.onFirstDelta?.();
       // The caller validates current permissions and applies its own output backpressure.
       await onDelta(delta.content);
       if (signal.aborted) throw cancelledError();
@@ -366,6 +419,7 @@ async function readStreamResponse(
       }
     }
     if (signal.aborted) throw cancelledError();
+    if (usage) observer?.onUsage?.(usage);
     return text.trim();
   } catch (error) {
     if (error instanceof ApiError) throw error;
@@ -382,6 +436,7 @@ async function sendModelRequest(
   body: string,
   signal?: AbortSignal,
   onDelta?: (delta: string) => Promise<void>,
+  observer?: ModelObserver,
 ): Promise<string> {
   const controller = new AbortController();
   let stopError: ApiError | undefined;
@@ -432,9 +487,21 @@ async function sendModelRequest(
         }
         if (response.redirected) throw statusError(302);
         if (!response.ok) throw statusError(response.status);
-        const result = onDelta
-          ? await readStreamResponse(response, controller.signal, onDelta)
-          : completionText(await readResponse(response, controller.signal));
+        let result: string;
+        if (onDelta)
+          result = await readStreamResponse(
+            response,
+            controller.signal,
+            onDelta,
+            validated.streamUsage === true,
+            observer,
+          );
+        else {
+          const value = await readResponse(response, controller.signal);
+          result = completionText(value);
+          const usage = readModelUsage(value);
+          if (usage) observer?.onUsage?.(usage);
+        }
         if (stopError) throw stopError;
         return result;
       })(),
@@ -470,6 +537,7 @@ async function requestModel(
   messages: ModelMessage[],
   signal?: AbortSignal,
   onDelta?: (delta: string) => Promise<void>,
+  observer?: ModelObserver,
 ): Promise<string> {
   const validated = validateConfig(config);
   if (signal?.aborted) throw cancelledError();
@@ -492,18 +560,22 @@ async function requestModel(
     messages: messages.map(({ role, content }) => ({ role, content })),
     stream: !!onDelta,
     ...generationOptions(validated),
+    ...(onDelta && validated.streamUsage === true
+      ? { stream_options: { include_usage: true } }
+      : {}),
   });
   if (new TextEncoder().encode(body).length > MAX_REQUEST_BYTES)
     throw new ApiError(413, "MODEL_INPUT_TOO_LARGE", "本次资料过多，请缩小范围后重试。");
-  return sendModelRequest(validated, body, signal, onDelta);
+  return sendModelRequest(validated, body, signal, onDelta, observer);
 }
 
 export function callModel(
   config: ModelConfig,
   messages: ModelMessage[],
   signal?: AbortSignal,
+  observer?: ModelObserver,
 ): Promise<string> {
-  return requestModel(config, messages, signal);
+  return requestModel(config, messages, signal, undefined, observer);
 }
 
 /**
@@ -515,6 +587,7 @@ export function callVisionModel(
   messages: ModelMessage[],
   image: InlineModelImage,
   signal?: AbortSignal,
+  observer?: ModelObserver,
 ): Promise<string> {
   try {
     const validated = validateConfig(config);
@@ -562,7 +635,7 @@ export function callVisionModel(
     });
     if (new TextEncoder().encode(body).length > MAX_VISION_REQUEST_BYTES)
       throw new ApiError(413, "MODEL_INPUT_TOO_LARGE", "区域图片过大，请缩小区域后重试。");
-    return sendModelRequest(validated, body, signal);
+    return sendModelRequest(validated, body, signal, undefined, observer);
   } catch (error) {
     return Promise.reject(error);
   }
@@ -574,8 +647,9 @@ export function callModelStream(
   messages: ModelMessage[],
   signal: AbortSignal | undefined,
   onDelta: (delta: string) => Promise<void>,
+  observer?: ModelObserver,
 ): Promise<string> {
   if (typeof onDelta !== "function")
     return Promise.reject(new ApiError(400, "MODEL_INPUT", "无法读取模型请求，请调整问题后重试。"));
-  return requestModel(config, messages, signal, onDelta);
+  return requestModel(config, messages, signal, onDelta, observer);
 }

@@ -66,7 +66,7 @@ vi.mock("../ai/requests", () => ({
 import { POST } from "@/app/api/v1/ask/route";
 
 const owner = "owner-a",
-  store = { name: "server-ledger" };
+  store = { name: "server-ledger", rpc: mock.rpc };
 const config = {
   baseUrl: "https://model.example/v1",
   model: "configured-model",
@@ -218,6 +218,7 @@ async function nextDraft(events: ReturnType<typeof readEvents>) {
 beforeEach(() => {
   Object.values(mock).forEach((fn) => fn.mockReset());
   workspace = createDemoWorkspace();
+  delete process.env.CONUO_FEATURE_AI_TRACES;
   currentUser = owner;
   cloudRevision = 1;
   const chain = { select: mock.select, eq: mock.eq, maybeSingle: mock.read };
@@ -260,11 +261,38 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  delete process.env.CONUO_FEATURE_AI_TRACES;
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
 describe("authenticated generated-answer SSE route", () => {
+  it.each([
+    ["complete", "completed"],
+    ["cached", "cached"],
+    ["extractive", "extractive"],
+    ["cancel", "cancelled"],
+  ] as const)("records the %s trace outcome", async (mode, outcome) => {
+    process.env.CONUO_FEATURE_AI_TRACES = "on";
+    if (mode === "cached") {
+      const cached = bindGeneratedAnswer(generated, buildGrounding(workspace, question()));
+      mock.reserveRequest.mockResolvedValueOnce({ kind: "cached", result: cached });
+    } else if (mode === "extractive") {
+      mock.readModelConfig.mockReturnValueOnce(null);
+    } else if (mode === "cancel") {
+      mock.callModelStream.mockRejectedValueOnce(
+        new ApiError(499, "REQUEST_CANCELLED", "回答已停止，问题已保留。"),
+      );
+    }
+    const events = await readEvents(await POST(request({ requestId: `trace-${mode}` }))).all();
+    if (mode === "cancel")
+      expect(events.at(-1)).toMatchObject({ type: "error", code: "REQUEST_CANCELLED" });
+    await Promise.resolve();
+    const calls = mock.rpc.mock.calls.filter(([name]) => name === "record_ai_trace");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]![1].p_trace.outcome).toBe(outcome);
+  });
+
   it("binds each optional thinking mode into the SSE answer fingerprint", async () => {
     const fingerprints: string[] = [];
     for (const thinkingMode of [undefined, "enabled", "disabled"] as const) {

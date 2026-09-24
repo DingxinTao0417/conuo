@@ -9,6 +9,7 @@ const config: ModelConfig = {
   jsonMode: false,
   tokenLimitParameter: "max_completion_tokens",
   timeoutMs: 45_000,
+  streamUsage: false,
 };
 const messages: Array<{ role: "system" | "user"; content: string }> = [
   { role: "system", content: "Return a JSON object using only the supplied evidence." },
@@ -215,6 +216,31 @@ describe("thinking transport for completions", () => {
 });
 
 describe("model HTTP adapter", () => {
+  it("reports provider token usage to the observer", async () => {
+    fetchMock.mockResolvedValue(
+      response(
+        completion({
+          usage: {
+            prompt_tokens: 12,
+            completion_tokens: 7,
+            total_tokens: 19,
+            completion_tokens_details: { reasoning_tokens: 3 },
+            prompt_tokens_details: { cached_tokens: 5 },
+          },
+        }),
+      ),
+    );
+    const onUsage = vi.fn();
+    await callModel(config, messages, undefined, { onUsage });
+    expect(onUsage).toHaveBeenCalledExactlyOnceWith({
+      promptTokens: 12,
+      completionTokens: 7,
+      totalTokens: 19,
+      reasoningTokens: 3,
+      cacheHitTokens: 5,
+    });
+  });
+
   it("makes one bounded nonstreaming request and returns assistant content", async () => {
     fetchMock.mockResolvedValue(response());
     expect(await callModel(config, messages)).toBe('{"answer":"quoted evidence"}');
