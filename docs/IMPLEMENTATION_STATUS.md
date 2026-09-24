@@ -1,10 +1,19 @@
 # Conuo Web 开发状态
 
-更新日期：2026-09-23。范围：Web 开发增量及独立 staging 部署，并链接当前 iPadOS 工作包状态。Windows/macOS 与 iOS/iPadOS 的实现、测试与未完成范围见[客户端开发记录](CLIENT_IMPLEMENTATION.md)；下文历史 staging 推送记录不代表本轮客户端改动已部署。
+更新日期：2026-09-24。范围：Web 开发增量及独立 staging 部署，并链接当前 iPadOS 工作包状态。Windows/macOS 与 iOS/iPadOS 的实现、测试与未完成范围见[客户端开发记录](CLIENT_IMPLEMENTATION.md)；下文历史 staging 推送记录不代表本轮客户端改动已部署。
 
 本项目已有可运行的 Web 工作台，支持导入、阅读与版本历史、笔记与知识审核、普通搜索、原始资料问答、PDF 区域截图学习及个人 ZIP 备份恢复。当前已使用自编 QA 资料完成真实 DeepSeek 问答、回答另存笔记、截图解读／提问／出题、资料分析、跨资料主题生成与人工接受，并确认相关笔记和知识正文的云端保存及刷新恢复；知识页也已基于固定原始依据收到流式问答成功终态，知识页正文本身不充当证据。2026-09-20 已创建独立 staging：27 份迁移已应用，Web 已部署到 https://conuo-staging.vercel.app，分钟级资料整理调度及三条清理 Cron 已配置。上传、跨账号隔离、双会话 CAS、真实模型后台整理、六条主要业务冲突接口，以及孤立上传、带数据历史版本、资料、Storage 和账号 Auth 删除主链路均已通过；一次性 signup/recovery token 的确认与密码更新、真实等待后的过期 signup token、受控邮箱的真实注册确认邮件及同浏览器 PKCE、Chrome／Edge 跨一小时持久会话自动刷新也已通过。三条清理 Cron 已在未手工调用 cleanup API 的情况下达到主自然调度预期终态；被遗弃租约和可重试故障的韧性阶段仍待下一次自然调度。项目所有者于 `2026-09-21` 确认物理双设备同步矩阵及真实找回密码邮件的同浏览器完整链路均无异常；跨浏览器邮件点击仍待验收。原生产数据库未升级，生产网页代码与 schema 仍可能不一致。本轮已提交并推送 `staging`；可变域名的当前版本由 `/api/health` 返回 Vercel 环境、Git 分支和完整 SHA，首次探针验证为 `d64ee3f76bdb24cdfcfed76cbd958a615183feb5`。详细证据见 [Staging 部署与验收](STAGING_DEPLOYMENT.md)和[生产发布手册](PRODUCTION_RELEASE.md)。 **完整 M0 仍未验收。**
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
+
+## AI 增强 WP-13（2026-09-24，本地）
+
+- 范围：问答请求增加可选 `conversationId`；`ANSWER_MEMORY` 打开时服务端从同空间、同范围的已保存会话读取最近 2 条已完成模型回答。文本只作为非证据上下文，当前版本和当前范围内重新校验通过的历史引用才可加入本次 evidence。
+- 客户端：阅读器、比较问答和跨库问答在保存会话后传递会话 ID；`AnswerScopeSnapshot` 不携带该字段，`askCloud` 继续发送完整请求 JSON。
+- 提示词与安全边界：历史回答进入用户 JSON 的 `priorAssistantAnswers`，系统提示明确其不可信、非证据；失败／停止／extractive 回答、覆盖说明、换版引用和其他空间引用均被排除。开关关闭时沿用原提示词和 evidence 组装，开启时请求指纹追加 `memory:key`。
+- PRD：按 DEC-02 更新 `docs/PRD.md` 的 ASK-07、7.7 段落和 AT-35，并同步更新 `docs/STREAMING_ANSWERS.md` 连续追问边界。
+- 测试：新增 answer-memory、grounding 注入与顺序、请求契约、客户端传递和路由开关回归；R-15 为 Web 275 个测试文件／4401 项通过、2 项跳过，typecheck 通过，lint 0 错误并保留 1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过。
+- 未验收边界：WP-02 follow-up 用例“再举一个不同的例子”及 `citationSupportRate` 对照仍需人工评测；在评测达标前不开 staging 开关，未执行真实模型、部署或远程操作。
 
 ## AI 增强 WP-14（2026-09-24，本地）
 
