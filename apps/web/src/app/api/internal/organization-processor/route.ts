@@ -1,8 +1,8 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { ApiError, failure, json, readJson } from "@/lib/supabase/api";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runOrganizationTasks } from "@/lib/supabase/organization-task-runner";
+import { requireProcessorIdentity } from "@/lib/supabase/processor-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,25 +19,6 @@ const requestSchema = z
   })
   .strict();
 const cronInput = { workerId: "vercel-organization-processor", limit: 1, leaseSeconds: 120 };
-
-function configuredSecrets() {
-  return [process.env.CONUO_PROCESSOR_SECRET?.trim(), process.env.CRON_SECRET?.trim()].filter(
-    (secret): secret is string =>
-      !!secret && secret.length >= 32 && secret.length <= 4096 && !/[^\x21-\x7e]/.test(secret),
-  );
-}
-
-function requireProcessorIdentity(request: Request) {
-  const secrets = configuredSecrets();
-  if (!secrets.length)
-    throw new ApiError(503, "PROCESSOR_NOT_CONFIGURED", "后台整理入口尚未配置。");
-  const header = request.headers.get("authorization") || "";
-  if (header.length > 8192) throw new ApiError(401, "PROCESSOR_UNAUTHORIZED", "后台整理身份无效。");
-  const digest = (value: string) => createHash("sha256").update(value).digest();
-  const actual = digest(header);
-  const matched = secrets.some((secret) => timingSafeEqual(actual, digest(`Bearer ${secret}`)));
-  if (!matched) throw new ApiError(401, "PROCESSOR_UNAUTHORIZED", "后台整理身份无效。");
-}
 
 async function runProcessor(request: Request, input: z.infer<typeof requestSchema>) {
   requireProcessorIdentity(request);

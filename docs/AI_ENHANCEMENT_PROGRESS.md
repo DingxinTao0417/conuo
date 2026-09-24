@@ -5,7 +5,7 @@
 | 项         | 值                                      |
 | ---------- | --------------------------------------- |
 | 分支       | `feat/ai-enhancement`（本地，未推送）   |
-| 下一个 WP  | WP-10                                   |
+| 下一个 WP  | WP-11                                   |
 | 当前阶段   | 阶段 0 已完成；阶段 1 进行中            |
 | 更新日期   | 2026-09-23                              |
 
@@ -23,7 +23,7 @@
 | 6    | WP-03  | 完成     | `3a81562` | 265 个测试文件／4310 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有警告；新增文件定向 Prettier 通过；仓库级 format:check 被既有 36 个 `._*` AppleDouble 文件阻断 | 回答反馈、显式内容附带、撤回和人工转评测流程；阶段 0 离线门槛通过 |
 | 7    | WP-07  | 完成     | `73d41a3` | 266 个测试文件／4323 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 变更文件 Prettier 定向检查通过；仓库级 format:check 被既有 36 个 `._*` AppleDouble 文件阻断 | 四档模型配置、问答／整理／后台整理／区域视觉路由档位指纹隔离；真实模型与部署未验收 |
 | 8    | WP-09  | 完成     | `2edfa43` | 267 个测试文件／4328 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 变更文件 Prettier 定向检查通过；仓库级 format:check 被既有 `._*` AppleDouble 文件阻断 | 完整资料长上下文、静态前缀与服务端引用上限；未运行真实模型评测 |
-| 9    | WP-10  | 未开始   |      |      |      |
+| 9    | WP-10  | 完成     | `LOCAL_COMMIT` | 269 个测试文件／4358 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件 Prettier 定向检查通过；仓库级 format:check 被既有 `._*` AppleDouble 文件阻断 | 批量 Embeddings、Node 向量执行器、共享处理器鉴权与 staging 调度脚本（未执行） |
 | 10   | WP-11  | 未开始   |      |      | 子项 A → D → B → C 分提交 |
 | 11   | WP-08  | 未开始   |      |      |      |
 | 12   | WP-14  | 未开始   |      |      |      |
@@ -53,7 +53,7 @@
 | 阶段   | 状态   | 记录 |
 | ------ | ------ | ---- |
 | 阶段 0 | 完成   | 离线检索评测通过；`grounding-v7` 基线总体及 15 类均为 1.0，`isolation` 100%，`single-late` 1.0 |
-| 阶段 1 | 未开始 |      |
+| 阶段 1 | 进行中 | WP-10 已完成；下一项 WP-11 |
 | 阶段 2 | 未开始 |      |
 | 阶段 3 | 本轮不做 21-4 起，不跑完整门槛 | DEC-04 |
 | 阶段 4 | 未开始 |      |
@@ -130,11 +130,18 @@
 - [x] `docs/MODEL_SETUP.md` 与 `apps/web/.env.example` 已同步全部档位变量；未创建密钥、未执行迁移、远程数据库操作、部署或外部模型调用。
 
 
+- 2026-09-23：完成 WP-10。新增批量 Embeddings 边界、Node.js 向量任务执行器、共享处理器鉴权和内部入口；定向与全量本地检查通过。staging 调度 SQL 仅加入仓库，未执行远程操作。下一项为 WP-11。
+
+## WP-10 自查
+
+- [x] EmbeddingConfig 新增 dimensionsParam 与 batchSize；默认关闭 dimensions 参数时保留旧 fingerprint，开启时追加 dimensions-param。
+- [x] embedTexts 严格校验批量大小、文本字符数、UTF-8 总字节、响应大小、索引唯一性、1536 维向量有限值和非零约束；供应商状态按手册映射为可重试或拒绝。
+- [x] Node runner 复用 embedding_jobs RPC 的租约、心跳、字符额度、分批提交、连续 cursor、失败退避和 finish 发布语义；共享处理器鉴权已由 organization-processor 复用。
+- [x] 新内部入口和 staging 操作脚本已加入；未执行远程 SQL、迁移、部署或调度，未创建密钥。
 ## WP-09 自查
 
 - [x] `Grounding` 明确区分 `retrieval` 与 `full-document`；完整布局只接受规范切块、限定资料数和 `contextChars` 预算，失败自动回退现有检索路径。
 - [x] 完整布局消息按系统规则、静态证据、动态问题三条发送；静态前缀不包含问题或覆盖说明变化，引用编号与选段编号仍由服务端数据生成。
 - [x] `bindGeneratedAnswer` 对去重后的原文引用执行 12 条上限；问答指纹加入布局，trace 只在实际使用完整布局时记录 `longContext: true`。
 - [x] `CONTEXT_CHARS` 的估算、UTF-8 预检查、0.8 请求体阈值及输入 token／延迟／费用影响已写入 `docs/MODEL_SETUP.md`；未修改迁移、远程资源、供应商密钥或 staging 开关。
-
 

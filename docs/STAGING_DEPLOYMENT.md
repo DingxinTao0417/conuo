@@ -37,12 +37,13 @@
 
 ## 调度
 
-| 任务           | 实际调度                                                                             | 已观察证据                                                                            |
-| -------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| 资料／知识整理 | Supabase `pg_cron` 每分钟，通过 `pg_net` POST `/api/internal/organization-processor` | job 1 / `conuo-staging-organization` 为 active；多次 HTTP 200；有真实模型任务发布成功 |
-| 资料原件清理   | Vercel `17 3 * * *` UTC                                                              | 已注册；手动 200；自然调度后的待清理原件已物理消失                                    |
-| 上传预留清理   | Vercel `20 3 * * *` UTC                                                              | 已注册；手动 200；自然调度后的过期预留原件已物理消失                                  |
-| 账号注销清理   | Vercel `22 3 * * *` UTC                                                              | 已注册；手动 200；自然调度后的 Storage 与 Auth 删除均完成                             |
+| 任务           | 实际调度                                                                                                                | 已观察证据                                                                            |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 资料／知识整理 | Supabase `pg_cron` 每分钟，通过 `pg_net` POST `/api/internal/organization-processor`                                    | job 1 / `conuo-staging-organization` 为 active；多次 HTTP 200；有真实模型任务发布成功 |
+| 向量处理       | 待部署；按 [staging-embedding-cron.sql](../supabase/operations/staging-embedding-cron.sql) 添加 Supabase `pg_cron` 调度 | 本地入口、租约和批量提交已实现；尚未执行操作脚本或远程验收                            |
+| 资料原件清理   | Vercel `17 3 * * *` UTC                                                                                                 | 已注册；手动 200；自然调度后的待清理原件已物理消失                                    |
+| 上传预留清理   | Vercel `20 3 * * *` UTC                                                                                                 | 已注册；手动 200；自然调度后的过期预留原件已物理消失                                  |
+| 账号注销清理   | Vercel `22 3 * * *` UTC                                                                                                 | 已注册；手动 200；自然调度后的 Storage 与 Auth 删除均完成                             |
 
 Vercel Hobby 的 daily Cron 有一小时调度窗口。三条清理任务已验证注册及平台手动触发；另通过受保护清理入口完成孤立上传、带数据的历史版本、资料和账号删除生命周期，确认 Storage 原件物理消失及 Auth 用户删除。
 
@@ -53,6 +54,10 @@ Vercel Hobby 的 daily Cron 有一小时调度窗口。三条清理任务已验�
 Vercel 以 `CRON_SECRET` 发送 Bearer；本环境 `CONUO_CLEANUP_SECRET` 与其相同。整理 processor 使用另一把 `CONUO_PROCESSOR_SECRET`，存于 Supabase Vault 的 `conuo_staging_processor_secret`。运维 SQL 在 [staging-organization-cron.sql](../supabase/operations/staging-organization-cron.sql)，不是 schema migration，不能随迁移复制到生产。
 
 分钟调度每次最多领取 1 个任务，租约 120 秒，HTTP 超时 65 秒。成功的 cron SQL 仅代表 HTTP 已排队，应同时查看 `net._http_response` 和任务状态。暂停时先核实 job 名称／ID，再使用脚本注释中的 `cron.alter_job`；恢复时重新确认端点和凭据。三条 Vercel Cron 可在 staging 的 Cron Jobs 设置暂停。本轮为后续验收保留这些调度运行，没有启用付费套餐。
+
+### 向量处理调度（待部署）
+
+Node.js 向量处理入口为 `/api/internal/embedding-processor`，默认每分钟最多领取 2 个任务，每次最多运行 50 秒。部署 staging 时由人工核对 Vault 中的 `conuo_staging_processor_secret`，按操作脚本创建或暂停 `conuo-staging-embedding`，并检查 `net._http_response` 与 `embedding_jobs` 状态；本地完成不代表远程调度已启用。
 
 ## 实际验收
 

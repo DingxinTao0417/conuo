@@ -95,6 +95,8 @@
 CONUO_EMBEDDING_BASE_URL=
 CONUO_EMBEDDING_API_KEY=
 CONUO_EMBEDDING_MODEL=
+CONUO_EMBEDDING_DIMENSIONS_PARAM=false
+CONUO_EMBEDDING_BATCH_SIZE=10
 CONUO_EMBEDDING_DAILY_CHAR_LIMIT=200000
 CONUO_PROCESSOR_SECRET=
 ```
@@ -105,9 +107,18 @@ CONUO_PROCESSOR_SECRET=
 
 Next.js 在向 worker 返回正文或生成查询向量前，调用 `reserve_embedding_usage` 预占字符额度。默认每账号每 UTC 日 200,000 个 Unicode 字符；失败也消耗预占，重复请求 ID 不允许再次实际调用。字符预算是输入准入限制，**不是货币费用上限**，也不保证崩溃或网络中断时供应商只计费一次。生成式问答的每日次数账本与此预算独立。
 
+批量 Embeddings 请求最多 16 个文本，默认每次调用 10 个（由 CONUO_EMBEDDING_BATCH_SIZE 控制），单文本最多 24,000 字符，批次 UTF-8 输入最多 120,000 字节。CONUO_EMBEDDING_DIMENSIONS_PARAM=true 时向供应商显式发送 dimensions: 1536，并把 dimensions-param 纳入配置指纹；保持 false 可复用旧的 embedding-v1 指纹。供应商 429／5xx 会进入任务重试，输入拒绝不会重试。
+
 ## 任务执行、取消与重试
 
-`embedding_jobs` 同时作为持久 outbox 和可领取队列。本轮没有外部队列投递或云唤醒；已有 Python 3.12 处理器由操作者显式运行：
+`embedding_jobs` 同时作为持久 outbox 和可领取队列。Node.js 内部入口和 Python 3.12 处理器共用同一套领取、租约、分批提交和完成语义。Node.js 入口由受保护的内部调度调用：
+
+    curl -X POST https://<staging-host>/api/internal/embedding-processor \
+      -H 'Authorization: Bearer <processor-secret>' \
+      -H 'Content-Type: application/json' \
+      -d '{"workerId":"operator-worker","maxJobs":2,"maxSeconds":50}'
+
+生产化前需由运维按环境复制 staging-embedding-cron.sql 并完成 Vault secret、HTTP 响应和任务状态验收；该脚本只描述调度，不在本地或迁移流程中执行。没有调度时，已有 Python 3.12 处理器仍可由操作者显式运行：
 
 ```sh
 cd apps/processor

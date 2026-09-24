@@ -6,6 +6,14 @@
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
 
+## AI 增强 WP-10（2026-09-23，本地）
+
+- 范围：新增批量 Embeddings 调用、Node.js 向量任务执行器、共享处理器鉴权和 /api/internal/embedding-processor；新增 staging 调度操作脚本但未执行。
+- 契约：批次最多 16 项，单文本最多 24,000 字符、UTF-8 总输入最多 120,000 字节；429／5xx 可重试，供应商拒绝不重试；执行器沿用数据库租约、心跳、字符额度预占、连续 cursor 和完成发布语义。
+- 配置：新增 CONUO_EMBEDDING_DIMENSIONS_PARAM 与 CONUO_EMBEDDING_BATCH_SIZE；关闭 dimensions 参数时保持旧指纹，开启时加入 dimensions-param。
+- 测试：WP-10 定向测试 4 个文件／81 项通过；R-15 全量结果记录在 AI 增强进度表。
+- 未验收边界：未创建供应商密钥，未执行远程操作脚本、迁移、部署或 staging 调度；仓库级格式检查仍需单独处理既有 AppleDouble 文件阻断。
+
 ## AI 增强 WP-09（2026-09-23，本地）
 
 - 范围：问答在 `CONUO_FEATURE_LONG_CONTEXT=on` 且当前档位 `CONTEXT_CHARS > 0` 时，按范围、资料数、版本和规范切块条件把完整资料交给模型；不满足条件时沿用检索布局。
@@ -71,11 +79,11 @@
 
 移动端补齐 P1 两个云端闭环并全部本地验证：正文阅读位置按语义锚点节流回写 `readPage/lastReadAt`，回答完成后追加保存云端 `conversations`（Web 合同兼容、requestId 幂等、AI 面板可核对最近 3 轮），两者均遵循「结果未知先读回」的 CAS 规则；异常矩阵沿用既有 request-identity / draft-recovery 边界。P2 前置草案见[选型证据](IPADOS_P2_SELECTION.md)，其旧选型不作为当前实现合同；WP0 最新状态见下节。
 
-| 检查 | 结果 |
-| ---- | ---- |
-| 移动端测试 / 类型检查 | 92/92 通过；通过 |
-| Web 全量测试 | 251 文件、4234 项通过（修复本机 rolldown 绑定后重跑） |
-| Web typecheck / lint / build | 通过；ESLint 0 错误；生产构建通过 |
+| 检查                         | 结果                                                  |
+| ---------------------------- | ----------------------------------------------------- |
+| 移动端测试 / 类型检查        | 92/92 通过；通过                                      |
+| Web 全量测试                 | 251 文件、4234 项通过（修复本机 rolldown 绑定后重跑） |
+| Web typecheck / lint / build | 通过；ESLint 0 错误；生产构建通过                     |
 
 本轮已提交、推送并部署 staging（`5fa983f`，`/api/health` 已核对），并用真实账号完成原生 Bearer 闭环联调：登录→读取→保存→进度回写→对话历史→409 冲突→真实模型问答，全部通过且测试数据已清理（详见 [CLIENT_IMPLEMENTATION](CLIENT_IMPLEMENTATION.md)）；真机重新启动后已观察到非示例空工作区，支持 Keychain 会话恢复与 workspace 读取通过；显式登录／退出流程、进度/对话回写及其他 P1 交互仍待验收。目标 iPad 不支持 CoreDevice `devicectl appResize`，窄窗矩阵需用设备上的手动分屏验证。
 
@@ -911,7 +919,7 @@ WP0 技术验证退出条件已满足：Xcode 27.0 development build 在 iPad Pr
 | 阅读接续与标注     | PDF 页码、文本滚动位置、真实阅读活动、高亮、选段保存、当前版本的批注新增/编辑/删除；引用跳转与定位；双端阅读冲突逐资料选择、落选位置保留与稍后切换                                                                                                                                                                                     | 图片内文字不可直接选择；排版变化导致无法精确定位时显示原文摘录与提示；真实双浏览器并发与断网恢复尚未完成端到端验收                                                                                                                       |
 | 宽屏资料对照       | 同一未归档知识库中两份资料的固定版本链接、独立滚动的只读双栏、各自 PDF 页码/缩放、失效链接拒绝、受限比较问答与窄屏单独打开回退                                                                                                                                                                                                         | 仅宽于 1024px 并排；比较问答严格锁定两份当前、可检索且允许 AI 的资料，历史版本只读；真实云端资料、模型质量和多端阅读位置同步尚未验证                                                                                                     |
 | 普通搜索           | 资料库输入查询，区分资料、笔记和知识页；支持类型、标签、日期与范围，本机即用，云端资料读取规范化 RPC；普通资料页支持最近更新、最近添加和名称排序，非默认排序写入 URL                                                                                                                                                                   | 草稿默认排除；普通全库可管理归档库资料，AI 权限关闭不隐藏普通结果；问题找资料继续按相关度排序；笔记/知识页云端候选仍从账号快照计算                                                                                                       |
-| 语义与问答检索     | pgvector 当前版余弦检索与关键词 RRF；问答使用真实资料 RPC，语义未就绪保留关键词，摘要、比较与跨语言均匀抽样；其他问题以检索命中为主，选段优先使用选段及相邻片段；`document-notes` 可纳入已接受、明确人工且只关联当前资料当前版本的笔记块                                                                                                                                                                 | 普通语义范围仍只用原始资料；`document-notes` 只支持一份当前资料，需匹配的已发布 profile、全局/资料 AI 许可与语义开关，真实供应商质量尚未验收                                                                                             |
+| 语义与问答检索     | pgvector 当前版余弦检索与关键词 RRF；问答使用真实资料 RPC，语义未就绪保留关键词，摘要、比较与跨语言均匀抽样；其他问题以检索命中为主，选段优先使用选段及相邻片段；`document-notes` 可纳入已接受、明确人工且只关联当前资料当前版本的笔记块                                                                                               | 普通语义范围仍只用原始资料；`document-notes` 只支持一份当前资料，需匹配的已发布 profile、全局/资料 AI 许可与语义开关，真实供应商质量尚未验收                                                                                             |
 | 引用边界           | 保留来源、版本、片段、页码或章节；个人笔记依据另存原始问答空间、资料/资料版本、笔记版本和块快照；网页刷新与文件替换归档旧内容，各版按自身格式阅读；ZIP 恢复一致重映射历史身份                                                                                                                                                          | 原始资料引用与个人笔记依据不互相替代；历史只读，可另存摘录，禁新 AI、标注与当前阅读进度回写；新问答和整理只用当前版；清理后的精确历史引用会明确不可用，服务端灾难恢复仍需实现                                                            |
 | 对话               | 问题与结果保存、会话历史、停止、错误后重试、手动标记已解决；回答可分别保存原始资料引用与个人笔记证据快照                                                                                                                                                                                                                               | 按完整段落流式预览，最终确认后保存；含个人笔记依据的回答暂不支持直接另存，真实供应商与部署仍待验收，不自动判断“已掌握”                                                                                                                   |
 | 笔记与草稿         | Tiptap 编辑、摘录与回答保存、来源保留、知识页草稿、接受状态、历史版本恢复；完整原文依据回答可追加到当前知识库的既有知识页并保留旧页历史；普通搜索包含笔记与已接受知识页；document-notes 可受限使用明确人工的同资料笔记                                                                                                                 | 普通新 AI 范围不使用派生正文；草稿默认不进入普通搜索，关系不进入检索；追加要求当前资料版本与空间仍有效；含个人笔记依据的回答不直接另存为笔记/知识页                                                                                      |

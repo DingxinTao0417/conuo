@@ -4,7 +4,7 @@ const mock = vi.hoisted(() => ({ rpc: vi.fn(), fetch: vi.fn() }));
 vi.mock("../supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("./requests", () => ({ createRequestStore: () => ({ rpc: mock.rpc }) }));
 
-import { embedQuery, readEmbeddingConfig, reserveEmbeddingUsage } from "./embeddings";
+import { embedQuery, embedTexts, readEmbeddingConfig, reserveEmbeddingUsage } from "./embeddings";
 
 const env = {
   CONUO_EMBEDDING_BASE_URL: "https://embedding.example/v1",
@@ -94,6 +94,113 @@ describe("embedding configuration boundary", () => {
 });
 
 describe("embedding provider boundary (mock HTTP only)", () => {
+  it("adds dimensions only when enabled and batches provider results by index", async () => {
+    const batchConfig = readEmbeddingConfig({
+      ...env,
+      CONUO_EMBEDDING_DIMENSIONS_PARAM: "true",
+      CONUO_EMBEDDING_BATCH_SIZE: "2",
+    })!;
+    expect(batchConfig.dimensionsParam).toBe(true);
+    expect(batchConfig.batchSize).toBe(2);
+    expect(batchConfig.fingerprint).not.toBe(config.fingerprint);
+    mock.fetch.mockResolvedValue(
+      response({
+        object: "list",
+        model: "embedding-model",
+        data: [
+          { object: "embedding", index: 1, embedding: [2, ...Array<number>(1535).fill(0)] },
+          { object: "embedding", index: 0, embedding: vector() },
+        ],
+      }),
+    );
+    expect(await embedTexts(batchConfig, ["first", "second"])).toEqual([
+      vector(),
+      [2, ...Array<number>(1535).fill(0)],
+    ]);
+    const [, init] = mock.fetch.mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({
+      model: env.CONUO_EMBEDDING_MODEL,
+      input: ["first", "second"],
+      encoding_format: "float",
+      dimensions: 1536,
+    });
+  });
+
+  it("keeps the legacy embedding fingerprint when dimensions are disabled", () => {
+    const legacy = readEmbeddingConfig({ ...env, CONUO_EMBEDDING_DIMENSIONS_PARAM: "false" })!;
+    expect(legacy.dimensionsParam).toBe(false);
+    expect(legacy.batchSize).toBe(10);
+    expect(legacy.fingerprint).toBe(config.fingerprint);
+  });
+
+  it.each<[string[]]>([
+    [[]],
+    [Array.from({ length: 17 }, () => "x")],
+    [[""]],
+    [["x".repeat(24_001)]],
+  ])("rejects invalid embedding batches before HTTP", async (texts) => {
+    await expect(embedTexts(config, texts)).rejects.toMatchObject({
+      status: 400,
+      code: "EMBEDDING_INPUT_INVALID",
+    });
+    expect(mock.fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a batch whose UTF-8 body exceeds the provider input limit", async () => {
+    const texts = ["😀".repeat(30_001), "ok"];
+    await expect(embedTexts(config, texts)).rejects.toMatchObject({
+      status: 400,
+      code: "EMBEDDING_INPUT_INVALID",
+    });
+    expect(mock.fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [429, 503, "EMBEDDING_PROVIDER_RETRYABLE"],
+    [500, 503, "EMBEDDING_PROVIDER_RETRYABLE"],
+    [400, 502, "EMBEDDING_PROVIDER_REJECTED"],
+    [413, 502, "EMBEDDING_PROVIDER_REJECTED"],
+  ])("maps provider status %i without exposing its body", async (status, expectedStatus, code) => {
+    mock.fetch.mockResolvedValue(new Response("private-provider-body", { status }));
+    await expect(embedTexts(config, ["query"])).rejects.toMatchObject({
+      status: expectedStatus,
+      code,
+    });
+  });
+
+  it.each([
+    [
+      {
+        object: "list",
+        model: "embedding-model",
+        data: [
+          { object: "embedding", index: 0, embedding: vector() },
+          { object: "embedding", index: 0, embedding: vector() },
+        ],
+      },
+    ],
+    [
+      {
+        object: "list",
+        model: "embedding-model",
+        data: [{ object: "embedding", index: 0, embedding: [1] }],
+      },
+    ],
+    [
+      {
+        object: "list",
+        model: "embedding-model",
+        data: [{ object: "embedding", index: 0, embedding: Array<number>(1536).fill(0) }],
+      },
+    ],
+  ])("rejects malformed batch provider data", async (data) => {
+    mock.fetch.mockResolvedValue(response(data));
+    await expect(embedTexts(config, ["query"])).rejects.toMatchObject({
+      status: 502,
+      code: "EMBEDDING_PROVIDER_REJECTED",
+    });
+  });
+
   it("posts only the requested query, with redirects disabled and no cache", async () => {
     expect(await embedQuery(config, " 学习率😀 ")).toEqual(vector());
     expect(mock.fetch).toHaveBeenCalledTimes(1);
