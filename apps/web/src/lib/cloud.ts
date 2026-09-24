@@ -58,6 +58,7 @@ import {
   reviewRequestSchema,
 } from "./learning/schema";
 import type { LearningItem } from "./learning/types";
+import { learningOverviewSchema, type LearningOverview } from "./learning/overview";
 
 export type CloudUser = { id: string; email: string };
 export class CloudError extends Error {
@@ -387,6 +388,26 @@ export async function getLearningSettings(
       "学习设置返回了无效数据，请稍后重试。",
       502,
       "INVALID_LEARNING_SETTINGS_RESPONSE",
+    );
+  return parsed.data;
+}
+
+export async function getLearningOverview(
+  spaceId: string,
+  expectedUserId: string,
+  signal?: AbortSignal,
+): Promise<LearningOverview> {
+  const result = await cloudRequest<unknown>(
+    `/api/v1/learning/overview?spaceId=${encodeURIComponent(spaceId)}`,
+    expectedUserId,
+    { signal },
+  );
+  const parsed = learningOverviewSchema.safeParse(result);
+  if (!parsed.success)
+    throw new CloudError(
+      "学习概览返回了无效数据，请稍后刷新。",
+      502,
+      "INVALID_LEARNING_OVERVIEW_RESPONSE",
     );
   return parsed.data;
 }

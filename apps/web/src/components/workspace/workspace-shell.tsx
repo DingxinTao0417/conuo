@@ -287,6 +287,11 @@ export default function Workspace({
     useState<CrossLibrarySearchDraft | null>(null);
   const [crossLibraryAskPanelKey, setCrossLibraryAskPanelKey] = useState("cross-library-ask");
   const [crossLibraryAskBusy, setCrossLibraryAskBusy] = useState(false);
+  const [targetedPractice, setTargetedPractice] = useState<{
+    focus: string;
+    itemIds: string[];
+    spaceId: string;
+  } | null>(null);
   const [pendingNoteCitation, setPendingNoteCitation] = useState<Citation | undefined>();
   const [pendingConversationId, setPendingConversationId] = useState<string | null>(null);
   const [pendingComparisonConversationId, setPendingComparisonConversationId] = useState<
@@ -1247,6 +1252,7 @@ export default function Workspace({
     setComparisonTargetId("");
     clearConversationRouteState();
     setSection(next);
+    if (next !== "practice") setTargetedPractice(null);
     setSourceId(null);
     setSourceVersionId(null);
     setNoteId(null);
@@ -2118,6 +2124,14 @@ export default function Workspace({
     }
     navigate(tab, undefined, activeSpace.id);
   }
+  function openTargetedPractice(target: { focus: string; itemIds: string[]; spaceId: string }) {
+    navigate("practice", undefined, target.spaceId);
+    setTargetedPractice({
+      focus: target.focus,
+      itemIds: target.itemIds,
+      spaceId: target.spaceId,
+    });
+  }
   function openSettingsPane(pane: SettingsPane) {
     setSettingsPane(pane);
     window.history.pushState(null, "", `#settings/${pane}`);
@@ -2973,6 +2987,8 @@ export default function Workspace({
                 openExport={openExport}
                 setSpaceToDeleteId={setSpaceToDeleteId}
                 setModal={setModal}
+                startReview={() => navigate("review", undefined, activeSpace?.id ?? spaceId)}
+                openTargetedPractice={openTargetedPractice}
               />
             )}
             {section === "library" && spaceId === "all" && !libraryFiles && (
@@ -3173,7 +3189,12 @@ export default function Workspace({
               />
             )}
             {section === "practice" && user && (
-              <PracticeSection data={data} spaceId={spaceId} user={user} />
+              <PracticeSection
+                data={data}
+                spaceId={spaceId}
+                user={user}
+                target={targetedPractice ?? undefined}
+              />
             )}
             {section === "review" && user && (
               <ReviewSection data={data} spaceId={spaceId} user={user} openSource={openSource} />

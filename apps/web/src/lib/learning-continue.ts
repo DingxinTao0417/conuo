@@ -52,6 +52,22 @@ export function unresolvedConversations(
     .slice(0, Math.max(0, limit));
 }
 
+/** Home learning cards only surface questions updated during the last seven days. */
+export function recentUnresolvedConversations(
+  data: WorkspaceData,
+  spaceId: string,
+  limit = 3,
+  now = Date.now(),
+): Conversation[] {
+  const cutoff = now - 7 * 24 * 60 * 60 * 1000;
+  return unresolvedConversations(data, spaceId, data.conversations.length)
+    .filter((conversation) => {
+      const updatedAt = dateValue(conversation.updatedAt);
+      return updatedAt >= cutoff && updatedAt <= now;
+    })
+    .slice(0, Math.max(0, limit));
+}
+
 function continuationSpace(
   data: WorkspaceData,
   source: Source,

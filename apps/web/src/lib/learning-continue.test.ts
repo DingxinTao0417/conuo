@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   primaryLearningContinuation,
+  recentUnresolvedConversations,
   recentlyReadSources,
   unresolvedConversations,
 } from "./learning-continue";
@@ -124,6 +125,38 @@ describe("learning continuation", () => {
     ]);
     expect(unresolvedConversations(data, space.id).map((item) => item.id)).toEqual([
       "open-earlier",
+    ]);
+  });
+
+  it("limits today's unresolved questions to the last seven days", () => {
+    const data = createEmptyWorkspace();
+    const [space] = data.spaces;
+    const now = Date.parse("2026-09-24T12:00:00.000Z");
+    data.conversations.push(
+      {
+        id: "recent",
+        spaceId: space.id,
+        title: "最近的问题",
+        scope: "space",
+        sourceIds: [],
+        messages: [],
+        resolved: false,
+        updatedAt: "2026-09-20T12:00:00.000Z",
+      },
+      {
+        id: "old",
+        spaceId: space.id,
+        title: "较早的问题",
+        scope: "space",
+        sourceIds: [],
+        messages: [],
+        resolved: false,
+        updatedAt: "2026-09-16T11:59:59.000Z",
+      },
+    );
+
+    expect(recentUnresolvedConversations(data, space.id, 3, now).map((item) => item.id)).toEqual([
+      "recent",
     ]);
   });
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as getItems } from "@/app/api/v1/learning/items/route";
+import { GET as getOverview } from "@/app/api/v1/learning/overview/route";
 
 const requireUser = vi.hoisted(() => vi.fn());
 const aiFeatureEnabled = vi.hoisted(() => vi.fn());
@@ -36,5 +37,22 @@ describe("learning routes", () => {
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({ code: "LEARNING_DISABLED" });
     expect(requireUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the learning overview through the owner-scoped RPC", async () => {
+    aiFeatureEnabled.mockReturnValue(true);
+    const rpc = vi.fn().mockResolvedValue({
+      data: { dueCount: 2, newCount: 1, reviewsLast7d: 4, weakConcepts: [] },
+      error: null,
+    });
+    requireUser.mockResolvedValue({ supabase: { rpc } });
+
+    const response = await getOverview(
+      new Request("http://localhost/api/v1/learning/overview?spaceId=space-1"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("learning_overview", { p_space_id: "space-1" });
+    expect(await response.json()).toMatchObject({ dueCount: 2, newCount: 1 });
   });
 });

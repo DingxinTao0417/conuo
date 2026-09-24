@@ -13,7 +13,13 @@ import {
 } from "@/lib/ai/practice";
 import { learningKinds } from "@/lib/learning/types";
 import { id, requireLearningFeature } from "../_utils";
-import { learningAiRangeSchema, loadLearningWorkspace, makeAnswerRequest } from "../_ai";
+import {
+  assertLearningEvidence,
+  learningAiRangeSchema,
+  learningItemRows,
+  loadLearningWorkspace,
+  makeAnswerRequest,
+} from "../_ai";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +32,7 @@ const inputSchema = z
     count: z.number().int().min(3).max(8),
     kinds: z.array(z.enum(learningKinds)).min(1).max(5).optional(),
     focus: z.string().trim().max(200).optional(),
+    learningItemIds: z.array(id).max(5).optional(),
   })
   .strict();
 
@@ -58,7 +65,46 @@ export async function POST(request: Request) {
             { question, requestId: input.requestId },
           )
         : makeAnswerRequest(source, input.requestId, question);
-    const grounding = buildGrounding(data, answerRequest);
+    const grounding = input.learningItemIds?.length
+      ? await (async () => {
+          const related = await supabase.rpc("list_learning_items", {
+            p_space_id: null,
+            p_status: null,
+            p_limit: 100,
+            p_before: null,
+          });
+          if (related.error) throw related.error;
+          const items = learningItemRows(related.data).filter((item) =>
+            input.learningItemIds!.includes(item.itemId),
+          );
+          if (items.length !== input.learningItemIds!.length)
+            throw new ApiError(
+              409,
+              "LEARNING_SOURCE_UNAVAILABLE",
+              "针对性练习依据已变化，请刷新后重试。",
+            );
+          const citations = assertLearningEvidence(
+            data,
+            items.flatMap((item) => item.citations),
+          ).filter(
+            (citation, index, all) =>
+              all.findIndex(
+                (candidate) =>
+                  candidate.sourceId === citation.sourceId &&
+                  candidate.versionId === citation.versionId &&
+                  candidate.chunkId === citation.chunkId &&
+                  candidate.quote === citation.quote,
+              ) === index,
+          );
+          return {
+            evidence: citations,
+            noteEvidence: [],
+            coverage: "只使用相关练习题仍有效的原文引用。",
+            layout: "retrieval" as const,
+            fallback: { mode: "extractive" as const, citations, content: "" },
+          };
+        })()
+      : buildGrounding(data, answerRequest);
     if (!grounding.evidence.length)
       throw new ApiError(409, "LEARNING_SOURCE_UNAVAILABLE", "当前资料没有可用于出题的原文依据。");
     const profile = readModelProfile("default");
@@ -76,6 +122,7 @@ export async function POST(request: Request) {
           input.count,
           input.kinds ?? null,
           input.focus ?? null,
+          input.learningItemIds ?? null,
           grounding.evidence.map((item) => [
             item.sourceId,
             item.versionId,

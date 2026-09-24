@@ -11,6 +11,7 @@ export type PracticeSectionProps = {
   data: WorkspaceData;
   spaceId: string;
   user: NonNullable<WorkspaceUser>;
+  target?: { focus: string; itemIds: string[] };
 };
 
 function sourceFor(data: WorkspaceData, spaceId: string): Source | undefined {
@@ -22,7 +23,7 @@ function sourceFor(data: WorkspaceData, spaceId: string): Source | undefined {
   );
 }
 
-export default function PracticeSection({ data, spaceId, user }: PracticeSectionProps) {
+export default function PracticeSection({ data, spaceId, user, target }: PracticeSectionProps) {
   const [items, setItems] = useState<LearningItem[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [busy, setBusy] = useState(false);
@@ -79,6 +80,8 @@ export default function PracticeSection({ data, spaceId, user }: PracticeSection
             spaceId,
           },
           count: 3,
+          ...(target?.focus ? { focus: target.focus } : {}),
+          ...(target?.itemIds.length ? { learningItemIds: target.itemIds } : {}),
         }),
       });
       const body = (await response.json()) as { items?: Draft[]; error?: string };
@@ -170,7 +173,11 @@ export default function PracticeSection({ data, spaceId, user }: PracticeSection
         <div>
           <p className="eyebrow">用自己的话检验理解</p>
           <h1>练习</h1>
-          <p>题目先作为草稿展示，确认后才会加入复习。</p>
+          <p>
+            {target?.focus
+              ? `围绕“${target.focus}”生成题目。`
+              : "题目先作为草稿展示，确认后才会加入复习。"}
+          </p>
         </div>
         <button
           className="btn btn-primary"
