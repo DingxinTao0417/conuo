@@ -12,6 +12,13 @@
 - 测试：WP-20 定向 6 个文件／71 项通过；R-15 全量 293 个测试文件／4465 项通过、2 项跳过，typecheck 通过，lint 0 错误并保留 1 条既有 `_result` 警告；本地未调用真实视觉模型、未执行远程迁移、operations 脚本、部署或 staging 验收。仓库级 `format:check` 继续受既有 `._*` AppleDouble 文件阻断。
 - 设计说明见 [OCR](OCR.md)。DEC-12 下不修改 PRD。
 
+## AI 增强 WP-21-1（2026-09-24，本地）
+
+- 范围：完成资料正文外置的使用点核对，按手册三条 `rg` 清单整理 Web 297 个 `.text`、102 个 `.chunks` 和移动端 44 个命中；新增 [正文外置清单](SOURCE_BODY_EXTERNALIZATION.md)。
+- 设计交付：文档逐项区分单份正文、多份正文、生产校验／持久化和移动端读取，固定 21-2 正文读取 API、21-3 会话 LRU 缓存，以及 21-4～21-8 的 RPC、分段上传、schemaVersion 2、客户端切换、移动端和回滚计划。
+- 边界：本子步骤未修改代码、保存格式、已存在迁移、PRD、功能开关或远程资源；21-2、21-3 未开始，21-4 起受 DEC-04 人工评审闸门约束。
+- 验证：R-15 全量 293 个测试文件／4465 项通过、2 项跳过，typecheck 通过，lint 0 错误并保留 1 条既有 `_result` 警告；仓库级 `format:check` 被既有 36 个 `._*` AppleDouble 文件阻断；本子步骤文档定向 Prettier 检查通过。
+
 ## AI 增强 WP-19（2026-09-24，本地）
 
 - 范围：新增 `space_glossary_terms` 迁移和 owner-scoped authenticated RPC；新增 `glossary-v1` 建议路由，复用当前原文 grounding 生成 5–20 个术语，建议进入请求账本但不自动保存，用户接受或编辑后再写入；问答在原始检索查询后追加 accepted 术语的其他别名并加入更新时间指纹。
