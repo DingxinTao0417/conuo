@@ -364,6 +364,13 @@ const sourceBase = z
     blobKey: z.string().max(512).optional(),
     storagePath: z.string().max(512).optional(),
     originalMissing: z.boolean().optional(),
+    derivation: z
+      .object({
+        method: z.literal("ocr-vlm-v1"),
+        fromVersionId: id,
+      })
+      .strict()
+      .optional(),
     readPage: page,
     readOffset: z.number().finite().nonnegative().optional(),
     lastReadAt: timestamp.optional(),
@@ -496,6 +503,7 @@ const sourceVersion = sourceBase
     blobKey: true,
     storagePath: true,
     originalMissing: true,
+    derivation: true,
   })
   .extend({ createdAt: timestamp, archivedAt: timestamp })
   .superRefine((value, context) => {

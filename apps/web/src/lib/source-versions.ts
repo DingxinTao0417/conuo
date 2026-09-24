@@ -23,6 +23,7 @@ const contentKeys = [
   "blobKey",
   "storagePath",
   "originalMissing",
+  "derivation",
 ] as const satisfies ReadonlyArray<keyof Source>;
 type VersionContent = Omit<SourceVersion, "createdAt" | "archivedAt">;
 
@@ -173,6 +174,41 @@ export function replaceFileSource(
     throw new Error("文件资料已删除或不可用，请返回资料库检查。");
   if (current.versionId !== expectedVersionId)
     throw new Error("这份资料已有新版本，请重新打开替换面板。原文件没有被覆盖。");
+  if (candidate.derivation) return replaceWithDerivedParse(data, current, candidate);
+  validateFileReplacement(data, current, candidate, false);
+  const prepared = { ...candidate };
+  if (prepared.error)
+    prepared.error = prepared.error
+      .replaceAll("原文件尚未保存", "原文件已保存")
+      .replaceAll("确认后会保留原文件", "原文件已保留");
+  return applySourceReplacement(data, current, prepared, candidate.filename, candidate.createdAt);
+}
+
+/**
+ * Replace a PDF's parse result after browser OCR. The retained bytes keep the
+ * same content hash, while the new version owns the derived text and chunks.
+ */
+export function replaceWithDerivedParse(
+  data: WorkspaceData,
+  current: Source,
+  candidate: Source,
+): WorkspaceData {
+  const live = data.sources.find((item) => item.id === current.id);
+  if (!live || live.deletedAt || live.kind !== "pdf")
+    throw new Error("PDF 资料已删除或不可用，请返回资料库检查。");
+  if (live.versionId !== current.versionId)
+    throw new Error("这份资料已有新版本，请重新打开 OCR 页面。原解析未被覆盖。");
+  if (candidate.kind !== "pdf") throw new Error("OCR 派生版本必须来自 PDF 资料。");
+  validateFileReplacement(data, live, candidate, true);
+  return applySourceReplacement(data, live, candidate, candidate.filename, candidate.createdAt);
+}
+
+function validateFileReplacement(
+  data: WorkspaceData,
+  current: Source,
+  candidate: Source,
+  derived: boolean,
+) {
   const fileMimes = {
     pdf: "application/pdf",
     docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -197,19 +233,22 @@ export function replaceFileSource(
   )
     throw new Error("新文件预览无效，请重新选择并解析文件。");
   if (
+    (derived &&
+      (!candidate.derivation ||
+        candidate.derivation.method !== "ocr-vlm-v1" ||
+        candidate.derivation.fromVersionId !== current.versionId ||
+        candidate.hash !== current.hash)) ||
+    (!derived && candidate.derivation)
+  )
+    throw new Error("OCR 派生版本来源无效，请重新识别当前 PDF 页面。");
+  if (
     data.sources.some((source) =>
       [source, ...(source.versions ?? [])].some((version) => version.blobKey === candidate.blobKey),
     )
   )
     throw new Error("新文件原件标识已使用，请重新选择文件，避免覆盖已有原件。");
-  if (current.hash && current.hash === candidate.hash && !current.originalMissing)
+  if (!derived && current.hash && current.hash === candidate.hash && !current.originalMissing)
     throw new Error("文件内容与当前版本相同，无需创建新版本。可以取消或选择其他文件。");
-  const prepared = { ...candidate };
-  if (prepared.error)
-    prepared.error = prepared.error
-      .replaceAll("原文件尚未保存", "原文件已保存")
-      .replaceAll("确认后会保留原文件", "原文件已保留");
-  return applySourceReplacement(data, current, prepared, candidate.filename, candidate.createdAt);
 }
 
 function applySourceReplacement(

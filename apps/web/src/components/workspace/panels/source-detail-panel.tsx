@@ -248,6 +248,13 @@ export default function SourceDetailPanel({
                 <dd>{sourceAiStatus(detail)}</dd>
               </div>
             </dl>
+            {detail.kind === "pdf" &&
+              detail.coverage &&
+              ["failed", "partial"].includes(detail.coverage.parseState) && (
+                <button type="button" className="btn btn-primary" onClick={() => onOpenSource()}>
+                  打开阅读并识别扫描页面
+                </button>
+              )}
             <button
               type="button"
               className="text-button source-detail-more-info-toggle"

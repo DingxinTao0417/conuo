@@ -26,6 +26,10 @@ export interface SourceCoverage {
   parseState: SourceParseState;
   unavailablePageRanges?: SourcePageRange[];
 }
+export interface SourceDerivation {
+  method: "ocr-vlm-v1";
+  fromVersionId: string;
+}
 export interface Space {
   id: string;
   name: string;
@@ -83,6 +87,8 @@ export interface Source {
   storagePath?: string;
   /** This retained version was restored without its original bytes. */
   originalMissing?: boolean;
+  /** This parsed version was derived from the retained bytes of another version. */
+  derivation?: SourceDerivation;
   readPage?: number;
   readOffset?: number;
   /** Last real reading activity, separate from import and metadata updates. */
@@ -119,6 +125,7 @@ export type SourceVersion = Pick<
   | "blobKey"
   | "storagePath"
   | "originalMissing"
+  | "derivation"
 > & { createdAt: string; archivedAt: string };
 export interface Citation {
   sourceId: string;

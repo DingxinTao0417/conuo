@@ -6,7 +6,12 @@ import { importFile, makeWebSource, prepareFile } from "./import";
 import { questionContextKey } from "./question-context";
 import { resolveCitation, resolveSavedCitation, retrieveEvidence } from "./retrieval";
 import { createEmptyWorkspace } from "./seed";
-import { getSourceVersion, MAX_SOURCE_VERSIONS, replaceFileSource } from "./source-versions";
+import {
+  getSourceVersion,
+  MAX_SOURCE_VERSIONS,
+  replaceFileSource,
+  replaceWithDerivedParse,
+} from "./source-versions";
 import { MAX_WORKSPACE_BYTES, workspaceSchema } from "./supabase/validation";
 import type { AnswerRequest, Citation, Source, SourceVersion, WorkspaceData } from "./types";
 
@@ -476,6 +481,51 @@ describe("current-only generation and explicit new file versions", () => {
       source.versionId,
     ]);
     expect(getSourceVersion(restored, source.versionId)?.blobKey).toBe(source.blobKey);
+  });
+
+  it("creates a derived OCR version from the same PDF bytes and keeps the failed version", async () => {
+    const { data, source } = await fixture("%PDF scan", "scan.pdf");
+    mocks.pages = ["", ""];
+    const candidate: Source = {
+      ...structuredClone(source),
+      id: source.id,
+      versionId: "ocr-version-2",
+      kind: "pdf",
+      mime: "application/pdf",
+      filename: "scan.pdf",
+      blobKey: `original:${source.id}:ocr-version-2`,
+      hash: source.hash,
+      status: "ready",
+      text: "OCR 识别正文",
+      chunks: [
+        {
+          id: "ocr-chunk-1",
+          sourceId: source.id,
+          versionId: "ocr-version-2",
+          text: "OCR 识别正文",
+          section: "第 1 页",
+          page: 1,
+          order: 0,
+        },
+      ],
+      pageCount: 2,
+      parsedPages: 2,
+      coverage: { captureScope: "full", parseState: "complete" },
+      derivation: { method: "ocr-vlm-v1", fromVersionId: source.versionId },
+    };
+    expect(candidate.hash).toBe(source.hash);
+    const next = replaceWithDerivedParse(data, source, candidate);
+    expect(next.sources[0]).toMatchObject({
+      versionId: "ocr-version-2",
+      text: "OCR 识别正文",
+      derivation: { method: "ocr-vlm-v1", fromVersionId: source.versionId },
+    });
+    expect(next.sources[0].versions?.[0]).toMatchObject({
+      versionId: source.versionId,
+      status: "failed",
+      text: "",
+    });
+    expect(workspaceSchema.safeParse(next).success).toBe(true);
   });
 
   it.each(["empty-txt", "scanned-pdf"])(

@@ -47,6 +47,7 @@ import type {
   Source,
 } from "@/lib/types";
 import PdfReader from "../pdf-reader";
+import OcrPageFlow from "../ocr-page-flow";
 import type { PdfReadingMode } from "../pdf-reader";
 import RegionStudyPanel from "../region-study-panel";
 import DocxContent from "../docx-content";
@@ -2506,55 +2507,64 @@ export default function Reader(props: ReaderProps) {
             onScroll={saveReadingPosition}
           >
             {source.kind === "pdf" && !showText ? (
-              <PdfReader
-                key={`${source.id}:${source.versionId}`}
-                source={source}
-                cloudUserId={props.cloudUserId}
-                cloudSaveConfirmed={props.saveState === "cloud" && !historical}
-                onOutline={setPdfOutlineItems}
-                page={page}
-                readingMode={pdfReadingMode}
-                navigationRequest={pdfNavigationRequest}
-                scrollContainerRef={textContainer}
-                onVisiblePageChange={trackVisiblePdfPage}
-                zoom={zoom}
-                getSourceBlob={getSourceBlob}
-                onPages={setPages}
-                onRendered={() => {
-                  clearSearchResults();
-                  setRenderRevision((value) => value + 1);
-                }}
-                capture={{
-                  active: regionCaptureActive,
-                  limits: {
-                    maxOutputEdge: 2_048,
-                    maxOutputPixels: 3_000_000,
-                    maxBytes: 1_500_000,
-                  },
-                  onCapture: (next) => {
-                    const started = currentRegionCaptureStart;
-                    if (
-                      !started ||
-                      regionCaptureStartRef.current !== started ||
-                      next.identity.sourceId !== started.sourceId ||
-                      next.identity.versionId !== started.versionId
-                    )
-                      return;
-                    cancelRegionCapture();
-                    setRegionCapture({ ...next, accountId: started.accountId });
-                    setNotice("");
-                  },
-                  onCancel: () => {
-                    if (
-                      !currentRegionCaptureStart ||
-                      regionCaptureStartRef.current !== currentRegionCaptureStart
-                    )
-                      return;
-                    cancelRegionCapture();
-                    setNotice("");
-                  },
-                }}
-              />
+              <>
+                {!historical && props.onReplaceFile && (
+                  <OcrPageFlow
+                    source={source}
+                    getSourceBlob={props.getSourceBlob}
+                    onReplaceFile={props.onReplaceFile}
+                  />
+                )}
+                <PdfReader
+                  key={`${source.id}:${source.versionId}`}
+                  source={source}
+                  cloudUserId={props.cloudUserId}
+                  cloudSaveConfirmed={props.saveState === "cloud" && !historical}
+                  onOutline={setPdfOutlineItems}
+                  page={page}
+                  readingMode={pdfReadingMode}
+                  navigationRequest={pdfNavigationRequest}
+                  scrollContainerRef={textContainer}
+                  onVisiblePageChange={trackVisiblePdfPage}
+                  zoom={zoom}
+                  getSourceBlob={getSourceBlob}
+                  onPages={setPages}
+                  onRendered={() => {
+                    clearSearchResults();
+                    setRenderRevision((value) => value + 1);
+                  }}
+                  capture={{
+                    active: regionCaptureActive,
+                    limits: {
+                      maxOutputEdge: 2_048,
+                      maxOutputPixels: 3_000_000,
+                      maxBytes: 1_500_000,
+                    },
+                    onCapture: (next) => {
+                      const started = currentRegionCaptureStart;
+                      if (
+                        !started ||
+                        regionCaptureStartRef.current !== started ||
+                        next.identity.sourceId !== started.sourceId ||
+                        next.identity.versionId !== started.versionId
+                      )
+                        return;
+                      cancelRegionCapture();
+                      setRegionCapture({ ...next, accountId: started.accountId });
+                      setNotice("");
+                    },
+                    onCancel: () => {
+                      if (
+                        !currentRegionCaptureStart ||
+                        regionCaptureStartRef.current !== currentRegionCaptureStart
+                      )
+                        return;
+                      cancelRegionCapture();
+                      setNotice("");
+                    },
+                  }}
+                />
+              </>
             ) : (
               <article className="reader-paper" style={{ fontSize: `${(18 * zoom) / 100}px` }}>
                 <header className="reader-paper-header">
