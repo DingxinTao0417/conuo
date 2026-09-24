@@ -5,7 +5,7 @@
 | 项        | 值                                    |
 | --------- | ------------------------------------- |
 | 分支      | `feat/ai-enhancement`（本地，未推送） |
-| 下一个 WP | WP-18                                 |
+| 下一个 WP | WP-19                                 |
 | 当前阶段  | 阶段 1 待评审；阶段 2 进行中          |
 | 更新日期  | 2026-09-24                            |
 
@@ -31,7 +31,7 @@
 | 14   | WP-15        | 完成     | `b7de8ae`、`8fd9d83`                                  | Web 279 个测试文件／4412 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过；仓库级 format:check 被既有 `._*` AppleDouble 文件阻断             | PDF 书签与导入标题目录、版本级派生表与 API、问答 `sectionPath`；真实 PDF 云端浏览器验收未运行                                  |
 | 15   | WP-16        | 待评审   | `09f2f13`、`62562b6`                                                 | Web 284 个测试文件／4427 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过；仓库级 format:check 被既有 36 个 `._*` AppleDouble 文件阻断 | 分层摘要、每日章节额度、版本级缓存、问答 summary grounding 与资料详情入口已完成；WP-02 summary 类别真实模型前后覆盖数字待人工记录 |
 | 16   | WP-17        | 阻塞     | `c29d199`                                               | Web 定向整理回归 185 项通过；Web 全量 284 个测试文件／4431 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过；仓库级 format:check 被既有 `._*` 文件影响 | 代码已完成摘要导航、代表性原文证据、24 段／36,000 字符高预算边界与时间戳指纹；但 WP-16 迁移撤销了 `source_version_summaries` 对 `service_role` 的表权限，和 WP-17 要求 worker 直接查询冲突；需人工决定授权方式后再解除阻塞；未打开 staging 摘要开关 |
-| 17   | WP-18        | 未开始   |                                                       |                                                                                                                                                                                                  |                                                                                                                                |
+| 17   | WP-18        | 完成     | `94b88f4`                                               | Web 定向 151 项通过；全量 284 个测试文件／4436 项通过、1 项跳过（4438 项中 2 项跳过）；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过；仓库级 format:check 被既有 `._*` AppleDouble 文件阻断 | 默认关闭 `CONUO_FEATURE_KNOWLEDGE_NAVIGATION`；accepted 知识页最多 3 页／6 条当前原文引用进入 targeted/summary grounding；草稿、跨空间、旧版本与正文均被隔离；下一项 WP-19 |
 | 18   | WP-19        | 未开始   |                                                       |                                                                                                                                                                                                  |                                                                                                                                |
 | 19   | WP-20        | 未开始   |                                                       |                                                                                                                                                                                                  | 不改 PRD（DEC-12）                                                                                                             |
 | 20   | WP-21        | 未开始   |                                                       |                                                                                                                                                                                                  | 本轮只做 21-1～21-3；21-1 完成后标待评审                                                                                       |
@@ -53,8 +53,8 @@
 | 阶段   | 状态                           | 记录                                                                                              |
 | ------ | ------------------------------ | ------------------------------------------------------------------------------------------------- |
 | 阶段 0 | 完成                           | 离线检索评测通过；`grounding-v7` 基线总体及 15 类均为 1.0，`isolation` 100%，`single-late` 1.0    |
-| 阶段 1 | 进行中                         | WP-11-A、WP-11-B、WP-11-C、WP-11-D、WP-08 已完成；WP-14、WP-13、WP-16 待评审；WP-17 阻塞；WP-15 已完成；下一项 WP-18 |
-| 阶段 2 | 进行中                         | WP-15、WP-16 代码完成待评审；WP-17 阻塞；下一项 WP-18                                                   |
+| 阶段 1 | 进行中                         | WP-11-A、WP-11-B、WP-11-C、WP-11-D、WP-08 已完成；WP-14、WP-13、WP-16 待评审；WP-17 阻塞；WP-15 已完成；下一项 WP-19 |
+| 阶段 2 | 进行中                         | WP-15、WP-16 代码完成待评审；WP-17 阻塞；WP-18 已完成；下一项 WP-19                                                   |
 | 阶段 3 | 本轮不做 21-4 起，不跑完整门槛 | DEC-04                                                                                            |
 | 阶段 4 | 未开始                         |                                                                                                   |
 | 阶段 5 | 本轮只做 WP-31                 | DEC-08                                                                                            |
@@ -153,6 +153,8 @@
 
 - 2026-09-24：WP-17 本地实现完成但标记阻塞。`buildOrganizationGrounding` 在摘要开关打开且存在当前版本全书摘要时，按资料分配代表性原文切块，并把章节摘要作为不可信、不可引用的 `sectionSummaries` 传入整理提示；摘要缺失或读取失败时保留 WP-01 路径。`maxRequestBytes >= 524288` 时使用 24 段／36,000 字符，否则保持 12 段／24,000 字符；交互式与后台整理指纹追加摘要创建时间，`ORGANIZATION_MODEL_CONTRACT_VERSION` 升至 `organization-v3`。定向 185 项、全量 4431 项通过；发现 WP-16 对摘要表撤销 `service_role` 表权限，与 WP-17 后台直接查询要求冲突，等待人工决定授权方式。未打开 staging 开关、未执行远程迁移／operations 脚本、部署或真实模型评测；下一项为 WP-18。
 
+- 2026-09-24：完成 WP-18 本地实现。`CONUO_FEATURE_KNOWLEDGE_NAVIGATION` 默认关闭；开启后问答只在 `space`、`sources`、`document` 范围搜索前 20 个知识页候选，取前 3 个 accepted 且未删除、属于当前空间的知识页，再把最多 6 条仍绑定当前资料版本的原文引用加入 targeted/summary grounding。知识页正文不会进入提示词；草稿、跨空间、旧版本与不在 selectedSources 的引用均被丢弃。请求指纹加入导航引用签名，AI trace 记录导航引用数；定向 151 项通过，R-15 全量结果见 WP-18 状态行。未打开 staging 开关、未执行远程迁移／operations 脚本、部署或真实模型评测；下一项为 WP-19。
+
 ## WP-16 自查
 
 - [x] 摘要表、任务表和每日额度表按 owner／资料／不可变版本隔离，启用 RLS、撤销直接权限；资格与租约写入使用既有 `PT409` 冲突契约，版本删除级联清理摘要。
@@ -168,6 +170,13 @@
 - [x] `maxRequestBytes` 达到 524288 才启用 24 段／36,000 字符上限；其他档位保持 12 段／24,000 字符；摘要创建时间进入交互式与后台 worker 指纹。
 - [x] 用户路由使用 `read_source_summaries`；后台 worker 已实现 service role 当前版本直读尝试及失败回退；已覆盖交互式路由、后台 worker、跨资料分布和摘要隔离测试；未打开 staging、未执行远程操作或真实模型调用。
 - [ ] WP-16 迁移撤销了 `source_version_summaries` 对 `service_role` 的表权限；后台直读所需的最小授权方式待人工决定，决定前 WP-17 保持阻塞。
+
+## WP-18 自查
+
+- [x] `CONUO_FEATURE_KNOWLEDGE_NAVIGATION` 默认关闭；关闭时不搜索知识页、不改变 grounding 或请求指纹。
+- [x] 只对 `space`、`sources`、`document` 范围取前 20 个知识页候选，再限制前 3 个 accepted、未删除且属于当前空间的页面；收件箱、草稿、跨空间和旧版本均不进入导航。
+- [x] 每个知识页只贡献当前 selectedSources 内、`resolveCitation` 成功的原文引用，最多 6 条；grounding 只使用 canonical 原文，知识页正文不会进入模型消息。
+- [x] 导航引用签名进入请求指纹，trace 记录 `navigationCount`；已覆盖 targeted/summary 顺序、过滤、指纹变化、trace 和功能开关关闭回归；未打开 staging、未执行远程操作或真实模型调用。
 
 ## WP-11-D 自查
 
