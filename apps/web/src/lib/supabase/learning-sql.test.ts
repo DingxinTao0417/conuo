@@ -193,4 +193,98 @@ describe("learning foundation SQL", () => {
     );
     expect(purged.rows[0]).toMatchObject({ citations: [], origin_ref: { sourcePurged: true } });
   });
+
+  it("groups the last five reviews into weak concepts and keeps related citations", async () => {
+    await asOwner(ownerA, "authenticated", () =>
+      db.query("select public.upsert_learning_items($1::jsonb)", [
+        JSON.stringify([
+          {
+            itemId: "weak-a",
+            spaceId: "space-1",
+            kind: "recall",
+            prompt: "薄弱概念题一",
+            answer: { text: "答案" },
+            citations: [
+              {
+                sourceId: "source-weak",
+                versionId: "version-1",
+                chunkId: "chunk-1",
+                title: "原文",
+                quote: "相关原文",
+                section: "第一节",
+              },
+            ],
+            origin: "user",
+            conceptKey: "薄弱概念",
+            status: "active",
+            card: { due: "2026-09-24T12:00:00.000Z" },
+            dueAt: "2026-09-24T12:00:00.000Z",
+          },
+          {
+            itemId: "strong-a",
+            spaceId: "space-1",
+            kind: "recall",
+            prompt: "稳定概念题",
+            answer: { text: "答案" },
+            citations: [],
+            origin: "user",
+            conceptKey: "稳定概念",
+            status: "active",
+            card: { due: "2026-09-24T12:00:00.000Z" },
+            dueAt: "2026-09-24T12:00:00.000Z",
+          },
+          {
+            itemId: "incorrect-a",
+            spaceId: "space-1",
+            kind: "recall",
+            prompt: "最近批改错误的题",
+            answer: { text: "答案" },
+            citations: [],
+            origin: "user",
+            conceptKey: "最近错误",
+            status: "active",
+            card: { due: "2026-09-24T12:00:00.000Z" },
+            dueAt: "2026-09-24T12:00:00.000Z",
+          },
+        ]),
+      ]),
+    );
+    await db.query(
+      `insert into public.review_logs(owner_id,log_id,item_id,rating,grade,reviewed_at)
+       values
+         ($1,'weak-1','weak-a',1,null,now()-interval '4 days'),
+         ($1,'weak-2','weak-a',1,null,now()-interval '3 days'),
+         ($1,'weak-3','weak-a',3,null,now()-interval '2 days'),
+         ($1,'stable-1','strong-a',3,null,now()-interval '1 day'),
+         ($1,'incorrect-1','incorrect-a',3,'{"verdict":"incorrect"}'::jsonb,now())`,
+      [ownerA],
+    );
+
+    const result = await asOwner(ownerA, "authenticated", () =>
+      db.query<{ learning_overview: Record<string, unknown> }>(
+        "select public.learning_overview('space-1') as learning_overview",
+      ),
+    );
+    const overview = result.rows[0]!.learning_overview as {
+      dueCount: number;
+      newCount: number;
+      reviewsLast7d: number;
+      weakConcepts: Array<Record<string, unknown>>;
+    };
+    expect(overview).toMatchObject({ dueCount: 3, newCount: 3, reviewsLast7d: 5 });
+    expect(overview.weakConcepts).toHaveLength(2);
+    expect(overview.weakConcepts.find((item) => item.conceptKey === "薄弱概念")).toMatchObject({
+      conceptKey: "薄弱概念",
+      forgottenCount: 2,
+      latestIncorrect: false,
+      itemIds: ["weak-a"],
+    });
+    expect(overview.weakConcepts.find((item) => item.conceptKey === "最近错误")).toMatchObject({
+      forgottenCount: 0,
+      latestIncorrect: true,
+    });
+    expect(overview.weakConcepts.find((item) => item.conceptKey === "薄弱概念")!.citations).toEqual(
+      [expect.objectContaining({ chunkId: "chunk-1" })],
+    );
+  });
 });

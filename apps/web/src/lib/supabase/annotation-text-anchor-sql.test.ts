@@ -16,6 +16,7 @@ const postConflictMigrationNames = new Set([
   "20260923000200_pdf_ink_idempotent_reserve.sql",
   "20260923000300_pdf_ink_realtime.sql",
   "20260925000500_learning_foundation.sql",
+  "20260926000100_learning_overview_weak_concepts.sql",
 ]);
 const migrations = new URL("../../../../../supabase/migrations/", import.meta.url);
 const sourceText = "# 起点\n\n😀学习 **梯度下降**。\n\n😀学习 **梯度下降**。\n";
