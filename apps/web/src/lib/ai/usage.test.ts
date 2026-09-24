@@ -12,8 +12,11 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-09-14T23:59:00.000Z"));
   vi.stubEnv("CONUO_AI_DAILY_REQUEST_LIMIT", "");
+  vi.stubEnv("CONUO_AI_DAILY_TOKEN_LIMIT", "");
   fetchMock.mockReset();
-  fetchMock.mockResolvedValue(new Response(null, { headers: { "Content-Range": "0-4/5" } }));
+  fetchMock
+    .mockResolvedValueOnce(new Response(null, { headers: { "Content-Range": "0-4/5" } }))
+    .mockResolvedValue(new Response(JSON.stringify({ promptTokens: 120, completionTokens: 30 })));
   vi.stubGlobal("fetch", fetchMock);
 });
 afterEach(() => {
@@ -34,8 +37,9 @@ describe("AI reservation usage through the actual PostgREST client", () => {
       checkedAt: "2026-09-14T23:59:00.000Z",
       counting: "reserved_requests",
       includesFailedAndCancelled: true,
+      tokens: { promptTokens: 120, completionTokens: 30, limit: 0 },
     });
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [address, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const url = new URL(address);
     expect(url.pathname).toBe("/rest/v1/ai_requests");
@@ -48,12 +52,20 @@ describe("AI reservation usage through the actual PostgREST client", () => {
     expect(url.searchParams.has("state")).toBe(false);
     expect(init.method).toBe("HEAD");
     expect(new Headers(init.headers).get("Prefer")).toContain("count=exact");
+    const tokenAddress = fetchMock.mock.calls[1][0] as string;
+    expect(new URL(tokenAddress).pathname).toBe("/rest/v1/rpc/ai_token_usage_today");
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({ p_owner: ownerId });
     expect(JSON.stringify(usage)).not.toContain(ownerId);
   });
 
   it("resets to the next UTC window, independently of the local timezone", async () => {
     vi.setSystemTime(new Date("2026-09-15T00:00:00.000Z"));
-    fetchMock.mockResolvedValue(new Response(null, { headers: { "Content-Range": "*/0" } }));
+    fetchMock
+      .mockReset()
+      .mockResolvedValueOnce(new Response(null, { headers: { "Content-Range": "*/0" } }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ promptTokens: 0, completionTokens: 0 })),
+      );
     expect(await readAiRequestUsage(store, ownerId, new AbortController().signal)).toMatchObject({
       usedCount: 0,
       remainingCount: 50,
@@ -64,6 +76,12 @@ describe("AI reservation usage through the actual PostgREST client", () => {
 
   it("keeps the real used count when the configured limit was lowered", async () => {
     vi.stubEnv("CONUO_AI_DAILY_REQUEST_LIMIT", "3");
+    fetchMock
+      .mockReset()
+      .mockResolvedValueOnce(new Response(null, { headers: { "Content-Range": "0-4/5" } }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ promptTokens: 2, completionTokens: 1 })),
+      );
     expect(await readAiRequestUsage(store, ownerId, new AbortController().signal)).toMatchObject({
       usedCount: 5,
       dailyLimit: 3,
@@ -74,9 +92,14 @@ describe("AI reservation usage through the actual PostgREST client", () => {
   it.each([undefined, "0-4/NaN", "0-4/-1", "0-4/9007199254740992"])(
     "does not turn a missing or malformed count into a zero balance: %s",
     async (range) => {
-      fetchMock.mockResolvedValue(
-        new Response(null, { headers: range ? { "Content-Range": range } : {} }),
-      );
+      fetchMock
+        .mockReset()
+        .mockResolvedValueOnce(
+          new Response(null, { headers: range ? { "Content-Range": range } : {} }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ promptTokens: 0, completionTokens: 0 })),
+        );
       await expect(
         readAiRequestUsage(store, ownerId, new AbortController().signal),
       ).rejects.toMatchObject({ status: 503, code: "AI_USAGE_UNAVAILABLE" });
@@ -90,6 +113,32 @@ describe("AI reservation usage through the actual PostgREST client", () => {
     );
     expect(error).toMatchObject({ code: "AI_USAGE_UNAVAILABLE" });
     expect(String(error)).not.toContain("private SQL");
+  });
+
+  it("reads the configured daily token limit and rejects malformed token usage", async () => {
+    vi.stubEnv("CONUO_AI_DAILY_TOKEN_LIMIT", "1000");
+    fetchMock
+      .mockReset()
+      .mockResolvedValueOnce(new Response(null, { headers: { "Content-Range": "0-0/1" } }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ promptTokens: 1, completionTokens: 2 })),
+      );
+    await expect(
+      readAiRequestUsage(store, ownerId, new AbortController().signal),
+    ).resolves.toMatchObject({
+      tokens: { promptTokens: 1, completionTokens: 2, limit: 1000 },
+    });
+    fetchMock
+      .mockReset()
+      .mockResolvedValueOnce(new Response(null, { headers: { "Content-Range": "0-0/1" } }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ promptTokens: -1, completionTokens: 2 })),
+      );
+    await expect(
+      readAiRequestUsage(store, ownerId, new AbortController().signal),
+    ).rejects.toMatchObject({
+      code: "AI_USAGE_UNAVAILABLE",
+    });
   });
 
   it("rejects invalid limits before attempting the database", async () => {

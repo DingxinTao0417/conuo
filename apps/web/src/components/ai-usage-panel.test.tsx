@@ -19,6 +19,7 @@ function usage(usedCount = 12, dailyLimit = 50): AiRequestUsage {
     checkedAt: "2026-09-14T12:00:00.000Z",
     counting: "reserved_requests",
     includesFailedAndCancelled: true,
+    tokens: { promptTokens: 120, completionTokens: 30, limit: 0 },
   };
 }
 function deferred<T>() {
@@ -78,6 +79,22 @@ describe("AI usage panel", () => {
     expect(host.textContent).toContain("失败、取消和超时也计入");
     expect(host.textContent).toContain("缓存结果不新增次数");
     expect(host.textContent).toContain("供应商费用另行计算");
+    expect(host.textContent).toContain("提示 token");
+    expect(host.textContent).toContain("120");
+    expect(host.textContent).toContain("补全 token");
+    expect(host.textContent).toContain("30");
+    expect(host.textContent).toContain("按 token 计量未启用");
+  });
+
+  it("shows the configured token limit and approximate usage policy", async () => {
+    mock.getAiRequestUsage.mockResolvedValue({
+      ...usage(12, 50),
+      tokens: { promptTokens: 1200, completionTokens: 300, limit: 2000 },
+    });
+    await render();
+    expect(host.textContent).toContain("token 上限");
+    expect(host.textContent).toContain("2,000");
+    expect(host.textContent).toContain("近似值");
   });
 
   it("does not fetch or invent a balance without a confirmed account context", async () => {

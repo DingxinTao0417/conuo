@@ -241,7 +241,8 @@ afterAll(async () => {
 
 describe("withdrawal receipts through ordinary PostgreSQL workspace saves", () => {
   it("executes every migration and round-trips an applied review before withdrawal", async () => {
-    expect(migrationNames).toHaveLength(39);
+    expect(migrationNames).toHaveLength(40);
+    expect(migrationNames).toContain("20260926000200_ai_token_usage.sql");
     const { applied } = fixture();
     const revision = await save(applied);
     const saved = await reload();

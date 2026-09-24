@@ -24,6 +24,7 @@ beforeEach(() => {
   vi.stubEnv("SUPABASE_SECRET_KEY", "");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
   vi.stubEnv("CONUO_AI_DAILY_REQUEST_LIMIT", "");
+  vi.stubEnv("CONUO_AI_DAILY_TOKEN_LIMIT", "");
   mock.getSupabaseConfig.mockReturnValue({
     url: "https://project.example.test",
     key: "publishable-test-key",
@@ -92,6 +93,7 @@ describe("model request reservations", () => {
       p_request_id: requestId,
       p_fingerprint: fingerprint,
       p_daily_limit: 50,
+      p_daily_token_limit: 0,
     });
   });
 
@@ -100,6 +102,24 @@ describe("model request reservations", () => {
     await reserveRequest(client, ownerId, requestId, fingerprint);
     expect(mock.rpc.mock.calls[0][1].p_daily_limit).toBe(Number(value));
   });
+
+  it.each(["1", "100000000"])("passes a configured daily token limit of %s", async (value) => {
+    vi.stubEnv("CONUO_AI_DAILY_TOKEN_LIMIT", value);
+    await reserveRequest(client, ownerId, requestId, fingerprint);
+    expect(mock.rpc.mock.calls[0][1].p_daily_token_limit).toBe(Number(value));
+  });
+
+  it.each(["-1", "100000001", "2.5", "NaN", "Infinity", "not a number", " "])(
+    "rejects invalid token quota %s before reserving or invoking the database",
+    async (value) => {
+      vi.stubEnv("CONUO_AI_DAILY_TOKEN_LIMIT", value);
+      await expect(reserveRequest(client, ownerId, requestId, fingerprint)).rejects.toMatchObject({
+        status: 503,
+        code: "INVALID_AI_LIMIT",
+      });
+      expect(mock.rpc).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(["0", "501", "-1", "2.5", "NaN", "Infinity", "not a number", " "])(
     "rejects invalid quota %s before reserving or invoking the database",
@@ -139,6 +159,7 @@ describe("model request reservations", () => {
     ["busy", 409, "REQUEST_RUNNING"],
     ["mismatch", 409, "REQUEST_CHANGED"],
     ["limited", 429, "AI_DAILY_LIMIT"],
+    ["token_limited", 429, "AI_DAILY_TOKEN_LIMIT"],
   ])(
     "rejects %s without turning it into a new reservation",
     async (reservationStatus, status, code) => {

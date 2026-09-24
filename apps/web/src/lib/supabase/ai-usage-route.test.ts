@@ -24,6 +24,7 @@ const usage: AiRequestUsage = {
   checkedAt: "2026-09-14T12:00:00.000Z",
   counting: "reserved_requests",
   includesFailedAndCancelled: true,
+  tokens: { promptTokens: 120, completionTokens: 30, limit: 0 },
 };
 const store = { test: "privileged-store" };
 function request(query = "", signal?: AbortSignal) {

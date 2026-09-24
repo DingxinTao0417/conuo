@@ -3,10 +3,19 @@ import { z } from "zod";
 export const AI_DAILY_REQUEST_LIMIT_MIN = 1;
 export const AI_DAILY_REQUEST_LIMIT_MAX = 500;
 export const AI_DEFAULT_DAILY_REQUEST_LIMIT = 50;
+export const AI_DAILY_TOKEN_LIMIT_MAX = 100_000_000;
+export const AI_DEFAULT_DAILY_TOKEN_LIMIT = 0;
 export const AI_USAGE_CHANGED_EVENT = "conuo-ai-usage-changed";
 
 const count = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const utcTimestamp = z.iso.datetime({ precision: 3 });
+const tokenUsage = z
+  .object({
+    promptTokens: count,
+    completionTokens: count,
+    limit: z.number().int().min(0).max(AI_DAILY_TOKEN_LIMIT_MAX),
+  })
+  .strict();
 
 /** A sampled reservation count, never provider token usage or a billing balance. */
 export const aiRequestUsageSchema = z
@@ -19,6 +28,7 @@ export const aiRequestUsageSchema = z
     checkedAt: utcTimestamp,
     counting: z.literal("reserved_requests"),
     includesFailedAndCancelled: z.literal(true),
+    tokens: tokenUsage,
   })
   .strict()
   .superRefine((usage, context) => {

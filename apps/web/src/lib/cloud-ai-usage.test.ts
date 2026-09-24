@@ -15,6 +15,7 @@ const usage = {
   checkedAt: "2026-09-14T16:00:00.000Z",
   counting: "reserved_requests",
   includesFailedAndCancelled: true,
+  tokens: { promptTokens: 120, completionTokens: 30, limit: 0 },
 };
 beforeEach(() => {
   fetchMock.mockReset();

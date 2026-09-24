@@ -1,7 +1,7 @@
 import "server-only";
 import { aiRequestUsageSchema, type AiRequestUsage } from "../ai-request-usage";
 import { ApiError } from "../supabase/api";
-import { createRequestStore, readAiDailyRequestLimit } from "./requests";
+import { createRequestStore, readAiDailyRequestLimit, readAiDailyTokenLimit } from "./requests";
 
 export async function readAiRequestUsage(
   store: ReturnType<typeof createRequestStore>,
@@ -9,6 +9,7 @@ export async function readAiRequestUsage(
   signal: AbortSignal,
 ): Promise<AiRequestUsage> {
   const dailyLimit = readAiDailyRequestLimit();
+  const tokenLimit = readAiDailyTokenLimit();
   if (signal.aborted) throw new ApiError(499, "REQUEST_CANCELLED", "用量检查已停止，请重新刷新。");
   const checkedAt = new Date();
   const start = new Date(checkedAt);
@@ -32,6 +33,19 @@ export async function readAiRequestUsage(
     throw new ApiError(503, "AI_USAGE_UNAVAILABLE", "暂时无法读取 AI 用量，请稍后刷新。");
   }
   if (signal.aborted) throw new ApiError(499, "REQUEST_CANCELLED", "用量检查已停止，请重新刷新。");
+  let tokenUsage: unknown;
+  try {
+    const result = await store
+      .rpc("ai_token_usage_today", { p_owner: ownerId })
+      .abortSignal(signal);
+    if (result.error) throw result.error;
+    tokenUsage = result.data;
+  } catch {
+    if (signal.aborted)
+      throw new ApiError(499, "REQUEST_CANCELLED", "用量检查已停止，请重新刷新。");
+    throw new ApiError(503, "AI_USAGE_UNAVAILABLE", "暂时无法读取 AI 用量，请稍后刷新。");
+  }
+  if (signal.aborted) throw new ApiError(499, "REQUEST_CANCELLED", "用量检查已停止，请重新刷新。");
   // Missing/malformed counts are unknown, not zero. Include every reserved row,
   // regardless of running/completed/failed state, just like the reservation RPC.
   const parsed = aiRequestUsageSchema.safeParse({
@@ -43,6 +57,10 @@ export async function readAiRequestUsage(
     checkedAt: checkedAt.toISOString(),
     counting: "reserved_requests",
     includesFailedAndCancelled: true,
+    tokens: {
+      ...(tokenUsage && typeof tokenUsage === "object" ? tokenUsage : {}),
+      limit: tokenLimit,
+    },
   });
   if (!parsed.success)
     throw new ApiError(503, "AI_USAGE_UNAVAILABLE", "AI 用量返回异常，请稍后刷新。");

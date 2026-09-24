@@ -13,6 +13,8 @@ import {
   AI_DAILY_REQUEST_LIMIT_MIN,
   AI_DAILY_REQUEST_LIMIT_MAX,
   AI_DEFAULT_DAILY_REQUEST_LIMIT,
+  AI_DAILY_TOKEN_LIMIT_MAX,
+  AI_DEFAULT_DAILY_TOKEN_LIMIT,
 } from "../ai-request-usage";
 
 export function createRequestStore() {
@@ -40,8 +42,29 @@ export function readAiDailyRequestLimit(): number {
     throw new ApiError(503, "INVALID_AI_LIMIT", "模型每日调用限制配置无效。");
   return daily;
 }
+export function readAiDailyTokenLimit(): number {
+  const raw = process.env.CONUO_AI_DAILY_TOKEN_LIMIT;
+  const daily = raw === undefined || raw === "" ? AI_DEFAULT_DAILY_TOKEN_LIMIT : Number(raw);
+  if (
+    (raw !== undefined && raw !== "" && raw.trim() === "") ||
+    !Number.isInteger(daily) ||
+    daily < 0 ||
+    daily > AI_DAILY_TOKEN_LIMIT_MAX
+  )
+    throw new ApiError(503, "INVALID_AI_LIMIT", "模型每日 token 限制配置无效。");
+  return daily;
+}
 const reservationSchema = z.object({
-  status: z.enum(["reserved", "running", "completed", "failed", "mismatch", "busy", "limited"]),
+  status: z.enum([
+    "reserved",
+    "running",
+    "completed",
+    "failed",
+    "mismatch",
+    "busy",
+    "limited",
+    "token_limited",
+  ]),
   result: z.unknown().optional(),
   errorCode: z.string().nullable().optional(),
 });
@@ -55,11 +78,13 @@ export async function reserveRequest(
   options: { ttlSeconds?: number } = {},
 ): Promise<{ kind: "reserved" } | { kind: "cached"; result: unknown }> {
   const daily = readAiDailyRequestLimit();
+  const dailyTokenLimit = readAiDailyTokenLimit();
   const { data, error } = await store.rpc("reserve_ai_request", {
     p_owner: ownerId,
     p_request_id: requestId,
     p_fingerprint: fingerprint,
     p_daily_limit: daily,
+    p_daily_token_limit: dailyTokenLimit,
     ...(Object.hasOwn(options, "ttlSeconds") ? { p_ttl_seconds: options.ttlSeconds } : {}),
   });
   if (error)
@@ -86,6 +111,12 @@ export async function reserveRequest(
         429,
         "AI_DAILY_LIMIT",
         "今日模型调用次数已用完，明日 UTC 0 点恢复。仍可阅读、搜索和导出资料。",
+      );
+    case "token_limited":
+      throw new ApiError(
+        429,
+        "AI_DAILY_TOKEN_LIMIT",
+        "今日 AI 用量（按 token 计）已用完，UTC 次日恢复。仍可阅读、搜索和导出资料。",
       );
     case "failed":
       throw new ApiError(

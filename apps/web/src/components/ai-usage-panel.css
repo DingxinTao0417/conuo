@@ -69,6 +69,18 @@
   font-size: 11px;
   font-weight: 400;
 }
+.ai-usage-token-section {
+  margin-top: 14px;
+}
+.ai-usage-token-section h4 {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+.ai-usage-token-section p {
+  margin-top: 8px;
+}
 .ai-usage-panel .ai-usage-exhausted {
   margin-top: 12px;
   color: #845615;

@@ -23,6 +23,10 @@ function localDateTime(timestamp: string) {
   }).format(new Date(timestamp));
 }
 
+function formatCount(value: number) {
+  return value.toLocaleString("zh-CN");
+}
+
 function AccountUsage({ userId }: { userId: string }) {
   const [state, setState] = useState<UsageState>({ kind: "checking" });
   const [attempt, setAttempt] = useState(0);
@@ -144,6 +148,30 @@ function AccountUsage({ userId }: { userId: string }) {
                 </dd>
               </div>
             </dl>
+            <section className="ai-usage-token-section" aria-label="AI token 用量">
+              <h4>Token 用量（近似）</h4>
+              <dl className="ai-usage-metrics ai-usage-token-metrics">
+                <div>
+                  <dt>提示 token</dt>
+                  <dd>{formatCount(usage.tokens.promptTokens)}</dd>
+                </div>
+                <div>
+                  <dt>补全 token</dt>
+                  <dd>{formatCount(usage.tokens.completionTokens)}</dd>
+                </div>
+                <div>
+                  <dt>token 上限</dt>
+                  <dd>{usage.tokens.limit ? formatCount(usage.tokens.limit) : "未启用"}</dd>
+                </div>
+              </dl>
+              {usage.tokens.limit === 0 && <p>按 token 计量未启用。</p>}
+              {usage.tokens.limit > 0 &&
+                usage.tokens.promptTokens + usage.tokens.completionTokens >= usage.tokens.limit && (
+                  <p className="ai-usage-exhausted" role="status">
+                    今日 token 额度已用完，UTC 次日恢复；阅读、普通搜索和导出仍可使用。
+                  </p>
+                )}
+            </section>
             {usage.remainingCount === 0 && (
               <p className="ai-usage-exhausted" role="status">
                 今日次数已用完，重置后可继续生成；阅读、普通搜索和导出仍可使用。
@@ -165,7 +193,7 @@ function AccountUsage({ userId }: { userId: string }) {
       </div>
       <p className="ai-usage-policy">
         按已预占的新请求计次，失败、取消和超时也计入；读取同一请求的缓存结果不新增次数。 这里显示
-        Conuo 的请求限制，供应商费用另行计算。
+        Conuo 的请求限制；token 追踪是尽力写入的近似值，供应商费用另行计算。
       </p>
     </section>
   );
