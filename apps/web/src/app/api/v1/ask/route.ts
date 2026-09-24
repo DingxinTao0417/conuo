@@ -45,7 +45,12 @@ import {
   validateCrossLibraryAnswerRequest,
 } from "@/lib/cross-library-ask";
 import type { AnswerRequest, AnswerResult, WorkspaceData } from "@/lib/types";
-import { fuseCandidates, indexedCitations, indexedSourceCandidates } from "@/lib/server-search";
+import {
+  fuseCandidates,
+  indexedCitations,
+  indexedSourceCandidates,
+  noteSearchCandidates,
+} from "@/lib/server-search";
 import { readEmbeddingConfig } from "@/lib/ai/embeddings";
 import {
   REWRITE_CONTRACT_VERSION,
@@ -334,6 +339,48 @@ async function readSourceSummaries(
   }
 }
 
+function knowledgeNavigationCitations(data: WorkspaceData, question: AnswerRequest, query: string) {
+  if (question.spaceId === "inbox" || !["space", "sources", "document"].includes(question.scope))
+    return [];
+  const selected = selectedSources(data, question);
+  const allowedSources = new Set(selected.map((source) => `${source.id}:${source.versionId}`));
+  try {
+    const candidates = noteSearchCandidates(data, {
+      query,
+      scope: { kind: "space", spaceId: question.spaceId },
+      filters: { types: ["knowledge"] },
+      limit: 20,
+    });
+    const pages = candidates.filter((candidate) => candidate.kind === "knowledge").slice(0, 3);
+    const result = [] as import("@/lib/types").Citation[];
+    const seen = new Set<string>();
+    for (const candidate of pages) {
+      const note = data.notes.find(
+        (item) =>
+          item.id === candidate.objectId &&
+          item.kind === "knowledge" &&
+          item.status === "accepted" &&
+          !item.deletedAt &&
+          item.spaceId === question.spaceId,
+      );
+      if (!note) continue;
+      for (const citation of note.citations) {
+        if (result.length >= 6) break;
+        if (!allowedSources.has(`${citation.sourceId}:${citation.versionId}`)) continue;
+        const resolved = resolveCitation(data, citation);
+        if (!resolved) continue;
+        const key = `${citation.sourceId}:${citation.versionId}:${citation.chunkId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push(citation);
+      }
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
 export async function POST(request: Request) {
   const startedAt = Date.now();
   const preflightDeadlineAt = startedAt + ANSWER_STREAM_LIMITS.durationMs;
@@ -593,6 +640,19 @@ export async function POST(request: Request) {
               : { kind: "space" as const, spaceId: question.spaceId },
           limit: 100,
         };
+        const navigationCitations = aiFeatureEnabled("KNOWLEDGE_NAVIGATION")
+          ? knowledgeNavigationCitations(initial, question, searchRequest.query)
+          : [];
+        const navigationFingerprint = navigationCitations.length
+          ? JSON.stringify(
+              navigationCitations.map((citation) => [
+                citation.sourceId,
+                citation.versionId,
+                citation.chunkId,
+              ]),
+            )
+          : null;
+        traceRecorder?.set({ navigationCount: navigationCitations.length });
         const crossLibrary = isCrossLibraryAnswerRequest(question);
         const crossLibrarySemanticEnabled =
           crossLibrary && aiFeatureEnabled("CROSS_LIBRARY_SEMANTIC");
@@ -680,6 +740,7 @@ export async function POST(request: Request) {
                 ...(memoryEnabled ? ["memory:" + priorMemory.key] : []),
                 ...outlineFingerprint,
                 ...(summaryAvailable ? [SUMMARY_CONTRACT_VERSION, ...summaryFingerprint] : []),
+                ...(navigationFingerprint ? ["navigation:" + navigationFingerprint] : []),
               ]),
             )
             .digest("hex");
@@ -813,6 +874,7 @@ export async function POST(request: Request) {
         if (!extractiveCitations.length) {
           extractiveCitations = buildGrounding(initial, question, undefined, {
             neighborRadius,
+            navigationCitations,
           }).evidence.slice(0, 6);
         }
         const noteEvidence = extractiveCitations.length
@@ -880,6 +942,7 @@ export async function POST(request: Request) {
           buildGrounding(initial, question, retrieved, {
             neighborRadius,
             ...(memoryEnabled ? { priorCitations: priorMemory.citations } : {}),
+            ...(navigationCitations.length ? { navigationCitations } : {}),
             ...(sourceOutlines.outlines.size ? { outlines: sourceOutlines.outlines } : {}),
           });
         if (longContext) traceRecorder?.set({ longContext: true });
@@ -919,6 +982,7 @@ export async function POST(request: Request) {
                   ...(memoryEnabled ? ["memory:" + priorMemory.key] : []),
                   ...outlineFingerprint,
                   ...(summaryAvailable ? [SUMMARY_CONTRACT_VERSION, ...summaryFingerprint] : []),
+                  ...(navigationFingerprint ? ["navigation:" + navigationFingerprint] : []),
                 ]),
               )
               .digest("hex"),

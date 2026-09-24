@@ -42,6 +42,13 @@ describe("AI trace recorder", () => {
     expect(trace.metrics.evidenceRefs).toHaveLength(40);
   });
 
+  it("records the number of knowledge navigation citations", async () => {
+    const recorder = createTraceRecorder("ask", "owner-a", "request-navigation");
+    recorder.set({ navigationCount: 6 });
+    await recorder.finish("completed");
+    expect(mock.rpc.mock.calls[0]![1].p_trace.metrics.navigationCount).toBe(6);
+  });
+
   it("swallows a slow trace RPC", async () => {
     vi.useFakeTimers();
     mock.rpc.mockReturnValue(new Promise(() => undefined));

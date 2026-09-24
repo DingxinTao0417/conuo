@@ -262,6 +262,37 @@ function documentNote(): Note {
     deletedAt: null,
   };
 }
+
+function knowledgeNavigationNote(overrides: Partial<Note> = {}): Note {
+  const source = workspace.sources[0];
+  const chunk = source.chunks.find((item) => item.text.trim() && !item.text.startsWith("#"))!;
+  return {
+    id: "knowledge-navigation-note",
+    spaceId: workspace.spaces[0].id,
+    title: "学习率导航页",
+    content: "<p>KNOWLEDGE_NAVIGATION_BODY_ONLY</p><p>学习率过高时损失会振荡。</p>",
+    kind: "knowledge",
+    aiGenerated: true,
+    status: "accepted",
+    citations: [
+      {
+        sourceId: source.id,
+        versionId: source.versionId,
+        chunkId: chunk.id,
+        title: source.title,
+        quote: chunk.text,
+        section: chunk.section,
+        page: chunk.page,
+      },
+    ],
+    versions: [],
+    contentRevision: 4,
+    createdAt: "2026-09-13T00:00:00.000Z",
+    updatedAt: "2026-09-13T00:00:00.000Z",
+    deletedAt: null,
+    ...overrides,
+  };
+}
 async function expectError(response: Response, status: number, code: string) {
   expect(response.status).toBe(status);
   expect(await response.json()).toMatchObject({ code });
@@ -394,6 +425,56 @@ describe("generated answer route with canonical source and request-ledger bounda
     );
     expect(JSON.stringify(answer)).not.toContain(config.apiKey);
     expect(response.headers.get("Cache-Control")).toContain("no-store");
+  });
+
+  it("adds citations from accepted knowledge navigation without sending its body", async () => {
+    vi.stubEnv("CONUO_FEATURE_KNOWLEDGE_NAVIGATION", "on");
+    workspace.notes = [knowledgeNavigationNote()];
+    const response = await POST(request({ requestId: "knowledge-navigation" }));
+    expect(response.status).toBe(200);
+    const value = prompt();
+    const sourceEvidence = workspace.sources[0].chunks.find(
+      (chunk) => chunk.text.trim() && !chunk.text.startsWith("#"),
+    )!;
+    expect(value.evidence.length).toBeGreaterThan(0);
+    expect(value.evidence.some((item) => item.text === sourceEvidence.text)).toBe(true);
+    expect(JSON.stringify(value)).not.toContain("KNOWLEDGE_NAVIGATION_BODY_ONLY");
+    const navigationFingerprint = mock.reserveRequest.mock.calls[0]![3];
+    expect(navigationFingerprint).toEqual(expect.any(String));
+
+    vi.stubEnv("CONUO_FEATURE_KNOWLEDGE_NAVIGATION", "off");
+    const baseline = await POST(request({ requestId: "knowledge-navigation-off" }));
+    expect(baseline.status).toBe(200);
+    const baselineFingerprint = mock.reserveRequest.mock.calls.at(-1)![3];
+    expect(navigationFingerprint).not.toBe(baselineFingerprint);
+  });
+
+  it("ignores draft, foreign-space, and stale-version knowledge pages", async () => {
+    vi.stubEnv("CONUO_FEATURE_KNOWLEDGE_NAVIGATION", "on");
+    workspace.notes = [];
+    await POST(request({ requestId: "knowledge-navigation-empty" }));
+    const emptyFingerprint = mock.reserveRequest.mock.calls.at(-1)![3];
+
+    const foreignSpace = { ...workspace.spaces[0], id: "foreign-space" };
+    workspace.spaces.push(foreignSpace);
+    const stale = knowledgeNavigationNote({
+      id: "stale-knowledge-navigation-note",
+      citations: knowledgeNavigationNote().citations.map((citation) => ({
+        ...citation,
+        versionId: "old-version",
+      })),
+    });
+    workspace.notes = [
+      knowledgeNavigationNote({ id: "draft-knowledge-navigation-note", status: "draft" }),
+      knowledgeNavigationNote({
+        id: "foreign-knowledge-navigation-note",
+        spaceId: foreignSpace.id,
+      }),
+      stale,
+    ];
+    await POST(request({ requestId: "knowledge-navigation-invalid" }));
+    const invalidFingerprint = mock.reserveRequest.mock.calls.at(-1)![3];
+    expect(invalidFingerprint).toBe(emptyFingerprint);
   });
 
   it("loads only saved completed answers when answer memory is enabled", async () => {

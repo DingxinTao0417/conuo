@@ -205,6 +205,75 @@ describe("bounded model grounding", () => {
     ]);
   });
 
+  it("places canonical knowledge navigation citations after retrieval hits", () => {
+    const { data, question } = fixture();
+    setText(data, 0, "第一段正文。\n\n第二段正文。\n\n第三段正文。\n\n第四段正文。");
+    const source = data.sources[0]!;
+    const citation = (index: number) => ({
+      sourceId: source.id,
+      versionId: source.versionId,
+      chunkId: source.chunks[index]!.id,
+      title: source.title,
+      quote: source.chunks[index]!.text,
+      section: source.chunks[index]!.section,
+      page: source.chunks[index]!.page,
+    });
+    const retrieved: AnswerResult = {
+      mode: "extractive",
+      content: "",
+      citations: [citation(0)],
+    };
+    const targeted = buildGrounding(
+      data,
+      { ...question, question: "第二段的条件是什么？" },
+      retrieved,
+      { navigationCitations: [citation(3)] },
+    );
+    expect(targeted.evidence.map((item) => item.chunkId)).toEqual([
+      source.chunks[0]!.id,
+      source.chunks[3]!.id,
+    ]);
+
+    const summary = buildGrounding(data, { ...question, question: "总结这份资料" }, retrieved, {
+      navigationCitations: [citation(3)],
+    });
+    expect(summary.evidence.slice(0, 2).map((item) => item.chunkId)).toEqual([
+      source.chunks[0]!.id,
+      source.chunks[3]!.id,
+    ]);
+  });
+
+  it("drops navigation citations from another version before evidence assembly", () => {
+    const { data, question } = fixture();
+    setText(data, 0, Array.from({ length: 25 }, (_, index) => `第${index}段正文。`).join("\n\n"));
+    const source = data.sources[0]!;
+    const retrieved: AnswerResult = {
+      mode: "extractive",
+      content: "",
+      citations: [
+        {
+          sourceId: source.id,
+          versionId: source.versionId,
+          chunkId: source.chunks[0]!.id,
+          title: source.title,
+          quote: source.chunks[0]!.text,
+          section: source.chunks[0]!.section,
+          page: source.chunks[0]!.page,
+        },
+      ],
+    };
+    const forged = { ...retrieved.citations[0]!, versionId: "old-version" };
+    const grounding = buildGrounding(
+      data,
+      { ...question, question: "第0段的条件是什么？" },
+      retrieved,
+      {
+        navigationCitations: [forged],
+      },
+    );
+    expect(grounding.evidence.map((item) => item.chunkId)).toEqual([source.chunks[0]!.id]);
+  });
+
   it("requires AI and current canonical versions before using full-document layout", () => {
     const { data, question } = fixture();
     data.aiEnabled = false;

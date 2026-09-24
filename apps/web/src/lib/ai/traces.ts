@@ -30,6 +30,7 @@ const metricNames = new Set([
   "searchMode",
   "sourceCount",
   "candidateCount",
+  "navigationCount",
   "evidenceCount",
   "evidenceRefs",
   "promptTokens",

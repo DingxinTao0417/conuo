@@ -178,6 +178,7 @@ export function buildGrounding(
   options: {
     neighborRadius?: 0 | 1;
     priorCitations?: Citation[];
+    navigationCitations?: Citation[];
     outlines?: Map<string, OutlineItem[]>;
   } = {},
 ): Grounding {
@@ -240,6 +241,18 @@ export function buildGrounding(
           hit.quote === item.quote,
       ),
   );
+  const navigationHits = uniqueCitations(
+    (options.navigationCitations ?? []).flatMap((item) => {
+      const queue = queues.find((candidate) => candidate[0]?.sourceId === item.sourceId);
+      const canonical = queue?.find(
+        (value) =>
+          value.versionId === item.versionId &&
+          value.chunkId === item.chunkId &&
+          value.quote === item.quote,
+      );
+      return canonical ? [canonical] : [];
+    }),
+  );
   const intent = classifyQuestionIntent(request.question);
   const nonEmptyQueues = queues.filter((queue) => queue.length > 0);
   const perSource = Math.max(1, Math.ceil(MAX_CHUNKS / Math.max(1, nonEmptyQueues.length)));
@@ -272,6 +285,7 @@ export function buildGrounding(
   } else if (intent === "summary") {
     candidates = uniqueCitations([
       ...retrievalHits.slice(0, SUMMARY_RETRIEVAL_SLOTS),
+      ...navigationHits,
       ...priorHits,
       ...spread(),
     ]);
@@ -283,6 +297,7 @@ export function buildGrounding(
         ? priorHits.length
           ? uniqueCitations([
               ...retrievalHits,
+              ...navigationHits,
               ...priorHits,
               ...retrievalHits
                 .slice(0, 4)
@@ -292,9 +307,10 @@ export function buildGrounding(
               ...retrievalHits
                 .slice(0, 4)
                 .flatMap((hit) => [hit, ...adjacentCitations([hit], nonEmptyQueues, 1)]),
+              ...navigationHits,
               ...retrievalHits.slice(4),
             ])
-        : uniqueCitations([...retrievalHits, ...priorHits]);
+        : uniqueCitations([...retrievalHits, ...navigationHits, ...priorHits]);
     if (
       !candidates.length &&
       !isCrossLibraryAnswerRequest(request) &&
