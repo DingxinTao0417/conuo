@@ -6,6 +6,14 @@
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
 
+## AI 增强 WP-11-C（2026-09-23，本地）
+
+- 范围：新增默认关闭的可选重排服务适配器；`CONUO_FEATURE_RERANK=on` 且配置完整时，问答会在既有证据预算前对最多 40 条检索片段排序，再保留原有 12 条／24,000 字符预算。
+- 服务边界：适配器只发送问题和每条最多 2,000 字符的检索片段，限制请求／响应大小、10 秒超时、HTTPS（本机回环允许 HTTP）及结果索引的范围和唯一性；调用失败保留原检索顺序。设置页和 [MODEL_SETUP.md](MODEL_SETUP.md) 已说明供应商的数据处理边界。
+- 缓存与追踪：请求指纹包含启用重排时的连接配置摘要；trace 记录 `rerank` 是否实际完成排序。
+- 测试：重排适配器与问答路由定向测试 2 个文件／63 项通过；R-15 全量 Web 测试 272 个文件／4375 项通过、2 项跳过；typecheck 通过；lint 0 错误、保留 1 条既有 `_result` 警告；本 WP 代码文件定向 Prettier 通过。
+- 未验收边界：未配置供应商密钥，未打开 staging 开关，未运行真实模型调用、部署、远程数据库操作；仓库级 `format:check` 被既有 36 个 `._*` AppleDouble 文件阻断。
+
 ## AI 增强 WP-11-B（2026-09-23，本地）
 
 - 范围：在 `CONUO_FEATURE_QUERY_REWRITE=on` 且触发连续追问或跨文字体系条件时，用 `fast` 档位把问题改写为独立查询；改写结果与最多两个备用查询分别检索，再用 RRF 去重合并。改写失败或超时 10 秒时回退到既有 `answerRetrievalQuery`。
