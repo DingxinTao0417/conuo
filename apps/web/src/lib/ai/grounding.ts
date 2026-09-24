@@ -27,13 +27,24 @@ import {
 } from "./evidence-assembly";
 import { sanitizeAnswerMarkdown, withLabel, withReferences } from "./answer-markdown";
 import { sectionPathForPage, type OutlineItem } from "../source-outline";
+import type { SummaryParagraph } from "./source-summary";
 
 const MAX_CHUNKS = 12;
 const MAX_CONTEXT_CHARS = 24_000;
 const MAX_CHUNK_CHARS = 8_000;
 const SUMMARY_RETRIEVAL_SLOTS = 4;
-export const GROUNDING_CONTRACT_VERSION = "grounding-v10";
+export const GROUNDING_CONTRACT_VERSION = "grounding-v11";
 export type AnswerFormat = "plain" | "rich";
+export interface SummaryRow {
+  level: "section" | "document";
+  sectionIndex: number;
+  title: string;
+  pageStart?: number | null;
+  pageEnd?: number | null;
+  chunkIds: string[];
+  summary: { title?: string; paragraphs?: SummaryParagraph[] };
+  createdAt?: string;
+}
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 const compact = (value: string) => value.replace(/\s+/g, "");
 const hasHan = (value: string) => /[\u3400-\u9fff]/.test(value);
@@ -105,8 +116,9 @@ export interface Grounding {
   noteEvidence: AnswerNoteEvidence[];
   coverage: string;
   fallback: AnswerResult;
-  layout: "retrieval" | "full-document";
+  layout: "retrieval" | "full-document" | "summary";
   outlines?: Map<string, OutlineItem[]>;
+  summarySections?: Array<{ id: string; title: string; pages?: string; text: string }>;
 }
 
 function canonicalCitations(sources: Source[]): Citation[][] {
@@ -412,6 +424,126 @@ export function buildFullDocumentGrounding(
   };
 }
 
+const chapterQuestion =
+  /第([一二三四五六七八九十百\d]+)(?:章|节|部分)|chapter\s+(\d+)|section\s+(\d+)/iu;
+function chapterNumber(value: string): number | null {
+  const arabic = Number(value);
+  if (Number.isFinite(arabic)) return arabic;
+  const digits: Record<string, number> = {
+    一: 1,
+    二: 2,
+    三: 3,
+    四: 4,
+    五: 5,
+    六: 6,
+    七: 7,
+    八: 8,
+    九: 9,
+    十: 10,
+    百: 100,
+  };
+  if (!value || [...value].some((char) => !digits[char])) return null;
+  if (value === "十") return 10;
+  if (value.startsWith("十")) return 10 + (digits[value.slice(1)] ?? 0);
+  if (value.includes("十")) return (digits[value[0]!] ?? 0) * 10 + (digits[value[2]!] ?? 0);
+  return digits[value] ?? null;
+}
+function summaryText(row: SummaryRow): string {
+  return (row.summary.paragraphs ?? [])
+    .map((paragraph) => paragraph.text)
+    .join("\n")
+    .trim();
+}
+
+/** Uses summaries as navigation context while keeping all visible citations canonical. */
+export function buildSummaryGrounding(
+  data: WorkspaceData,
+  request: AnswerRequest,
+  summaries: SummaryRow[],
+  outline: OutlineItem[] | null = null,
+): Grounding | null {
+  if (!data.aiEnabled || !request.question.trim() || selectedSources(data, request).length !== 1)
+    return null;
+  const source = selectedSources(data, request)[0];
+  if (!source || !["ready", "partial"].includes(source.status)) return null;
+  const rows = summaries.filter(
+    (row) => row.level === "section" && row.chunkIds.length && summaryText(row),
+  );
+  const document = summaries.find((row) => row.level === "document" && summaryText(row));
+  if (!document || !rows.length) return null;
+  const chapter = chapterQuestion.exec(request.question);
+  let selectedRows = rows;
+  if (chapter) {
+    const number = chapterNumber(chapter[1] ?? chapter[2] ?? chapter[3] ?? "");
+    const byTitle =
+      number === null
+        ? undefined
+        : rows.find((row) =>
+            new RegExp(`(?:第\\s*${number}|chapter\\s*${number}|section\\s*${number})`, "iu").test(
+              row.title,
+            ),
+          );
+    const byOutline = number === null ? undefined : rows[number - 1];
+    const selected = byTitle ?? byOutline;
+    if (!selected) return null;
+    selectedRows = [selected];
+  }
+  const canonical = canonicalCitations([source])[0] ?? [];
+  const byId = new Map(canonical.map((citation) => [citation.chunkId, citation]));
+  const evidence: Citation[] = [];
+  for (const row of selectedRows) {
+    const citationCounts = new Map<string, number>();
+    for (const paragraph of row.summary.paragraphs ?? [])
+      for (const id of paragraph.chunkIds)
+        citationCounts.set(id, (citationCounts.get(id) ?? 0) + 1);
+    const ids = chapter
+      ? row.chunkIds
+      : [...row.chunkIds]
+          .sort((left, right) => (citationCounts.get(right) ?? 0) - (citationCounts.get(left) ?? 0))
+          .slice(0, 2);
+    const cited = ids.map((id) => byId.get(id)).filter((item): item is Citation => Boolean(item));
+    const supplement =
+      row.pageStart == null && row.pageEnd == null
+        ? []
+        : source.chunks
+            .filter(
+              (chunk) =>
+                chunk.text.trim() &&
+                chunk.page !== undefined &&
+                (row.pageStart == null || chunk.page >= row.pageStart) &&
+                (row.pageEnd == null || chunk.page <= row.pageEnd),
+            )
+            .map((chunk) => byId.get(chunk.id))
+            .filter((item): item is Citation => Boolean(item));
+    for (const citation of [...cited, ...supplement]) {
+      if (!evidence.some((item) => item.chunkId === citation.chunkId)) evidence.push(citation);
+      if (
+        evidence.length >= 24 ||
+        evidence.reduce((sum, item) => sum + item.quote.length, 0) >= 36_000
+      )
+        break;
+    }
+  }
+  if (!evidence.length) return null;
+  const sectionSummaries = selectedRows.map((row, index) => ({
+    id: `s${index + 1}`,
+    title: row.title,
+    ...(row.pageStart || row.pageEnd
+      ? { pages: [row.pageStart, row.pageEnd].filter(Boolean).join("–") }
+      : {}),
+    text: summaryText(row),
+  }));
+  return {
+    evidence: evidence.slice(0, 24),
+    noteEvidence: [],
+    coverage: `依据全书 ${rows.length} 个章节的摘要与 ${evidence.length} 段原文。`,
+    fallback: retrieveEvidence(data, request),
+    layout: "summary",
+    summarySections: sectionSummaries,
+    ...(outline ? { outlines: new Map([[`${source.id}:${source.versionId}`, outline]]) } : {}),
+  };
+}
+
 function evidenceJson(citation: Citation, id: string, outlines?: Map<string, OutlineItem[]>) {
   const path =
     citation.page !== undefined
@@ -506,6 +638,27 @@ export function groundingMessages(
             title: evidence.title,
             text: evidence.quote,
           })),
+        }),
+      },
+    ];
+  }
+  if (grounding.layout === "summary") {
+    return [
+      {
+        role: "system",
+        content: `${systemContent}\nsectionSummaries are AI-generated navigation notes. Use them to understand the document's structure, but never cite them; cite only e IDs.`,
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          question: request.question,
+          priorUserQuestions: normalizeUserQuestionContext(request.userContext),
+          ...(options.priorAnswers?.length ? { priorAssistantAnswers: options.priorAnswers } : {}),
+          coverage: grounding.coverage,
+          sectionSummaries: grounding.summarySections ?? [],
+          evidence: grounding.evidence.map((citation, index) =>
+            evidenceJson(citation, `e${index + 1}`, grounding.outlines),
+          ),
         }),
       },
     ];

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -25,12 +25,15 @@ import "./source-detail-panel.css";
 
 /** The three sections of a source's details; the shell keeps this in its state
  * so returning from the reader can reopen the exact section that was open. */
-export type SourceDetailTab = "basic" | "recognized" | "versions";
+export type SourceDetailTab = "basic" | "recognized" | "versions" | "summary";
+
+const summariesEnabled = process.env.NEXT_PUBLIC_CONUO_FEATURE_SECTION_SUMMARIES === "on";
 
 const tabs: { id: SourceDetailTab; label: string }[] = [
   { id: "basic", label: "基本" },
   { id: "recognized", label: "已识别内容" },
   { id: "versions", label: "版本" },
+  ...(summariesEnabled ? [{ id: "summary" as const, label: "全书摘要" }] : []),
 ];
 
 export type SourceDetailPanelProps = {
@@ -76,6 +79,46 @@ export default function SourceDetailPanel({
   const closeActions = useCallback(() => setActionsOpen(false), []);
   useMenuDismissal(actionsOpen, actionsMenu, closeActions);
   const versions = detail.versions ?? [];
+  const [summaryState, setSummaryState] = useState<{
+    state: string;
+    sectionsDone?: number;
+    sectionsTotal?: number;
+    summaries?: Array<{
+      level: "section" | "document";
+      title: string;
+      summary?: { paragraphs?: Array<{ text: string; chunkIds: string[] }> };
+      chunkIds: string[];
+    }>;
+  } | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  useEffect(() => {
+    if (!summariesEnabled || tab !== "summary") return;
+    let active = true;
+    void fetch(
+      `/api/v1/sources/${encodeURIComponent(detail.id)}/versions/${encodeURIComponent(detail.versionId)}/summary`,
+      { cache: "no-store" },
+    )
+      .then((response) => (response.ok ? response.json() : null))
+      .then((value) => {
+        if (active && value && typeof value === "object") setSummaryState(value);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [detail.id, detail.versionId, tab]);
+  const requestSummary = async () => {
+    setSummaryLoading(true);
+    try {
+      const response = await fetch(
+        `/api/v1/sources/${encodeURIComponent(detail.id)}/versions/${encodeURIComponent(detail.versionId)}/summary`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
+      );
+      if (response.ok) setSummaryState(await response.json());
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
 
   return (
     <aside className="source-detail-panel" aria-label="资料详情">
@@ -306,6 +349,69 @@ export default function SourceDetailPanel({
               与恢复历史版本都会改变当前正文和引用，需要在阅读器的「更多资料操作 ·{" "}
               {detail.kind === "web" ? "网页版本记录" : "资料版本记录"}」中确认。
             </p>
+          </section>
+        )}
+        {tab === "summary" && summariesEnabled && (
+          <section aria-label="全书摘要">
+            {!summaryState || summaryState.state === "not_requested" ? (
+              <>
+                <p>会按章节调用 AI，计入每日摘要额度。</p>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={summaryLoading}
+                  onClick={() => void requestSummary()}
+                >
+                  {summaryLoading ? "正在请求…" : "生成全书摘要"}
+                </button>
+              </>
+            ) : summaryState.state === "queued" || summaryState.state === "running" ? (
+              <p>
+                正在生成摘要：第 {summaryState.sectionsDone ?? 0}／
+                {summaryState.sectionsTotal ?? "?"} 章。
+              </p>
+            ) : (
+              <>
+                {summaryState.summaries
+                  ?.filter((row) => row.level === "document")
+                  .flatMap((row) => row.summary?.paragraphs ?? [])
+                  .map((paragraph, index) => (
+                    <p key={`document-${index}`}>
+                      {paragraph.text}{" "}
+                      {paragraph.chunkIds.map((chunkId) => {
+                        const chunk = detail.chunks.find((item) => item.id === chunkId);
+                        return chunk ? (
+                          <button
+                            key={chunkId}
+                            type="button"
+                            className="text-button"
+                            onClick={() =>
+                              onOpenSource({
+                                sourceId: detail.id,
+                                versionId: detail.versionId,
+                                chunkId,
+                                title: detail.title,
+                                quote: chunk.text,
+                                page: chunk.page,
+                                section: chunk.section,
+                              })
+                            }
+                          >
+                            查看原文
+                          </button>
+                        ) : null;
+                      })}
+                    </p>
+                  ))}
+                <ol>
+                  {summaryState.summaries
+                    ?.filter((row) => row.level === "section")
+                    .map((row) => (
+                      <li key={row.title}>{row.title}</li>
+                    ))}
+                </ol>
+              </>
+            )}
           </section>
         )}
       </div>

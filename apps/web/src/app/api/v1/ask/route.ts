@@ -28,6 +28,7 @@ import {
   GROUNDING_CONTRACT_VERSION,
   buildFullDocumentGrounding,
   buildGrounding,
+  buildSummaryGrounding,
   groundingMessages,
   parseGeneratedAnswer,
   renderGeneratedAnswer,
@@ -61,6 +62,7 @@ import {
   type AnswerStreamSink,
 } from "@/lib/ai/answer-response-stream";
 import type { OutlineItem } from "@/lib/source-outline";
+import { SUMMARY_CONTRACT_VERSION } from "@/lib/ai/source-summary";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -256,6 +258,25 @@ const outlineRowSchema = z
     updatedAt: z.string(),
   })
   .strict();
+const summaryRowSchema = z
+  .object({
+    level: z.enum(["section", "document"]),
+    sectionIndex: z.number().int().min(0).max(1000),
+    title: z.string().min(1).max(200),
+    pageStart: z.number().int().positive().nullable().optional(),
+    pageEnd: z.number().int().positive().nullable().optional(),
+    chunkIds: z.array(z.string()).min(1).max(400),
+    summary: z
+      .object({
+        paragraphs: z
+          .array(z.object({ text: z.string(), chunkIds: z.array(z.string()).min(1).max(6) }))
+          .max(8),
+      })
+      .passthrough(),
+    modelName: z.string().nullable().optional(),
+    createdAt: z.string().optional(),
+  })
+  .strict();
 
 async function readSourceOutlines(
   supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
@@ -283,6 +304,33 @@ async function readSourceOutlines(
     return { outlines, fingerprint: fingerprint.length ? JSON.stringify(fingerprint) : null };
   } catch {
     return { outlines: new Map<string, OutlineItem[]>(), fingerprint: null };
+  }
+}
+
+async function readSourceSummaries(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  source: WorkspaceData["sources"][number],
+) {
+  try {
+    const { data, error } = await supabase.rpc("read_source_summaries", {
+      p_source_id: source.id,
+      p_version_id: source.versionId,
+    });
+    if (error || !Array.isArray(data))
+      return { rows: [] as import("@/lib/ai/grounding").SummaryRow[], fingerprint: null };
+    const rows = data.flatMap((value: unknown) => {
+      const parsed = summaryRowSchema.safeParse(value);
+      return parsed.success ? [parsed.data] : [];
+    });
+    const fingerprint = rows
+      .map((row) => [row.level, row.sectionIndex, row.createdAt ?? ""])
+      .sort((a, b) => a.join("/").localeCompare(b.join("/")));
+    return {
+      rows: rows as import("@/lib/ai/grounding").SummaryRow[],
+      fingerprint: fingerprint.length ? JSON.stringify(fingerprint) : null,
+    };
+  } catch {
+    return { rows: [] as import("@/lib/ai/grounding").SummaryRow[], fingerprint: null };
   }
 }
 
@@ -563,6 +611,21 @@ export async function POST(request: Request) {
         const outlineFingerprint = sourceOutlines.fingerprint
           ? [`outlines:${sourceOutlines.fingerprint}`]
           : [];
+        const summaryRequested =
+          Boolean(config) &&
+          aiFeatureEnabled("SECTION_SUMMARIES") &&
+          selectedSources(initial, question).length === 1 &&
+          (classifyQuestionIntent(question.question) === "summary" ||
+            /第([一二三四五六七八九十百\d]+)(?:章|节|部分)|chapter\s+(\d+)|section\s+(\d+)/iu.test(
+              question.question,
+            ));
+        const sourceSummary = summaryRequested
+          ? await readSourceSummaries(supabase, selectedSources(initial, question)[0]!)
+          : { rows: [], fingerprint: null };
+        const summaryFingerprint = sourceSummary.fingerprint
+          ? [`summaries:${sourceSummary.fingerprint}`]
+          : [];
+        const summaryAvailable = sourceSummary.rows.some((row) => row.level === "document");
         const verifyEnabled = aiFeatureEnabled("ANSWER_VERIFY");
         const rerankEnabled = aiFeatureEnabled("RERANK");
         let rerankConfig = null;
@@ -616,6 +679,7 @@ export async function POST(request: Request) {
                 ...(verifyEnabled ? [VERIFY_CONTRACT_VERSION] : []),
                 ...(memoryEnabled ? ["memory:" + priorMemory.key] : []),
                 ...outlineFingerprint,
+                ...(summaryAvailable ? [SUMMARY_CONTRACT_VERSION, ...summaryFingerprint] : []),
               ]),
             )
             .digest("hex");
@@ -802,6 +866,16 @@ export async function POST(request: Request) {
             ? fullDocument
             : null;
         const grounding =
+          (summaryAvailable
+            ? buildSummaryGrounding(
+                initial,
+                question,
+                sourceSummary.rows,
+                sourceOutlines.outlines.get(
+                  `${selectedSources(initial, question)[0]?.id}:${selectedSources(initial, question)[0]?.versionId}`,
+                ) ?? null,
+              )
+            : null) ??
           longContext ??
           buildGrounding(initial, question, retrieved, {
             neighborRadius,
@@ -844,6 +918,7 @@ export async function POST(request: Request) {
                   ...(verifyEnabled ? [VERIFY_CONTRACT_VERSION] : []),
                   ...(memoryEnabled ? ["memory:" + priorMemory.key] : []),
                   ...outlineFingerprint,
+                  ...(summaryAvailable ? [SUMMARY_CONTRACT_VERSION, ...summaryFingerprint] : []),
                 ]),
               )
               .digest("hex"),
