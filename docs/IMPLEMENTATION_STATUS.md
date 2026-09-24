@@ -6,6 +6,14 @@
 
 [PRD](PRD.md) 定义目标需求，[技术方案](TECH_STACK.md) 定义目标架构；本页说明实际代码与验证边界。Supabase 配置见 [CLOUD_SETUP.md](CLOUD_SETUP.md)，真实云端验收见 [CLOUD_E2E_ACCEPTANCE.md](CLOUD_E2E_ACCEPTANCE.md)，生产发布闸门见 [PRODUCTION_RELEASE.md](PRODUCTION_RELEASE.md)，模型接入见 [MODEL_SETUP.md](MODEL_SETUP.md)，PDF 区域视觉见 [REGION_STUDY.md](REGION_STUDY.md)，批注位置见 [ANNOTATION_POSITIONS.md](ANNOTATION_POSITIONS.md)，流式问答见 [STREAMING_ANSWERS.md](STREAMING_ANSWERS.md)，搜索与任务见 [SEARCH_INDEXING.md](SEARCH_INDEXING.md)，网页提取见 [WEB_IMPORT.md](WEB_IMPORT.md)，文件替换见 [FILE_VERSIONS.md](FILE_VERSIONS.md)，整理见 [ORGANIZATION.md](ORGANIZATION.md)，安全撤回见 [KNOWLEDGE_UPDATE_WITHDRAWAL.md](KNOWLEDGE_UPDATE_WITHDRAWAL.md)，备份见 [EXPORT_FORMAT.md](EXPORT_FORMAT.md)，恢复见 [BACKUP_RESTORE.md](BACKUP_RESTORE.md)。
 
+## AI 增强 WP-03（2026-09-23，本地）
+
+- 范围：新增 `public.answer_feedback` 迁移、`POST/DELETE /api/v1/ai/feedback`、回答完成后的反馈控件与设置页隐私说明；功能开关 `NEXT_PUBLIC_CONUO_FEATURE_ANSWER_FEEDBACK` 默认关闭。
+- 数据边界：默认只保存评分、原因和回答标识；用户勾选后才保存问题与回答。表启用 RLS 并撤销直接访问，RPC 校验登录、账号注销状态、请求 ID、原因枚举、长度及重复 requestId 更新。
+- 客户端与回流：共享回答面板支持有帮助／没帮助、原因、可选评论、显式内容附带和撤回；`apps/web/eval/README.md` 记录 service_role 只读导出、人工去标识和追加评测集流程，不自动导出。
+- 测试：新增 SQL、路由和 jsdom 组件测试；全量 Vitest、typecheck、lint 和定向格式检查结果见实施进度表。离线检索评测通过，`grounding-v7` 基线总体及 15 类均为 1.0。
+- 未验收边界：未执行远程迁移、真实云端反馈、部署或 staging 开关；仓库级格式检查仍被既有 `._*` AppleDouble 文件阻断。
+
 ## AI 增强 WP-01（2026-09-23，本地）
 
 - 范围：修复问句词覆盖检索结果；新增问题意图分类、全文均匀抽样、跨资料轮询、选段相邻片段与跨语言无命中回退；`GROUNDING_CONTRACT_VERSION` 从 `grounding-v6` 升至 `grounding-v7`。

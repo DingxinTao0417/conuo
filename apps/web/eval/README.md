@@ -16,3 +16,18 @@ CONUO_EVAL_MODEL=1 CONUO_EVAL_MAX_CASES=40 npx vitest run eval/model.eval.test.t
 ```
 
 All corpus files are self-authored. Do not add user documents, copied textbook passages, or web pages.
+
+## 反馈转评测用例
+
+回答反馈默认只保存评分和原因，不保存问题或回答内容。只有用户明确勾选附上内容后，反馈才可作为人工整理评测样本的输入。
+
+由具备 `service_role` 权限的维护人员只读导出负面反馈：
+
+```sql
+select request_id, question, answer, reasons, comment, contract_version
+from public.answer_feedback
+where rating = 'down' and include_content = true
+order by created_at;
+```
+
+人工逐条重写为去除个人信息的自有评测用例，确认资料范围和引用仍然适用后，再追加到 `datasets/core.jsonl`。不要把导出结果直接提交到仓库，也不要自动生成评测集。
