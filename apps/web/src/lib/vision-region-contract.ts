@@ -43,6 +43,13 @@ export const visionImageInputSchema = z
   })
   .strict();
 
+const visionHistoryItemSchema = z
+  .object({
+    question: z.string().trim().min(1).max(2_000),
+    answer: z.string().trim().min(1).max(2_000),
+  })
+  .strict();
+
 export const visionStudyRequestSchema = z
   .object({
     requestId: id,
@@ -50,6 +57,7 @@ export const visionStudyRequestSchema = z
     provenance: visionProvenanceSchema,
     image: visionImageInputSchema,
     question: z.string().trim().min(1).max(2_000).optional(),
+    history: z.array(visionHistoryItemSchema).max(3).optional(),
   })
   .strict()
   .superRefine((request, context) => {

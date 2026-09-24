@@ -101,6 +101,34 @@ describe("vision region client", () => {
     });
   });
 
+  it("sends same-region follow-up history with the next request", async () => {
+    const response = {
+      mode: "vision",
+      task: "ask",
+      provenance: {
+        sourceId: "source-one",
+        versionId: "version-one",
+        page: 3,
+        region: capture.region,
+      },
+      content: "继续解释。",
+    };
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => json(response));
+    vi.stubGlobal("fetch", fetch);
+    await requestVisionRegionStudy(
+      {
+        capture,
+        task: "ask",
+        question: "继续解释？",
+        history: [{ question: "上一问", answer: "上一答" }],
+        requestId: "request-two",
+      },
+      "account-one",
+    );
+    const body = JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit).body));
+    expect(body.history).toEqual([{ question: "上一问", answer: "上一答" }]);
+  });
+
   it("rejects a response rebound to another page", async () => {
     vi.stubGlobal(
       "fetch",

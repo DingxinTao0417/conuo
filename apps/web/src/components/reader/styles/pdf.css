@@ -87,6 +87,14 @@
   user-select: none;
   z-index: 2;
 }
+.reader-pdf-region-highlight {
+  position: absolute;
+  border: 3px solid #4b3fe3;
+  background: #4b3fe326;
+  box-shadow: 0 0 0 4px #ffffffb8;
+  pointer-events: none;
+  z-index: 4;
+}
 .reader-pdf-status {
   position: sticky;
   left: 12px;

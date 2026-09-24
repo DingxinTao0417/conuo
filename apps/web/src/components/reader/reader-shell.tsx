@@ -129,6 +129,7 @@ import type {
   ExcerptKnowledgeTarget,
   ReaderProps,
   ReaderSearchResult,
+  ReaderRegionTarget,
   RegionCaptureStart,
   SelectionToolbarPosition,
 } from "./reader-types";
@@ -222,6 +223,8 @@ export default function Reader(props: ReaderProps) {
     getSourceBlob,
     initialCitation,
     onCitationConsumed,
+    initialRegion,
+    onRegionConsumed,
   } = props;
   const liveSource = props.currentSource ?? sources.find((item) => item.id === source.id) ?? source;
   const historical = liveSource.versionId !== source.versionId;
@@ -242,6 +245,7 @@ export default function Reader(props: ReaderProps) {
   // scroll position. Tablets still use the reader-plus-slide-over pattern.
   const [mobileTab, setMobileTab] = useState<"reading" | "ai" | "citation">("reading");
   const [page, setPage] = useState(source.readPage || 1);
+  const [regionHighlight, setRegionHighlight] = useState<ReaderRegionTarget | null>(null);
   const pageRef = useRef(source.readPage || 1);
   const [pages, setPages] = useState(source.pageCount || 1);
   const [pdfReadingMode] = useState<PdfReadingMode>("continuous");
@@ -783,6 +787,22 @@ export default function Reader(props: ReaderProps) {
     }
     if (initialCitation) onCitationConsumed?.();
   }, [focusCitation, source.id, source.versionId, sources, initialCitation, onCitationConsumed]);
+
+  useEffect(() => {
+    if (
+      !initialRegion ||
+      initialRegion.sourceId !== source.id ||
+      initialRegion.versionId !== source.versionId
+    )
+      return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRegionHighlight(initialRegion);
+    pageRef.current = initialRegion.page;
+    setPage(initialRegion.page);
+    setPdfNavigationRequest((value) => value + 1);
+    setMobileTab("reading");
+    onRegionConsumed?.();
+  }, [initialRegion, onRegionConsumed, source.id, source.versionId]);
 
   useEffect(() => {
     if (mobileTab !== "citation") return;
@@ -2523,6 +2543,13 @@ export default function Reader(props: ReaderProps) {
                   cloudSaveConfirmed={props.saveState === "cloud" && !historical}
                   onOutline={setPdfOutlineItems}
                   page={page}
+                  highlightRegion={
+                    regionHighlight?.sourceId === source.id &&
+                    regionHighlight.versionId === source.versionId &&
+                    regionHighlight.page === page
+                      ? regionHighlight.rect
+                      : undefined
+                  }
                   readingMode={pdfReadingMode}
                   navigationRequest={pdfNavigationRequest}
                   scrollContainerRef={textContainer}
@@ -3111,6 +3138,7 @@ export default function Reader(props: ReaderProps) {
         <RegionStudyPanel
           capture={currentRegionCapture}
           sourceTitle={source.title}
+          spaceId={props.space.id}
           expectedUserId={props.cloudUserId}
           onClose={() => setRegionCapture(null)}
           onRecapture={() => {

@@ -15,6 +15,7 @@ import { citationSchema } from "@/lib/citation-schema";
 import { resolveSavedCitation } from "@/lib/retrieval";
 import type { Citation, WorkspaceData } from "@/lib/types";
 import type { LearningItem, ReviewRating } from "@/lib/learning/types";
+import type { PdfCaptureRegion } from "@/components/pdf-capture";
 import type { WorkspaceUser } from "../types";
 
 export type ReviewSectionProps = {
@@ -22,6 +23,7 @@ export type ReviewSectionProps = {
   spaceId: string;
   user: NonNullable<WorkspaceUser>;
   openSource: (sourceId: string, versionId: string, citation?: Citation) => void;
+  openRegion?: (sourceId: string, versionId: string, page: number, rect: PdfCaptureRegion) => void;
 };
 
 const ratingLabels: Record<ReviewRating, string> = {
@@ -64,6 +66,31 @@ function citationList(item: LearningItem): Citation[] {
   });
 }
 
+function regionOrigin(item: LearningItem) {
+  if (item.origin !== "region" || !item.originRef || typeof item.originRef !== "object")
+    return null;
+  const value = item.originRef as Record<string, unknown>;
+  const sourceId = typeof value.sourceId === "string" ? value.sourceId : "";
+  const versionId = typeof value.versionId === "string" ? value.versionId : "";
+  const page = typeof value.page === "number" && Number.isSafeInteger(value.page) ? value.page : 0;
+  const rect = value.rect;
+  if (!sourceId || !versionId || page < 1 || !rect || typeof rect !== "object") return null;
+  const candidate = rect as Record<string, unknown>;
+  const values = [candidate.x, candidate.y, candidate.width, candidate.height];
+  if (values.some((entry) => typeof entry !== "number" || !Number.isFinite(entry))) return null;
+  const normalized = candidate as unknown as PdfCaptureRegion;
+  if (
+    normalized.x < 0 ||
+    normalized.y < 0 ||
+    normalized.width <= 0 ||
+    normalized.height <= 0 ||
+    normalized.x + normalized.width > 1 ||
+    normalized.y + normalized.height > 1
+  )
+    return null;
+  return { sourceId, versionId, page, rect: normalized };
+}
+
 function mergeLearningQueue(batches: LearningItem[][]): LearningItem[] {
   const seen = new Set<string>();
   return batches
@@ -76,7 +103,13 @@ function mergeLearningQueue(batches: LearningItem[][]): LearningItem[] {
     .sort((left, right) => (left.dueAt ?? "").localeCompare(right.dueAt ?? ""));
 }
 
-export default function ReviewSection({ data, spaceId, user, openSource }: ReviewSectionProps) {
+export default function ReviewSection({
+  data,
+  spaceId,
+  user,
+  openSource,
+  openRegion,
+}: ReviewSectionProps) {
   const targetSpaceIds = useMemo(
     () =>
       spaceId === "all"
@@ -234,6 +267,7 @@ export default function ReviewSection({ data, spaceId, user, openSource }: Revie
   }, [item, rate, revealed, reviewing]);
 
   const citations = item ? citationList(item) : [];
+  const region = item ? regionOrigin(item) : null;
   const newCount = queue.filter((candidate) => (candidate.reps ?? 0) === 0).length;
 
   return (
@@ -341,6 +375,23 @@ export default function ReviewSection({ data, spaceId, user, openSource }: Revie
                       </span>
                     );
                   })}
+                </div>
+              )}
+              {item.origin === "region" && (
+                <div aria-label="区域来源">
+                  {region && openRegion ? (
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() =>
+                        openRegion(region.sourceId, region.versionId, region.page, region.rect)
+                      }
+                    >
+                      打开原页区域
+                    </button>
+                  ) : (
+                    <span className="muted">原页区域已不可用</span>
+                  )}
                 </div>
               )}
               {answer.trim() && item.kind !== "recall" && (

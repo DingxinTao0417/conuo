@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import type { PdfCaptureResult } from "./pdf-capture";
+import { newReviewCard } from "@/lib/learning/fsrs";
 import {
   getVisionRegionAvailability,
   requestVisionRegionStudy,
@@ -36,6 +37,7 @@ const tasks: { id: StudyTask; label: string; description: string; icon: typeof L
 export interface RegionStudyPanelProps {
   capture: PdfCaptureResult;
   sourceTitle: string;
+  spaceId: string;
   expectedUserId: string;
   onClose: () => void;
   onRecapture: () => void;
@@ -72,6 +74,7 @@ const sectionLabels = {
 export default function RegionStudyPanel({
   capture,
   sourceTitle,
+  spaceId,
   expectedUserId,
   onClose,
   onRecapture,
@@ -88,6 +91,8 @@ export default function RegionStudyPanel({
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
+  const [history, setHistory] = useState<Array<{ question: string; answer: string }>>([]);
+  const [savedQuestions, setSavedQuestions] = useState<Set<number>>(new Set());
   const [previewUrl, setPreviewUrl] = useState("");
   const requestController = useRef<AbortController | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -199,11 +204,18 @@ export default function RegionStudyPanel({
           task,
           requestId: crypto.randomUUID(),
           ...(task === "ask" ? { question } : {}),
+          ...(task === "ask" && history.length ? { history } : {}),
         },
         expectedUserId,
         controller.signal,
       );
-      if (!controller.signal.aborted) setResult(next);
+      if (!controller.signal.aborted) {
+        setResult(next);
+        if (task === "ask" && next.task === "ask")
+          setHistory((current) =>
+            [...current, { question: question.trim(), answer: next.content }].slice(-3),
+          );
+      }
     } catch (cause) {
       if (controller.signal.aborted) return;
       setError(
@@ -225,6 +237,46 @@ export default function RegionStudyPanel({
     } catch {
       setError("复制失败，请手动选择结果文字。");
     }
+  }
+
+  async function saveQuizQuestion(
+    question: { question: string; answer: string; explanation: string },
+    index: number,
+  ) {
+    if (savedQuestions.has(index)) return;
+    const card = newReviewCard();
+    const response = await fetch("/api/v1/learning/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Conuo-User": expectedUserId },
+      body: JSON.stringify({
+        items: [
+          {
+            itemId: crypto.randomUUID().replaceAll("-", ""),
+            spaceId,
+            kind: "short",
+            prompt: question.question,
+            answer: { text: question.answer },
+            explanation: question.explanation,
+            citations: [],
+            origin: "region",
+            originRef: {
+              sourceId: capture.identity.sourceId,
+              versionId: capture.identity.versionId,
+              page: capture.identity.page,
+              rect: capture.region,
+            },
+            status: "active",
+            card: card.card,
+            dueAt: card.dueAt,
+          },
+        ],
+      }),
+    });
+    if (!response.ok) {
+      setError("加入复习失败，请稍后重试。");
+      return;
+    }
+    setSavedQuestions((current) => new Set(current).add(index));
   }
 
   const available = availability.state === "ready" && availability.value.available;
@@ -398,6 +450,13 @@ export default function RegionStudyPanel({
                           <div className="region-study-quiz-question">
                             <RegionStudyMarkdown content={item.question} />
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => void saveQuizQuestion(item, index)}
+                            disabled={savedQuestions.has(index)}
+                          >
+                            {savedQuestions.has(index) ? "已加入复习" : "加入复习"}
+                          </button>
                           <button
                             type="button"
                             onClick={() =>

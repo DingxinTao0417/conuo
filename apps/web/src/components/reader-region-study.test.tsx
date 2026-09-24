@@ -198,6 +198,23 @@ describe("Reader region study integration", () => {
     expect((bridge.pdfProps?.capture as { active: boolean }).active).toBe(false);
   });
 
+  it("jumps to and highlights a saved review region", async () => {
+    const onRegionConsumed = vi.fn();
+    const rect = { x: 0.1, y: 0.2, width: 0.3, height: 0.25 };
+    await render({
+      initialRegion: {
+        sourceId: "pdf-source",
+        versionId: "pdf-version",
+        page: 4,
+        rect,
+      },
+      onRegionConsumed,
+    });
+    expect(bridge.pdfProps?.page).toBe(4);
+    expect(bridge.pdfProps?.highlightRegion).toEqual(rect);
+    expect(onRegionConsumed).toHaveBeenCalledOnce();
+  });
+
   it("ends selection when the account changes before any screenshot is captured", async () => {
     await click(regionTriggers()[0]!);
     expect(captureControl().active).toBe(true);
@@ -279,9 +296,7 @@ describe("Reader region study integration", () => {
     // The parsed-text switch is a pressed-state control in the tool strip now,
     // so it is addressed by the label the reader actually sees.
     const toggle = [
-      ...host.querySelectorAll<HTMLButtonElement>(
-        "[data-reader-desktop-bottom-controls] button",
-      ),
+      ...host.querySelectorAll<HTMLButtonElement>("[data-reader-desktop-bottom-controls] button"),
     ].find((button) => button.textContent?.trim() === "解析文本");
     expect(toggle).toBeTruthy();
     await click(toggle!);

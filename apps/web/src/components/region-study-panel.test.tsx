@@ -30,11 +30,24 @@ const capture: PdfCaptureResult = {
   bytes: 6,
 };
 
+const quizResult: VisionStudyResult = {
+  mode: "vision",
+  task: "quiz",
+  provenance: {
+    sourceId: "source-one",
+    versionId: "version-one",
+    page: 7,
+    region: capture.region,
+  },
+  questions: [{ question: "图中极限是多少？", answer: "1", explanation: "使用等价无穷小。" }],
+};
+
 describe("RegionStudyPanel", () => {
   let host: HTMLDivElement;
   let root: Root;
   let onClose: ReturnType<typeof vi.fn<() => void>>;
   let onRecapture: ReturnType<typeof vi.fn<() => void>>;
+  let fetch: ReturnType<typeof vi.fn<typeof globalThis.fetch>>;
 
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -49,6 +62,10 @@ describe("RegionStudyPanel", () => {
     });
     mock.availability.mockReset();
     mock.request.mockReset();
+    fetch = vi.fn<typeof globalThis.fetch>(
+      async () => new Response(JSON.stringify({}), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetch);
     mock.availability.mockResolvedValue({ available: true, message: "多模态模型已就绪。" });
     onClose = vi.fn<() => void>();
     onRecapture = vi.fn<() => void>();
@@ -69,6 +86,7 @@ describe("RegionStudyPanel", () => {
         createElement(RegionStudyPanel, {
           capture,
           sourceTitle: "高等数学",
+          spaceId: "space-one",
           expectedUserId: "account-one",
           onClose,
           onRecapture,
@@ -301,6 +319,76 @@ describe("RegionStudyPanel", () => {
     await click(button("查看答案"));
     expect(host.textContent).toContain("答案：1");
     expect(host.textContent).toContain("解析：使用等价无穷小。");
+  });
+
+  it("passes same-region history on a follow-up question", async () => {
+    mock.request
+      .mockResolvedValueOnce({
+        mode: "vision",
+        task: "ask",
+        provenance: {
+          sourceId: "source-one",
+          versionId: "version-one",
+          page: 7,
+          region: capture.region,
+        },
+        content: "第一次回答。",
+      } satisfies VisionStudyResult)
+      .mockResolvedValueOnce({
+        mode: "vision",
+        task: "ask",
+        provenance: {
+          sourceId: "source-one",
+          versionId: "version-one",
+          page: 7,
+          region: capture.region,
+        },
+        content: "第二次回答。",
+      } satisfies VisionStudyResult);
+    await render();
+    await click(button("提问"));
+    await act(async () => enterTextarea("第一问"));
+    await click(button("发送问题"));
+    await act(async () => enterTextarea("第二问"));
+    await click(button("发送问题"));
+    expect(mock.request).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ history: [{ question: "第一问", answer: "第一次回答。" }] }),
+      "account-one",
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("saves a selected visual exercise into learning with region provenance", async () => {
+    mock.request.mockResolvedValue(quizResult);
+    await render();
+    await click(button("出题"));
+    await click(host.querySelector<HTMLButtonElement>(".region-study-run")!);
+    await click(button("加入复习"));
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/v1/learning/items",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.any(String),
+      }),
+    );
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]).toMatchObject({
+      spaceId: "space-one",
+      kind: "short",
+      prompt: "图中极限是多少？",
+      answer: { text: "1" },
+      explanation: "使用等价无穷小。",
+      citations: [],
+      origin: "region",
+      originRef: {
+        sourceId: "source-one",
+        versionId: "version-one",
+        page: 7,
+        rect: capture.region,
+      },
+    });
   });
 
   it("does not offer image submission when the vision service is unavailable", async () => {

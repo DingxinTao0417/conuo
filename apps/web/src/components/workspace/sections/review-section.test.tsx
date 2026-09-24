@@ -124,6 +124,8 @@ describe("ReviewSection", () => {
     await act(async () =>
       host.querySelector<HTMLButtonElement>('button[aria-label="查看答案"]')?.click(),
     );
+    await vi.waitFor(() => expect(host.textContent).toContain("学习率是步长系数。"));
+    console.log("REGION_REVIEW_TEXT", host.textContent);
     expect(host.textContent).toContain("学习率是步长系数。");
     await act(async () =>
       host.querySelector<HTMLButtonElement>('button[aria-label="评分：记得"]')?.click(),
@@ -153,9 +155,12 @@ describe("ReviewSection", () => {
     await act(async () => await Promise.resolve());
     await act(async () => host.querySelector<HTMLButtonElement>("button")?.click());
     const answer = host.querySelector<HTMLTextAreaElement>("textarea");
-    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
-    setter?.call(answer, "学习率是步长。");
-    answer?.dispatchEvent(new Event("input", { bubbles: true }));
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+      setter?.call(answer, "学习率是步长。");
+      answer?.dispatchEvent(new Event("input", { bubbles: true }));
+      answer?.dispatchEvent(new Event("change", { bubbles: true }));
+    });
     await act(async () =>
       host.querySelector<HTMLButtonElement>('button[aria-label="查看答案"]')?.click(),
     );
@@ -189,5 +194,57 @@ describe("ReviewSection", () => {
     );
     expect(start?.disabled).toBe(true);
     expect(host.textContent).toContain("复习已暂停");
+  });
+
+  it("opens the saved region after revealing a region review answer", async () => {
+    const regionItem = {
+      ...item,
+      origin: "region" as const,
+      originRef: {
+        sourceId: "source-a",
+        versionId: "version-a",
+        page: 4,
+        rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.25 },
+      },
+    };
+    const openRegion = vi.fn();
+    mock.getLearningQueue.mockResolvedValue([regionItem]);
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await act(async () => {
+      root.render(
+        createElement(ReviewSection, {
+          data,
+          spaceId: "space-a",
+          user: { id: "owner-a", email: "learner@example.test" },
+          openSource: vi.fn(),
+          openRegion,
+        }),
+      );
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(host.textContent).toContain("今日到期 1"));
+    await act(async () => host.querySelector<HTMLButtonElement>("button")?.click());
+    const answer = host.querySelector<HTMLTextAreaElement>("textarea");
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+      setter?.call(answer, "学习率是步长。");
+      answer?.dispatchEvent(new Event("input", { bubbles: true }));
+      answer?.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('button[aria-label="查看答案"]')?.click(),
+    );
+    const openButton = [...host.querySelectorAll<HTMLButtonElement>("button")].find((button) =>
+      button.textContent?.includes("打开原页区域"),
+    );
+    expect(openButton).toBeDefined();
+    await act(async () => openButton?.click());
+    expect(openRegion).toHaveBeenCalledWith("source-a", "version-a", 4, {
+      x: 0.1,
+      y: 0.2,
+      width: 0.3,
+      height: 0.25,
+    });
   });
 });

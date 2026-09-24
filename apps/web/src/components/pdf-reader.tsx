@@ -6,7 +6,12 @@ import type { Source } from "@/lib/types";
 import { readPdfOutline, sourceOutlineCache, type OutlineItem } from "@/lib/source-outline";
 import { AlertCircle, LoaderCircle } from "lucide-react";
 import PdfRegionSelector from "./pdf-region-selector";
-import type { PdfCaptureLimits, PdfCaptureResult, PdfCaptureSelection } from "./pdf-capture";
+import type {
+  PdfCaptureLimits,
+  PdfCaptureRegion,
+  PdfCaptureResult,
+  PdfCaptureSelection,
+} from "./pdf-capture";
 import { startForegroundCloudUpdateChecks } from "@/lib/foreground-cloud-updates";
 import { subscribeToInkPageHeads } from "@/lib/ink-live";
 import {
@@ -41,6 +46,7 @@ interface Props {
   onVisiblePageChange?: (page: number) => void;
   cloudSaveConfirmed?: boolean;
   onOutline?: (items: OutlineItem[]) => void;
+  highlightRegion?: PdfCaptureRegion;
 }
 
 interface PdfReaderFrame {
@@ -68,6 +74,7 @@ function PdfPage({
   onPageNode,
   onSize,
   inkPreviewUrl,
+  highlightRegion,
 }: {
   source: Source;
   page: number;
@@ -84,6 +91,7 @@ function PdfPage({
   onPageNode: (page: number, node: HTMLDivElement | null) => void;
   onSize: (page: number, size: { width: number; height: number }) => void;
   inkPreviewUrl?: string;
+  highlightRegion?: PdfCaptureRegion;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const textLayer = useRef<HTMLDivElement>(null);
@@ -279,6 +287,18 @@ function PdfPage({
                 />
               </>
             )}
+            {highlightRegion && (
+              <div
+                className="reader-pdf-region-highlight"
+                aria-label="原页区域"
+                style={{
+                  left: `${highlightRegion.x * 100}%`,
+                  top: `${highlightRegion.y * 100}%`,
+                  width: `${highlightRegion.width * 100}%`,
+                  height: `${highlightRegion.height * 100}%`,
+                }}
+              />
+            )}
             <div
               ref={textLayer}
               className="reader-pdf-text textLayer"
@@ -372,6 +392,7 @@ export default function PdfReader({
   onVisiblePageChange,
   cloudSaveConfirmed = false,
   onOutline,
+  highlightRegion,
 }: Props) {
   const wrapper = useRef<HTMLDivElement>(null);
   const pageNodes = useRef(new Map<number, HTMLDivElement>());
@@ -790,6 +811,7 @@ export default function PdfReader({
             onPageNode={registerPageNode}
             onSize={handleSize}
             inkPreviewUrl={inkPreviewPages[number]?.url}
+            highlightRegion={number === currentPage ? highlightRegion : undefined}
           />
         ))}
       {!loading && pdf && (

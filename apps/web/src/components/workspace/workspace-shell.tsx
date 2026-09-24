@@ -148,6 +148,8 @@ import NotesSection from "./sections/notes-section";
 import QuestionsSection from "./sections/questions-section";
 import PracticeSection from "./sections/practice-section";
 import ReviewSection from "./sections/review-section";
+import type { ReaderRegionTarget } from "@/components/reader/reader-types";
+import type { PdfCaptureRegion } from "@/components/pdf-capture";
 import SettingsSection from "./sections/settings/settings-section";
 import TrashSection from "./sections/trash-section";
 import {
@@ -293,6 +295,7 @@ export default function Workspace({
     spaceId: string;
   } | null>(null);
   const [pendingNoteCitation, setPendingNoteCitation] = useState<Citation | undefined>();
+  const [pendingRegion, setPendingRegion] = useState<ReaderRegionTarget | undefined>();
   const [pendingConversationId, setPendingConversationId] = useState<string | null>(null);
   const [pendingComparisonConversationId, setPendingComparisonConversationId] = useState<
     string | null
@@ -1351,6 +1354,7 @@ export default function Workspace({
     citation?: Citation,
     conversationId?: string,
     returnTarget?: ReaderReturnTarget,
+    region?: ReaderRegionTarget,
   ) {
     if (section === "library" && !sourceId)
       latestLibraryViewRoute.current = currentLibraryViewRoute;
@@ -1363,6 +1367,7 @@ export default function Workspace({
     setConversationRouteIssue("");
     setConversationToInspectId(null);
     setPendingConversationId(conversationId ?? null);
+    setPendingRegion(region);
     setPendingComparisonConversationId(null);
     readerReturnTargetRef.current = nextReturnTarget;
     setReaderReturnTarget(nextReturnTarget);
@@ -2936,6 +2941,8 @@ export default function Workspace({
             getSourceBlob={store.sourceBlob}
             initialCitation={pendingNoteCitation}
             onCitationConsumed={() => setPendingNoteCitation(undefined)}
+            initialRegion={pendingRegion}
+            onRegionConsumed={() => setPendingRegion(undefined)}
             initialConversationId={pendingConversationId ?? undefined}
           />
         ) : currentNote ? (
@@ -3197,7 +3204,20 @@ export default function Workspace({
               />
             )}
             {section === "review" && user && (
-              <ReviewSection data={data} spaceId={spaceId} user={user} openSource={openSource} />
+              <ReviewSection
+                data={data}
+                spaceId={spaceId}
+                user={user}
+                openSource={openSource}
+                openRegion={(sourceId, versionId, page, rect: PdfCaptureRegion) =>
+                  openSource(sourceId, versionId, undefined, undefined, undefined, {
+                    sourceId,
+                    versionId,
+                    page,
+                    rect,
+                  })
+                }
+              />
             )}
             {section === "trash" && (
               <TrashSection

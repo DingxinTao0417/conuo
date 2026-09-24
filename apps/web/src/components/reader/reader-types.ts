@@ -11,7 +11,7 @@ import type {
   Source,
   Space,
 } from "@/lib/types";
-import type { PdfCaptureResult } from "../pdf-capture";
+import type { PdfCaptureRegion, PdfCaptureResult } from "../pdf-capture";
 
 export type BoundPdfCaptureResult = PdfCaptureResult & {
   accountId: string;
@@ -21,6 +21,13 @@ export type RegionCaptureStart = {
   accountId: string;
   sourceId: string;
   versionId: string;
+};
+
+export type ReaderRegionTarget = {
+  sourceId: string;
+  versionId: string;
+  page: number;
+  rect: PdfCaptureRegion;
 };
 
 export interface ReaderProps {
@@ -102,6 +109,8 @@ export interface ReaderProps {
   getSourceBlob: (source: Source) => Promise<Blob | undefined>;
   initialCitation?: Citation;
   onCitationConsumed?: () => void;
+  initialRegion?: ReaderRegionTarget;
+  onRegionConsumed?: () => void;
   /** Opens a specific retained thread when navigation came from the question queue. */
   initialConversationId?: string;
 }

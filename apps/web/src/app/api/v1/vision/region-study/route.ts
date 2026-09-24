@@ -42,6 +42,25 @@ async function loadWorkspace(supabase: UserClient, ownerId: string) {
   return workspace.data;
 }
 
+function pageTextForRequest(
+  workspace: Awaited<ReturnType<typeof loadWorkspace>>,
+  input: VisionStudyRequest,
+) {
+  const source = workspace.sources.find(
+    (candidate) =>
+      candidate.id === input.provenance.sourceId &&
+      candidate.versionId === input.provenance.versionId,
+  );
+  if (!source) return undefined;
+  const pageText = source.chunks
+    .filter((chunk) => chunk.versionId === source.versionId && chunk.page === input.provenance.page)
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))
+    .map((chunk) => chunk.text)
+    .join("\n\n")
+    .slice(0, 6_000);
+  return pageText.trim() ? pageText : undefined;
+}
+
 function cancelled(): ApiError {
   return new ApiError(499, "REQUEST_CANCELLED", "区域视觉学习已停止，请重新选择区域后再试。");
 }
@@ -148,6 +167,7 @@ export async function POST(request: Request) {
     const image = validateVisionImage(input.image);
     const initial = await loadWorkspace(supabase, user.id);
     assertVisionSource(initial, input);
+    const pageText = pageTextForRequest(initial, input);
     const contextKey = visionSourceContextKey(initial, input);
     if (request.signal.aborted) throw cancelled();
 
@@ -175,6 +195,8 @@ export async function POST(request: Request) {
           input.task,
           input.question ?? null,
           input.provenance,
+          pageText ?? null,
+          input.history ?? null,
           image.mimeType,
           image.width,
           image.height,
@@ -223,14 +245,14 @@ export async function POST(request: Request) {
       const raw = aiFeatureEnabled("AI_TRACES")
         ? await callVisionModel(
             config,
-            visionStudyMessages(input),
+            visionStudyMessages(input, pageText),
             { mimeType: image.mimeType, base64: image.base64 },
             request.signal,
             { onUsage: (usage) => traceRecorder?.addUsage(usage) },
           )
         : await callVisionModel(
             config,
-            visionStudyMessages(input),
+            visionStudyMessages(input, pageText),
             { mimeType: image.mimeType, base64: image.base64 },
             request.signal,
           );

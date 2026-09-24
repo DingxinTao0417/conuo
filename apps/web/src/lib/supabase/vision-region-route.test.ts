@@ -228,6 +228,43 @@ describe("region visual-learning route", () => {
     expect(JSON.stringify(result)).not.toContain(input.image.dataUrl);
   });
 
+  it("sends only the current requested page text and bounded follow-up history", async () => {
+    const source = workspace.sources[0];
+    source.chunks = [
+      { ...source.chunks[0]!, id: "page-two-late", page: 2, order: 2, text: "当前页后半段。" },
+      { ...source.chunks[0]!, id: "page-one", page: 1, order: 1, text: "其他页不应发送。" },
+      { ...source.chunks[0]!, id: "page-two-early", page: 2, order: 1, text: "当前页前半段。" },
+    ];
+    const input = payload({
+      task: "ask",
+      question: "为什么？",
+      history: [{ question: "上一问", answer: "上一答" }],
+    });
+    mock.callVisionModel.mockImplementationOnce(async (_config, messages) => {
+      const user = JSON.parse(messages[1].content);
+      expect(user.pageText).toBe("当前页前半段。\n\n当前页后半段。");
+      expect(user.history).toEqual([{ question: "上一问", answer: "上一答" }]);
+      return JSON.stringify({ task: "ask", content: "因为当前页的条件如此。" });
+    });
+    const response = await POST(post(input));
+    expect(response.status).toBe(200);
+  });
+
+  it("truncates the current page text layer to 6000 characters", async () => {
+    const source = workspace.sources[0];
+    source.chunks = [
+      { ...source.chunks[0]!, id: "page-two-long", page: 2, order: 1, text: "x".repeat(7000) },
+    ];
+    const input = payload({ task: "ask", question: "这页写了什么？" });
+    mock.callVisionModel.mockImplementationOnce(async (_config, messages) => {
+      const user = JSON.parse(messages[1].content);
+      expect(user.pageText).toHaveLength(6000);
+      return JSON.stringify({ task: "ask", content: "当前页内容已读取。" });
+    });
+    const response = await POST(post(input));
+    expect(response.status).toBe(200);
+  });
+
   it("escapes model section headings while deriving canonical content on the server", async () => {
     const input = payload();
     const generated = explanation();
@@ -503,7 +540,7 @@ describe("region visual-learning route", () => {
         createHash("sha256")
           .update(
             JSON.stringify([
-              "vision-region-v3",
+              "vision-region-v4",
               config.baseUrl,
               config.model,
               config.jsonMode,
@@ -513,6 +550,8 @@ describe("region visual-learning route", () => {
               input.task,
               input.question ?? null,
               input.provenance,
+              null,
+              null,
               "image/png",
               input.image.width,
               input.image.height,

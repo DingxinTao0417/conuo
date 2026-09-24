@@ -141,6 +141,7 @@ export async function requestVisionRegionStudy(
     capture: PdfCaptureResult;
     task: "explain" | "ask" | "quiz";
     question?: string;
+    history?: Array<{ question: string; answer: string }>;
     requestId: string;
   },
   expectedUserId: string,
@@ -159,6 +160,7 @@ export async function requestVisionRegionStudy(
     },
     image: { dataUrl, width: input.capture.width, height: input.capture.height },
     ...(input.task === "ask" ? { question: input.question?.trim() } : {}),
+    ...(input.history?.length ? { history: input.history } : {}),
   });
   if (!request.success)
     throw new VisionRegionClientError(
