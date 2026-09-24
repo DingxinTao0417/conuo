@@ -25,12 +25,14 @@ import {
   stratifiedSample,
   uniqueCitations,
 } from "./evidence-assembly";
+import { sanitizeAnswerMarkdown, withLabel, withReferences } from "./answer-markdown";
 
 const MAX_CHUNKS = 12;
 const MAX_CONTEXT_CHARS = 24_000;
 const MAX_CHUNK_CHARS = 8_000;
 const SUMMARY_RETRIEVAL_SLOTS = 4;
-export const GROUNDING_CONTRACT_VERSION = "grounding-v7";
+export const GROUNDING_CONTRACT_VERSION = "grounding-v8";
+export type AnswerFormat = "plain" | "rich";
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
 const compact = (value: string) => value.replace(/\s+/g, "");
 const hasHan = (value: string) => /[\u3400-\u9fff]/.test(value);
@@ -260,7 +262,13 @@ export function buildGrounding(
 export function groundingMessages(
   grounding: Grounding,
   request: AnswerRequest,
+  options: { format?: AnswerFormat } = {},
 ): Array<{ role: "system" | "user"; content: string }> {
+  const format = options.format ?? "plain";
+  const answerFormatInstruction =
+    format === "rich"
+      ? "Every answered paragraph must cite at least one supplied evidence ID that supports it. Use kind source only with original-source e IDs and no n IDs; use kind note only with personal-note n IDs and no e IDs; use kind inference for a clearly marked deduction that may combine either type. Personal notes are the user's saved understanding, not original source material; never present them as quoted source text. Use at most 10 paragraphs, each at most 3000 characters. Each paragraph text may use this safe Markdown subset only: **bold**, *italic*, `inline code`, fenced code blocks, bulleted or numbered lists, GFM tables, inline math written as $...$, and display math with $$ on its own line before and after the formula. Never use headings, links, images, HTML, blockquotes, horizontal rules, footnotes, or bracketed numbers such as [1]. Escape backslashes correctly inside JSON strings (write \\\\frac for \\frac). Never invent page numbers."
+      : "Every answered paragraph must cite at least one supplied evidence ID that supports it. Use kind source only with original-source e IDs and no n IDs; use kind note only with personal-note n IDs and no e IDs; use kind inference for a clearly marked deduction that may combine either type. Personal notes are the user's saved understanding, not original source material; never present them as quoted source text. Use at most 10 paragraphs, each at most 2000 characters. Plain text only, no markdown, links, manually numbered citations or invented page numbers.";
   return [
     {
       role: "system",
@@ -270,7 +278,7 @@ export function groundingMessages(
         "Explain clearly. Preserve disagreements and conditions across sources; do not invent consensus. Mark deductions as inference. Do not claim coverage beyond the supplied passages.",
         "Never use a numeric confidence, certainty, reliability, credibility, probability, score or percentage to rate your own answer or conclusion. 不得输出可信度、置信度、把握度、可靠性、确定性或概率的数字、分数或百分比来评价本回答或结论。 If evidence is insufficient, return insufficient instead.",
         'Return ONLY a JSON object: {"status":"answered"|"insufficient","paragraphs":[{"text":"plain text paragraph","evidenceIds":["e1"],"kind":"source"|"note"|"inference"}]}.',
-        "Every answered paragraph must cite at least one supplied evidence ID that supports it. Use kind source only with original-source e IDs and no n IDs; use kind note only with personal-note n IDs and no e IDs; use kind inference for a clearly marked deduction that may combine either type. Personal notes are the user's saved understanding, not original source material; never present them as quoted source text. Use at most 10 paragraphs, each at most 2000 characters. Plain text only, no markdown, links, manually numbered citations or invented page numbers.",
+        answerFormatInstruction,
         'If evidence is inadequate to answer, return {"status":"insufficient","paragraphs":[]}.',
       ].join("\n"),
     },
@@ -309,7 +317,7 @@ const generatedSchema = z
       .array(
         z
           .object({
-            text: z.string().trim().min(1).max(2000),
+            text: z.string().trim().min(1).max(3000),
             evidenceIds: z
               .array(z.string().regex(/^(?:e|n)[1-9][0-9]*$/))
               .min(1)
@@ -339,7 +347,11 @@ function insufficientAnswer(grounding: Grounding): AnswerResult {
 }
 
 /** The model supplies references only; canonical source IDs/quotes/pages remain server-owned. */
-export function bindGeneratedAnswer(raw: string, grounding: Grounding): AnswerResult {
+export function bindGeneratedAnswer(
+  raw: string,
+  grounding: Grounding,
+  options: { format?: AnswerFormat } = {},
+): AnswerResult {
   let value: unknown;
   try {
     value = JSON.parse(raw);
@@ -408,7 +420,11 @@ export function bindGeneratedAnswer(raw: string, grounding: Grounding): AnswerRe
           : paragraph.kind === "note"
             ? "**来自我的笔记：** "
             : "";
-      return `${prefix}${escapeMarkdown(paragraph.text)} ${refs.join(" ")}`;
+      const body =
+        options.format === "rich"
+          ? sanitizeAnswerMarkdown(paragraph.text)
+          : escapeMarkdown(paragraph.text);
+      return withReferences(withLabel(body, prefix), refs.join(" "));
     })
     .join("\n\n");
   if (hasQuantifiedSelfRating)

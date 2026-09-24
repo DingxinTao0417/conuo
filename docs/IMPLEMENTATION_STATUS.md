@@ -26,6 +26,14 @@
 - 测试：新增稳定版本、版本变化触发一次完整重载、版本变化同时禁用 AI 三条路由回归；既有流式和模型测试的模拟云端写入同步递增 `revision`。Web 全量测试 258 个文件／4272 项通过；typecheck 通过；lint 0 错误、保留 1 条既有 `_result` 警告；本 WP 变更文件定向 Prettier 通过。仓库级 `format:check` 仍被既有 `._*` 文件及未涉及文件阻断。
 - 未验收边界：未修改接口契约、认证逻辑或数据库迁移；未执行部署、staging 或远程数据库操作。
 
+## AI 增强 WP-06（2026-09-23，本地）
+
+- 范围：新增 `CONUO_FEATURE_RICH_ANSWERS` 服务端开关。开启时问答请求指纹加入 `format: "rich"`，模型可输出安全 Markdown 子集、GFM 表格和公式；`GROUNDING_CONTRACT_VERSION` 从 `grounding-v7` 升至 `grounding-v8`。关闭时保留原有纯文本提示词与转义行为。
+- 服务端：新增 AST 白名单净化；禁止节点、内部引用标记和正文 `[n]` 会退回转义纯文本，模型 `$x$` 会改写为 `$$x$$`，引用与标签在块级 Markdown 后安全拼接。流式预览与最终绑定共用同一格式选项。
+- 阅读器：回答使用本地 KaTeX 安全选项和 `singleDollarTextMath: false`，旧回答中的 `$5` 等文字不会被误渲染；公式中的 `[1]` 不会变成引用按钮，表格在回答容器内横向滚动。公式另存笔记／知识页和移动端渲染仍保留手册列出的限制，详见 [流式资料问答](STREAMING_ANSWERS.md)。
+- 测试：新增服务端净化、提示词、流式预览和阅读器 jsdom 回归，并覆盖开关关闭／开启及请求指纹隔离。Web 全量测试 260 个文件／4288 项通过、2 项跳过；typecheck 通过；lint 0 错误、保留 1 条既有 `_result` 警告；本 WP 变更文件定向 Prettier 通过。仓库级 `format:check` 仍被既有 `._*` 文件及未涉及文件阻断。
+- 未验收边界：未执行真实模型公式评测、部署或 staging 开关；未修改保存格式、移动端合同、数据库迁移或远程资源。
+
 ## iPadOS P1 云端闭环增量（2026-09-22，本地）
 
 移动端补齐 P1 两个云端闭环并全部本地验证：正文阅读位置按语义锚点节流回写 `readPage/lastReadAt`，回答完成后追加保存云端 `conversations`（Web 合同兼容、requestId 幂等、AI 面板可核对最近 3 轮），两者均遵循「结果未知先读回」的 CAS 规则；异常矩阵沿用既有 request-identity / draft-recovery 边界。P2 前置草案见[选型证据](IPADOS_P2_SELECTION.md)，其旧选型不作为当前实现合同；WP0 最新状态见下节。

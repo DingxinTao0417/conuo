@@ -1,4 +1,4 @@
-import { bindGeneratedAnswer, type Grounding } from "./grounding";
+import { bindGeneratedAnswer, type AnswerFormat, type Grounding } from "./grounding";
 import { ApiError } from "../supabase/api";
 import type { AnswerResult } from "../types";
 
@@ -25,7 +25,10 @@ const invalid = () => new ApiError(502, "INVALID_MODEL_ANSWER", "模型回答格
  * Only closed, schema-validated paragraphs can become a provisional answer. Callers must
  * still validate the full raw answer, current permissions, citations, and ledger completion.
  */
-export function createGroundingPreview(grounding: Grounding): {
+export function createGroundingPreview(
+  grounding: Grounding,
+  options: { format?: AnswerFormat } = {},
+): {
   push(delta: string): AnswerResult | undefined;
 } {
   const root: ObjectFrame = {
@@ -67,7 +70,11 @@ export function createGroundingPreview(grounding: Grounding): {
       if (parent.values.length > (parent.role === "paragraphs" ? 10 : 12)) throw invalid();
       if (parent.role === "paragraphs") {
         // Reuse the final binder's exact paragraph schema, canonical references and escaping.
-        bindGeneratedAnswer(JSON.stringify({ status: "answered", paragraphs: [value] }), grounding);
+        bindGeneratedAnswer(
+          JSON.stringify({ status: "answered", paragraphs: [value] }),
+          grounding,
+          options,
+        );
         if (root.values.status === "insufficient") throw invalid();
         paragraphs.push(value);
       }
@@ -175,11 +182,12 @@ export function createGroundingPreview(grounding: Grounding): {
             string = char;
           } else if (!/[ \t\r\n]/.test(char)) token(char, false);
         }
-        if (complete) bindGeneratedAnswer(raw, grounding);
+        if (complete) bindGeneratedAnswer(raw, grounding, options);
         if (root.values.status !== "answered" || paragraphs.length <= emitted) return undefined;
         const answer = bindGeneratedAnswer(
           JSON.stringify({ status: "answered", paragraphs }),
           grounding,
+          options,
         );
         emitted = paragraphs.length;
         return answer;

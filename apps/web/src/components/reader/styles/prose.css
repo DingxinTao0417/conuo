@@ -74,6 +74,18 @@
   font-size: 0.85em;
   margin: 16px 0;
 }
+.reader-message-table {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 16px 0;
+}
+.reader-message-content .reader-message-table > table {
+  display: table;
+  overflow: visible;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+}
 .reader-prose th,
 .reader-prose td,
 .reader-message-content th,

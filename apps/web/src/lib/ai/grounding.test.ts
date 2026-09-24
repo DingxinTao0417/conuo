@@ -377,6 +377,15 @@ describe("bounded model grounding", () => {
     );
     expect(system).toMatch(/不得[^。]+(?:可信度|置信度)[^。]+(?:回答|结论)/u);
   });
+  it("uses the rich safe Markdown prompt only when requested", () => {
+    const { data, question } = fixture();
+    const grounding = buildGrounding(data, question);
+    const plain = groundingMessages(grounding, question)[0].content;
+    const rich = groundingMessages(grounding, question, { format: "rich" })[0].content;
+    expect(plain).toContain("Plain text only, no markdown");
+    expect(rich).toContain("Each paragraph text may use this safe Markdown subset only");
+    expect(rich).not.toContain("Plain text only, no markdown");
+  });
   it("adds only canonical document-linked personal notes as separately labelled evidence", () => {
     const { data, question } = fixture();
     data.notes = [linkedNote(data)];
@@ -520,6 +529,22 @@ describe("server-owned citations", () => {
     );
     expect(answer.content).toContain("\\!\\[tracking\\]");
     expect(answer.content).toContain("\\<script\\>");
+  });
+  it("keeps rich Markdown blocks intact while placing labels and references safely", () => {
+    const ctx = context();
+    const answer = bindGeneratedAnswer(
+      JSON.stringify({
+        status: "answered",
+        paragraphs: [
+          { text: "- 一\n- 二", evidenceIds: ["e1"], kind: "source" },
+          { text: "- 推断一\n- 推断二", evidenceIds: ["e1"], kind: "inference" },
+        ],
+      }),
+      ctx,
+      { format: "rich" },
+    );
+    expect(answer.content).toContain("- 二\n\n[1]");
+    expect(answer.content).toContain("**推断：**\n\n- 推断一");
   });
   it("rejects fenced or truncated JSON instead of silently repairing it", () => {
     expect(() => bindGeneratedAnswer('```json\n{"status":"answered"}\n```', context())).toThrow();

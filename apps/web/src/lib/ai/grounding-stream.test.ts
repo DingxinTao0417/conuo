@@ -84,6 +84,13 @@ describe("grounded streaming preview", () => {
     expect(preview.push('{"status":"insufficient","paragraphs":[]}')).toBeUndefined();
   });
 
+  it("uses the rich binder for streaming previews", () => {
+    const preview = createGroundingPreview(grounding, { format: "rich" });
+    const value =
+      '{"status":"answered","paragraphs":[{"text":"设 $x^2$ 为平方","evidenceIds":["e1"],"kind":"source"}]}';
+    expect(preview.push(value)?.content).toContain("$$x^2$$");
+  });
+
   it("rejects a quantified self-rating before the first draft and never exposes it", () => {
     const preview = createGroundingPreview(grounding);
     const selfRated = {

@@ -1,14 +1,19 @@
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
 import { answerNoteMarkerIndex, extractiveCitationMarkerIndex } from "@/lib/citation-markers";
 import type { AnswerNoteEvidence, Citation, Message } from "@/lib/types";
+import { answerMathOptions } from "../markdown-math";
 
 const CITATION_HREF_PREFIX = "#conuo-citation-";
 const CITATION_HREF_PATTERN = /^#conuo-citation-([1-9]\d*)$/u;
 const NOTE_EVIDENCE_HREF_PREFIX = "#conuo-note-";
 const NOTE_EVIDENCE_HREF_PATTERN = /^#conuo-note-([1-9]\d*)$/u;
-const citationMarkdownParser = unified().use(remarkParse).use(remarkGfm);
+const citationMarkdownParser = unified()
+  .use(remarkParse)
+  .use(remarkGfm)
+  .use(remarkMath, answerMathOptions);
 const citationMarkerIndexCache = new WeakMap<
   Citation[],
   WeakMap<AnswerNoteEvidence[], Map<string, EvidenceMarkerIndexes>>

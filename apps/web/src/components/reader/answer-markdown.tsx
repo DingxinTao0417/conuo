@@ -2,8 +2,12 @@
 import { ChevronRight, FileText, StickyNote } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import type { AnswerNoteEvidence, Citation, Message, Note, Source } from "@/lib/types";
 import { markdownSourceComponents } from "../markdown-selection";
+import { answerMathOptions, safeKatexOptions } from "../markdown-math";
 import {
   citationCardId,
   citationIndexFromHref,
@@ -148,7 +152,13 @@ export function AnswerMarkdown({
 }: AnswerMarkdownProps) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm, createRemarkCitationReferences(citations, noteEvidence, mode)]}
+      skipHtml
+      remarkPlugins={[
+        remarkGfm,
+        [remarkMath, answerMathOptions],
+        createRemarkCitationReferences(citations, noteEvidence, mode),
+      ]}
+      rehypePlugins={[[rehypeKatex, safeKatexOptions()]]}
       components={{
         a: ({ href, children }) => {
           const index = citationIndexFromHref(href);
@@ -189,6 +199,11 @@ export function AnswerMarkdown({
         },
         img: ({ alt }) => (
           <span className="reader-image-placeholder">[图片{alt ? `：${alt}` : ""}]</span>
+        ),
+        table: ({ children }) => (
+          <div className="reader-message-table">
+            <table>{children}</table>
+          </div>
         ),
       }}
     >

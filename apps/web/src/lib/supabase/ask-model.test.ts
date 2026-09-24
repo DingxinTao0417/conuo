@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDemoWorkspace } from "@/lib/seed";
 import { resolveCitation, retrieveEvidence } from "@/lib/retrieval";
 import {
@@ -216,6 +216,7 @@ async function expectError(response: Response, status: number, code: string) {
 
 describe("generated answer route with canonical source and request-ledger boundaries", () => {
   beforeEach(() => {
+    vi.stubEnv("CONUO_FEATURE_RICH_ANSWERS", "off");
     Object.values(mock).forEach((fn) => fn.mockReset());
     workspace = createDemoWorkspace();
     workspaceRevision = 1;
@@ -266,6 +267,10 @@ describe("generated answer route with canonical source and request-ledger bounda
     });
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("returns a grounded model answer with real quotes and saves only the owner's result", async () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
@@ -282,7 +287,7 @@ describe("generated answer route with canonical source and request-ledger bounda
       "question-attempt-1",
       expect.stringMatching(/^[a-f0-9]{64}$/),
     );
-    expect(GROUNDING_CONTRACT_VERSION).toBe("grounding-v7");
+    expect(GROUNDING_CONTRACT_VERSION).toBe("grounding-v8");
     const actualFingerprint = mock.reserveRequest.mock.calls[0][3];
     const embeddingFingerprint = readEmbeddingConfig()?.fingerprint ?? null;
     const searchMode = workspace.semanticSearch && embeddingFingerprint ? "semantic" : "keyword";
@@ -291,6 +296,7 @@ describe("generated answer route with canonical source and request-ledger bounda
         .update(
           JSON.stringify([
             contract,
+            "plain",
             config.baseUrl,
             config.model,
             config.jsonMode,
@@ -311,6 +317,28 @@ describe("generated answer route with canonical source and request-ledger bounda
     );
     expect(JSON.stringify(answer)).not.toContain(config.apiKey);
     expect(response.headers.get("Cache-Control")).toContain("no-store");
+  });
+
+  it("uses the rich format only when the server switch is enabled", async () => {
+    vi.stubEnv("CONUO_FEATURE_RICH_ANSWERS", "on");
+    mock.callModel.mockImplementationOnce(async () => generated("设 $x^2$ 为平方"));
+    const richResponse = await POST(request({ requestId: "rich-answer" }));
+    expect(richResponse.status).toBe(200);
+    const richAnswer = (await richResponse.json()) as AnswerResult;
+    expect(richAnswer.content).toContain("$$x^2$$");
+    expect((mock.callModel.mock.calls.at(-1)![1] as ModelMessage[])[0]!.content).toContain(
+      "Each paragraph text may use this safe Markdown subset only",
+    );
+    const richFingerprint = mock.reserveRequest.mock.calls.at(-1)![3];
+
+    vi.stubEnv("CONUO_FEATURE_RICH_ANSWERS", "off");
+    const plainResponse = await POST(request({ requestId: "plain-answer" }));
+    expect(plainResponse.status).toBe(200);
+    const plainFingerprint = mock.reserveRequest.mock.calls.at(-1)![3];
+    expect(plainFingerprint).not.toBe(richFingerprint);
+    expect((mock.callModel.mock.calls.at(-1)![1] as ModelMessage[])[0]!.content).toContain(
+      "Plain text only, no markdown",
+    );
   });
 
   it("binds omitted, enabled and disabled thinking modes to distinct answer fingerprints", async () => {

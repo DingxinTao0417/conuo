@@ -15,11 +15,13 @@ import {
 } from "@/lib/supabase/validation";
 import { readModelConfig, callModel, callModelStream } from "@/lib/ai/model";
 import {
+  type AnswerFormat,
   GROUNDING_CONTRACT_VERSION,
   buildGrounding,
   bindGeneratedAnswer,
   groundingMessages,
 } from "@/lib/ai/grounding";
+import { aiFeatureEnabled } from "@/lib/ai/features";
 import { createGroundingPreview } from "@/lib/ai/grounding-stream";
 import { createRequestStore, reserveRequest, finishRequest } from "@/lib/ai/requests";
 import { questionContextKey } from "@/lib/question-context";
@@ -521,12 +523,14 @@ export async function POST(request: Request) {
         if (!config) return retrieved;
         const grounding = buildGrounding(initial, question, retrieved);
         if (!grounding.evidence.length) return grounding.fallback;
+        const format: AnswerFormat = aiFeatureEnabled("RICH_ANSWERS") ? "rich" : "plain";
         if (!question.requestId)
           throw new ApiError(400, "REQUEST_ID_REQUIRED", "请刷新页面后重新发起问题。");
         const fingerprint = createHash("sha256")
           .update(
             JSON.stringify([
               GROUNDING_CONTRACT_VERSION,
+              format,
               config.baseUrl,
               config.model,
               config.jsonMode,
@@ -554,8 +558,8 @@ export async function POST(request: Request) {
           await send?.({ type: "progress", phase: "generating" });
           // Waiting for a downstream reader must not make the evidence check stale.
           await assertCurrent(signal);
-          const preview = send ? createGroundingPreview(grounding) : undefined;
-          const messages = groundingMessages(grounding, question);
+          const preview = send ? createGroundingPreview(grounding, { format }) : undefined;
+          const messages = groundingMessages(grounding, question, { format });
           const raw = send
             ? await callModelStream(config, messages, signal, async (delta) => {
                 const draft = preview!.push(delta);
@@ -564,7 +568,7 @@ export async function POST(request: Request) {
               })
             : await callModel(config, messages, signal);
           await send?.({ type: "progress", phase: "validating" });
-          answer = bindGeneratedAnswer(raw, grounding);
+          answer = bindGeneratedAnswer(raw, grounding, { format });
         }
         await assertAnswer(answer, signal);
         if (reservation) {
