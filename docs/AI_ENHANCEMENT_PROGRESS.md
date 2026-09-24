@@ -26,7 +26,7 @@
 | 9    | WP-10  | 完成     | `9cbbc69` | 269 个测试文件／4358 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件 Prettier 定向检查通过；仓库级 format:check 被既有 `._*` AppleDouble 文件阻断 | 批量 Embeddings、Node 向量执行器、共享处理器鉴权与 staging 调度脚本（未执行） |
 | 10   | WP-11  | 完成     | `72d86e6`、`a8164d3`、`187fc7d`、`614e588`、`1570a83` | 272 个测试文件／4375 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本子项代码文件 Prettier 定向检查通过；仓库级 format:check 被既有 36 个 `._*` AppleDouble 文件阻断 | 11-A、11-B、11-C、11-D 已完成；下一项 WP-08 |
 | 11   | WP-08  | 完成     | `68c0b54` | 273 个测试文件／4385 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过；仓库级 format:check 被既有 `._*` 文件和未涉及文件阻断 | 深度思考请求、reasoning SSE 进度、280 秒服务端预算、300 秒 Route Handler 上限、310 秒浏览器读取和 330 秒账本 TTL；开关默认关闭 |
-| 12   | WP-14  | 待评审   | `20c8202` | 274 个测试文件／4393 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过；仓库级 format:check 被既有 36 个 `._*` 文件及 2 个未涉及文件阻断 | 代码与离线测试完成；等待 WP-02 真实模型人工抽查错误改标率与核验 p95 |
+| 12   | WP-14  | 待评审   | `9d6258f` | 274 个测试文件／4393 项通过、2 项跳过；typecheck 通过；lint 0 错误、1 条既有 `_result` 警告；本 WP 文件定向 Prettier 通过；仓库级 format:check 被既有 36 个 `._*` 文件及 2 个未涉及文件阻断 | 代码与离线测试完成；等待 WP-02 真实模型人工抽查错误改标率与核验 p95 |
 | 13   | WP-13  | 未开始   |      |      | DEC-02；开关默认关 |
 | 14   | WP-15  | 未开始   |      |      |      |
 | 15   | WP-16  | 未开始   |      |      |      |
