@@ -101,22 +101,24 @@ const vertexShader = /* glsl */ `
       sin(uTime * 0.9 + aSeed * 17.0)
     ) * 0.32 * turbulence;
 
+    // Pointer "torchlight": a small soft patch lifts toward the viewer and
+    // brightens. Nothing is pushed away, so the glyph never opens a hole.
     vec2 away = p.xy - uPointer.xy;
-    float dist = length(away);
-    float push = smoothstep(1.35, 0.0, dist) * uPointerForce * ti * (1.0 - tm);
-    p.xy += normalize(away + 1e-4) * push * 0.55;
-    p.z += push * 0.9;
+    float glow = exp(-dot(away, away) / 0.09) * uPointerForce * ti * (1.0 - tm);
+    p.z += glow * 0.42;
+    p.xy += normalize(away + 1e-4) * glow * 0.035;
 
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
-    float size = uSize * (0.55 + aSeed * 0.9) * (1.0 + push * 0.8);
+    float size = uSize * (0.55 + aSeed * 0.9) * (1.0 + glow * 0.75);
     gl_PointSize = size * uPixelRatio * (10.0 / -mv.z);
 
     vec3 color = mix(aColorA, aColorB, ti);
     color = mix(color, aColorC, tm);
-    vColor = color + push * 0.25;
+    vColor = color + glow * vec3(0.32, 0.28, 0.45);
     float twinkle = 0.75 + 0.25 * sin(uTime * 2.0 + aSeed * 60.0);
-    vAlpha = uOpacity * (0.45 + 0.55 * aSeed) * mix(twinkle, 1.0, ti * (1.0 - tm));
+    vAlpha =
+      uOpacity * (0.45 + 0.55 * aSeed) * mix(twinkle, 1.0, ti * (1.0 - tm)) * (1.0 + glow * 0.9);
   }
 `;
 
@@ -455,8 +457,9 @@ export async function createHeroScene(options: Options): Promise<HeroScene | nul
     pointer.x += (pointer.tx - pointer.x) * 0.08;
     pointer.y += (pointer.ty - pointer.y) * 0.08;
     pointer.force += ((pointer.inside ? 1 : 0) - pointer.force) * 0.06;
-    group.rotation.y = pointer.x * 0.22 * (1 - eased);
-    group.rotation.x = -pointer.y * 0.14 * (1 - eased);
+    // A gentle 3D tilt toward the pointer.
+    group.rotation.y = pointer.x * 0.26 * (1 - eased);
+    group.rotation.x = -pointer.y * 0.16 * (1 - eased);
     const worldX = pointer.x * layout.halfW;
     const worldY = pointer.y * layout.halfH;
     uniforms.uPointer.value.set(

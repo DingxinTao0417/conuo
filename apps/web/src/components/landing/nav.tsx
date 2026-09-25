@@ -112,10 +112,7 @@ export default function Nav({
             >
               {switchTo}
             </button>
-            <button type="button" className="lp-nav-login" onClick={() => onAuth("login")}>
-              {t.login}
-            </button>
-            <button type="button" className="lp-nav-start" onClick={() => onAuth("signup")}>
+            <button type="button" className="lp-nav-start" onClick={() => onAuth("start")}>
               {t.start}
             </button>
             <button
@@ -151,15 +148,8 @@ export default function Nav({
         <div className="lp-menu-actions">
           <button
             type="button"
-            className="lp-btn lp-btn-ghost"
-            onClick={() => (onMenu(false), onAuth("login"))}
-          >
-            {t.login}
-          </button>
-          <button
-            type="button"
             className="lp-btn lp-btn-glow"
-            onClick={() => (onMenu(false), onAuth("signup"))}
+            onClick={() => (onMenu(false), onAuth("start"))}
           >
             {t.start}
           </button>

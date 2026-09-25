@@ -5,7 +5,6 @@ import Image from "next/image";
 import { Cloud, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isCloudConfigured, subscribeSession, type CloudUser } from "@/lib/cloud";
-import type { AccountEntryMode } from "./account-panel";
 import type { AuthMode, Lang } from "./landing/auth-copy";
 import WebCloudAuthDialog from "./web-cloud-auth-dialog";
 import Workspace from "./workspace";
@@ -13,7 +12,7 @@ import "./web-cloud-entry.css";
 
 type EntryState =
   { kind: "loading" | "login" | "unavailable" } | { kind: "ready"; user: CloudUser };
-type AuthRequest = { mode: AccountEntryMode; lang: Lang; id: number };
+type AuthRequest = { mode: AuthMode; lang: Lang; id: number };
 
 // The homepage (three.js, GSAP, Lenis) is only fetched for signed-out visitors.
 const Landing = dynamic(() => import("./landing/landing"), {
@@ -117,7 +116,7 @@ export default function WebCloudEntry() {
       {auth ? (
         <WebCloudAuthDialog
           key={auth.id}
-          initialMode={auth.mode}
+          request={auth.mode}
           lang={auth.lang}
           unavailable={entry.kind === "unavailable"}
           onClose={closeAuth}

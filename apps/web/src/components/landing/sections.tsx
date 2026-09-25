@@ -306,13 +306,10 @@ export function FinalCta({
         </h2>
         <p className="lp-cta-lead">{t.lead}</p>
         <div className="lp-cta-actions">
-          <MagneticButton className="lp-btn lp-btn-glow" onClick={() => onAuth("signup")}>
+          <MagneticButton className="lp-btn lp-btn-glow" onClick={() => onAuth("start")}>
             {t.primary}
             <ArrowRight size={18} aria-hidden="true" />
           </MagneticButton>
-          <button type="button" className="lp-btn lp-btn-ghost" onClick={() => onAuth("login")}>
-            {t.secondary}
-          </button>
         </div>
       </div>
     </section>
@@ -335,8 +332,7 @@ export function Footer({
   onAuth: (mode: AuthMode) => void;
 }) {
   const follow = (target: string) => {
-    if (target === "auth:login") onAuth("login");
-    else if (target === "auth:signup") onAuth("signup");
+    if (target.startsWith("auth:")) onAuth("start");
     else scrollToSection(target);
   };
   return (

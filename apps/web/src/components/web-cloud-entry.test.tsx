@@ -70,7 +70,7 @@ vi.mock("./landing/landing", () => ({
     onAuth,
     paused,
   }: {
-    onAuth: (mode: "login" | "signup", lang: "zh" | "en") => void;
+    onAuth: (mode: "start" | "login" | "signup", lang: "zh" | "en") => void;
     paused?: boolean;
   }) {
     useEffect(() => {
@@ -79,8 +79,9 @@ vi.mock("./landing/landing", () => ({
     return createElement(
       "div",
       { "data-landing": paused ? "paused" : "active" },
-      createElement("button", { onClick: () => onAuth("signup", "zh") }, "主页开始使用"),
-      createElement("button", { onClick: () => onAuth("login", "en") }, "Homepage log in"),
+      createElement("button", { onClick: () => onAuth("start", "zh") }, "主页开始使用"),
+      createElement("button", { onClick: () => onAuth("start", "en") }, "Homepage get started"),
+      createElement("button", { onClick: () => onAuth("signup", "zh") }, "主页注册"),
     );
   },
 }));
@@ -274,16 +275,23 @@ describe("WebCloudEntry verified cloud-only gate", () => {
     await render();
     await verify(null);
     await act(async () => button("主页开始使用").click());
-    expect(accountPanel()?.dataset.mode).toBe("signup");
+    expect(accountPanel()?.dataset.mode).toBe("login");
+    expect(host.textContent).toContain("开始使用 Conuo");
     expect(landing()?.getAttribute("data-landing")).toBe("paused");
     await act(async () =>
       host.querySelector<HTMLButtonElement>('button[aria-label="关闭"]')!.click(),
     );
     expect(accountPanel()).toBeNull();
     expect(landing()?.getAttribute("data-landing")).toBe("active");
-    await act(async () => button("Homepage log in").click());
+    await act(async () => button("Homepage get started").click());
     expect(accountPanel()?.dataset.mode).toBe("login");
-    expect(host.textContent).toContain("Log in to keep learning");
+    expect(host.textContent).toContain("Get started with Conuo");
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click(),
+    );
+    await act(async () => button("主页注册").click());
+    expect(accountPanel()?.dataset.mode).toBe("signup");
+    expect(host.textContent).toContain("创建你的学习空间");
     expect(workspace()).toBeNull();
   });
 

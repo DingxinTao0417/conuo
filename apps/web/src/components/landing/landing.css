@@ -371,16 +371,6 @@ html.lp-scroll-locked {
 .lp-lang:hover {
   background: color-mix(in srgb, currentColor 10%, transparent);
 }
-.lp-nav-login {
-  padding: 8px 14px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  opacity: 0.86;
-}
-.lp-nav-login:hover {
-  opacity: 1;
-}
 .lp-nav-start {
   height: 38px;
   padding: 0 18px;
@@ -459,8 +449,6 @@ html.lp-scroll-locked {
 }
 .lp-menu-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
 }
 @keyframes lp-fade-in {
   from {
@@ -613,14 +601,6 @@ html.lp-scroll-locked {
   border-radius: 50%;
   background: var(--lp-teal);
   box-shadow: 0 0 12px var(--lp-teal);
-}
-.lp-badge-dot::after {
-  content: "";
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 1px solid var(--lp-teal);
-  animation: lp-ping 2.4s var(--lp-ease) infinite;
 }
 @keyframes lp-ping {
   from {
@@ -1030,8 +1010,7 @@ html.lp-scroll-locked {
   .lp {
     --lp-gutter: 24px;
   }
-  .lp-nav-links,
-  .lp-nav-login {
+  .lp-nav-links {
     display: none;
   }
   .lp-nav-actions {

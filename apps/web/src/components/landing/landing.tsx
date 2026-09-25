@@ -117,7 +117,7 @@ export default function Landing({ onAuth, paused = false }: LandingProps) {
           t={t.hero}
           lang={lang}
           reduced={reduced}
-          onStart={() => auth("signup")}
+          onStart={() => auth("start")}
           onExplore={() => scrollToSection("story")}
         />
         <Story t={t.story} excerpt={t.demo.paragraphs[1].text} pinned={wide && !reduced} />

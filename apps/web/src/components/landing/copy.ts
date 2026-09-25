@@ -23,7 +23,6 @@ export interface LandingCopy {
   meta: { langName: string; switchTo: string; switchLabel: string; skip: string };
   nav: {
     links: { id: string; label: string }[];
-    login: string;
     start: string;
     menu: string;
     closeMenu: string;
@@ -125,7 +124,7 @@ export interface LandingCopy {
     };
   };
   faq: { eyebrow: string; title: string; items: { q: string; a: string }[] };
-  cta: { title: [string, string]; lead: string; primary: string; secondary: string };
+  cta: { title: [string, string]; lead: string; primary: string };
   footer: {
     tagline: string;
     groups: { title: string; links: { label: string; target: string }[] }[];
@@ -149,7 +148,6 @@ const zh: LandingCopy = {
       { id: "platforms", label: "多端" },
       { id: "faq", label: "常见问题" },
     ],
-    login: "登录",
     start: "开始使用",
     menu: "打开菜单",
     closeMenu: "关闭菜单",
@@ -157,8 +155,8 @@ const zh: LandingCopy = {
   },
   hero: {
     badge: "以个人资料库为基础的 AI 陪伴学习工作台",
-    titleLines: ["陪你把", "知识学会。"],
-    highlight: "学会",
+    titleLines: ["每个答案，", "都有出处。"],
+    highlight: "出处",
     lead: "Conuo 把文件、网页和笔记组织成可检索、可追溯的个人知识库。阅读时提问，回到原文核对依据，保存自己的理解，下次从上次的问题继续。",
     primary: "开始使用",
     secondary: "看它如何工作",
@@ -444,10 +442,9 @@ const zh: LandingCopy = {
     title: ["今天读懂的，", "明天还在。"],
     lead: "创建你的第一个学习空间，从一份资料开始。",
     primary: "开始使用",
-    secondary: "已有账号？登录",
   },
   footer: {
-    tagline: "陪你把知识学会。",
+    tagline: "每个答案，都有出处。",
     groups: [
       {
         title: "产品",
@@ -467,10 +464,7 @@ const zh: LandingCopy = {
       },
       {
         title: "账号",
-        links: [
-          { label: "登录", target: "auth:login" },
-          { label: "创建账号", target: "auth:signup" },
-        ],
+        links: [{ label: "开始使用", target: "auth:start" }],
       },
     ],
     rights: "© 2026 Conuo（可诺）",
@@ -488,7 +482,6 @@ const en: LandingCopy = {
       { id: "platforms", label: "Platforms" },
       { id: "faq", label: "FAQ" },
     ],
-    login: "Log in",
     start: "Get started",
     menu: "Open menu",
     closeMenu: "Close menu",
@@ -496,8 +489,8 @@ const en: LandingCopy = {
   },
   hero: {
     badge: "An AI study companion built on your own library",
-    titleLines: ["From reading", "to really knowing."],
-    highlight: "really knowing.",
+    titleLines: ["Every answer,", "with its source."],
+    highlight: "source.",
     lead: "Conuo turns your files, web pages and notes into a searchable, traceable personal knowledge base. Ask while you read, check every answer against the source, keep what you understood, and pick up exactly where you left off.",
     primary: "Get started",
     secondary: "See how it works",
@@ -792,10 +785,9 @@ const en: LandingCopy = {
     title: ["What you understand today", "is still yours tomorrow."],
     lead: "Create your first study space and start with a single document.",
     primary: "Get started",
-    secondary: "Have an account? Log in",
   },
   footer: {
-    tagline: "Learn it, for real.",
+    tagline: "Every answer, with its source.",
     groups: [
       {
         title: "Product",
@@ -815,10 +807,7 @@ const en: LandingCopy = {
       },
       {
         title: "Account",
-        links: [
-          { label: "Log in", target: "auth:login" },
-          { label: "Create account", target: "auth:signup" },
-        ],
+        links: [{ label: "Get started", target: "auth:start" }],
       },
     ],
     rights: "© 2026 Conuo",

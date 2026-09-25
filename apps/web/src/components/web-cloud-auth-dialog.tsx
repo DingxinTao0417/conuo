@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Cloud, X } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import AccountPanel, { type AccountEntryMode } from "./account-panel";
-import { authCopy, type Lang } from "./landing/auth-copy";
+import { authCopy, type AuthMode, type Lang } from "./landing/auth-copy";
 
 const ignorePanelAction = () => {};
 
@@ -13,20 +13,23 @@ const ignorePanelAction = () => {};
  * the workspace still opens solely after WebCloudEntry's own verification.
  */
 export default function WebCloudAuthDialog({
-  initialMode,
+  request,
   lang,
   unavailable,
   onClose,
   onRetry,
 }: {
-  initialMode: AccountEntryMode;
+  /** Which call to action opened the dialog; "start" shows the login form with a neutral title. */
+  request: AuthMode;
   lang: Lang;
   unavailable: boolean;
   onClose: () => void;
   onRetry: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const initialMode: AccountEntryMode = request === "signup" ? "signup" : "login";
   const [mode, setMode] = useState<AccountEntryMode>(initialMode);
+  const neutral = request === "start" && mode === "login";
   const t = authCopy[lang];
 
   useLayoutEffect(() => {
@@ -41,7 +44,9 @@ export default function WebCloudAuthDialog({
     };
   }, []);
 
-  const title = unavailable ? t.titles.unavailable : t.titles[mode];
+  const title = unavailable ? t.titles.unavailable : neutral ? t.titles.start : t.titles[mode];
+  const lead =
+    !unavailable && mode === "reset" ? t.resetLead : !unavailable && neutral ? t.startLead : t.lead;
   return (
     <dialog
       ref={ref}
@@ -95,7 +100,7 @@ export default function WebCloudAuthDialog({
             {t.label}
           </span>
           <h2 id="web-cloud-entry-title">{title}</h2>
-          <p>{!unavailable && mode === "reset" ? t.resetLead : t.lead}</p>
+          <p>{lead}</p>
         </div>
         {unavailable ? (
           <div className="web-cloud-entry-unavailable">
