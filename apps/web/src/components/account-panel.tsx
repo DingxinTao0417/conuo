@@ -45,6 +45,8 @@ export type AccountSignOutControl = {
 export type AccountEntryMode = "login" | "signup" | "reset";
 type Props = {
   appearance?: "panel" | "entry";
+  /** Mode shown first, e.g. "signup" when opened from a sign-up call to action. */
+  initialMode?: AccountEntryMode;
   onModeChange?: (mode: AccountEntryMode) => void;
   storageMode?: "hybrid" | "cloud";
   onSessionChange: (user: CloudUser | null) => void;
@@ -73,6 +75,7 @@ function defaultSignOutMessage(state: AccountSignOutState) {
 
 export default function AccountPanel({
   appearance = "panel",
+  initialMode = "login",
   onModeChange,
   storageMode = "hybrid",
   onSessionChange,
@@ -81,7 +84,7 @@ export default function AccountPanel({
   signOutControl,
 }: Props) {
   const [user, setUser] = useState<CloudUser | null>(null);
-  const [mode, setMode] = useState<AccountEntryMode>("login");
+  const [mode, setMode] = useState<AccountEntryMode>(initialMode);
   useEffect(() => onModeChange?.(mode), [mode, onModeChange]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

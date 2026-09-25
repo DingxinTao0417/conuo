@@ -12,6 +12,7 @@ const mock = vi.hoisted(() => ({
   mounted: vi.fn(),
   unmounted: vi.fn(),
   stop: vi.fn(),
+  landing: vi.fn(),
 }));
 
 vi.mock("@/lib/cloud", () => ({
@@ -44,15 +45,17 @@ vi.mock("./workspace", () => ({
 }));
 vi.mock("./account-panel", () => ({
   default: ({
+    initialMode,
     onSessionChange,
     onClose,
   }: {
+    initialMode?: string;
     onSessionChange: (user: CloudUser | null) => void;
     onClose: () => void;
   }) =>
     createElement(
       "section",
-      { "aria-label": "账号登录" },
+      { "aria-label": "账号登录", "data-mode": initialMode ?? "login" },
       createElement(
         "button",
         { onClick: () => onSessionChange({ id: "unverified", email: "cached@example.test" }) },
@@ -60,6 +63,26 @@ vi.mock("./account-panel", () => ({
       ),
       createElement("button", { onClick: onClose }, "关闭账号面板"),
     ),
+}));
+
+vi.mock("./landing/landing", () => ({
+  default: function MockLanding({
+    onAuth,
+    paused,
+  }: {
+    onAuth: (mode: "login" | "signup", lang: "zh" | "en") => void;
+    paused?: boolean;
+  }) {
+    useEffect(() => {
+      mock.landing();
+    }, []);
+    return createElement(
+      "div",
+      { "data-landing": paused ? "paused" : "active" },
+      createElement("button", { onClick: () => onAuth("signup", "zh") }, "主页开始使用"),
+      createElement("button", { onClick: () => onAuth("login", "en") }, "Homepage log in"),
+    );
+  },
 }));
 
 import WebCloudEntry from "./web-cloud-entry";
@@ -102,6 +125,12 @@ describe("WebCloudEntry verified cloud-only gate", () => {
   }
   function workspace() {
     return host.querySelector("[data-workspace]");
+  }
+  function landing() {
+    return host.querySelector("[data-landing]");
+  }
+  function accountPanel() {
+    return host.querySelector<HTMLElement>('[aria-label="账号登录"]');
   }
   function button(label: string) {
     const item = [...host.querySelectorAll("button")].find(
@@ -228,6 +257,56 @@ describe("WebCloudEntry verified cloud-only gate", () => {
     await verify(accountB);
     expect(mock.unmounted).toHaveBeenCalledOnce();
     expect(mock.mounted).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows the public homepage to signed-out visitors without a workspace link", async () => {
+    window.history.replaceState(null, "", "/");
+    await render();
+    expect(landing()).toBeNull();
+    await verify(null);
+    expect(landing()).not.toBeNull();
+    expect(accountPanel()).toBeNull();
+    expect(workspace()).toBeNull();
+  });
+
+  it("homepage calls to action open the account dialog in the requested mode", async () => {
+    window.history.replaceState(null, "", "/");
+    await render();
+    await verify(null);
+    await act(async () => button("主页开始使用").click());
+    expect(accountPanel()?.dataset.mode).toBe("signup");
+    expect(landing()?.getAttribute("data-landing")).toBe("paused");
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('button[aria-label="关闭"]')!.click(),
+    );
+    expect(accountPanel()).toBeNull();
+    expect(landing()?.getAttribute("data-landing")).toBe("active");
+    await act(async () => button("Homepage log in").click());
+    expect(accountPanel()?.dataset.mode).toBe("login");
+    expect(host.textContent).toContain("Log in to keep learning");
+    expect(workspace()).toBeNull();
+  });
+
+  it("an unavailable cloud still shows the homepage and explains the failure on sign-in", async () => {
+    window.history.replaceState(null, "", "/");
+    mock.configured.mockReturnValue(false);
+    await render();
+    expect(landing()).not.toBeNull();
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    await act(async () => button("主页开始使用").click());
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain("云端配置");
+    expect(accountPanel()).toBeNull();
+  });
+
+  it("verification replaces the homepage with the workspace and closes the dialog", async () => {
+    window.history.replaceState(null, "", "/");
+    await render();
+    await verify(null);
+    await act(async () => button("主页开始使用").click());
+    await verify(accountA);
+    expect(landing()).toBeNull();
+    expect(accountPanel()).toBeNull();
+    expect(workspace()?.getAttribute("data-workspace")).toBe("cloud");
   });
 
   it("unsubscribes on unmount and ignores late account verification", async () => {
