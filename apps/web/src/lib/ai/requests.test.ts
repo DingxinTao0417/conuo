@@ -206,6 +206,96 @@ describe("model request reservations", () => {
   });
 });
 
+describe("membership enforcement", () => {
+  const options = { route: "learning" as const, features: ["learning_ai" as const] };
+
+  it("keeps the legacy RPC when enforcement is off, even with membership options", async () => {
+    vi.stubEnv("CONUO_MEMBERSHIP_ENFORCEMENT", "off");
+    await reserveRequest(client, ownerId, requestId, fingerprint, options);
+    expect(mock.rpc.mock.calls[0][0]).toBe("reserve_ai_request");
+    expect(mock.rpc.mock.calls[0][1]).not.toHaveProperty("p_route");
+  });
+
+  it.each(["shadow", "on"])("resolves the plan in the database when %s", async (mode) => {
+    vi.stubEnv("CONUO_MEMBERSHIP_ENFORCEMENT", mode);
+    await reserveRequest(client, ownerId, requestId, fingerprint, { ...options, ttlSeconds: 330 });
+    expect(mock.rpc).toHaveBeenCalledExactlyOnceWith("reserve_membership_ai_request", {
+      p_owner: ownerId,
+      p_request_id: requestId,
+      p_fingerprint: fingerprint,
+      p_route: "learning",
+      p_features: ["learning_ai"],
+      p_global_cap: 50,
+      p_enforcement: mode,
+      p_daily_token_limit: 0,
+      p_ttl_seconds: 330,
+    });
+  });
+
+  it("sends no feature list when none is required", async () => {
+    vi.stubEnv("CONUO_MEMBERSHIP_ENFORCEMENT", "on");
+    await reserveRequest(client, ownerId, requestId, fingerprint, { route: "ask", features: [] });
+    expect(mock.rpc.mock.calls[0][1].p_features).toBeNull();
+  });
+
+  it("maps an unavailable plan feature to 403 without calling the model", async () => {
+    vi.stubEnv("CONUO_MEMBERSHIP_ENFORCEMENT", "on");
+    mock.rpc.mockResolvedValue({
+      data: { status: "feature_unavailable", planCode: "free" },
+      error: null,
+    });
+    await expect(
+      reserveRequest(client, ownerId, requestId, fingerprint, options),
+    ).rejects.toMatchObject({ status: 403, code: "MEMBERSHIP_FEATURE_REQUIRED" });
+  });
+
+  it("logs shadow observations without account identifiers", async () => {
+    vi.stubEnv("CONUO_MEMBERSHIP_ENFORCEMENT", "shadow");
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    mock.rpc.mockResolvedValue({
+      data: {
+        status: "reserved",
+        shadow: { planCode: "free", planLimit: 20, wouldLimit: true, featureAllowed: true },
+      },
+      error: null,
+    });
+    expect(await reserveRequest(client, ownerId, requestId, fingerprint, options)).toEqual({
+      kind: "reserved",
+    });
+    expect(JSON.parse(String(info.mock.calls[0][0]))).toEqual({
+      event: "membership_shadow",
+      route: "learning",
+      status: "reserved",
+      planCode: "free",
+      planLimit: 20,
+      wouldLimit: true,
+      featureAllowed: true,
+    });
+    expect(String(info.mock.calls[0][0])).not.toContain(ownerId);
+    info.mockRestore();
+  });
+
+  it.each(["enforce", "ON", "true"])(
+    "rejects invalid enforcement %s before reserving",
+    async (mode) => {
+      vi.stubEnv("CONUO_MEMBERSHIP_ENFORCEMENT", mode);
+      await expect(
+        reserveRequest(client, ownerId, requestId, fingerprint, options),
+      ).rejects.toMatchObject({ status: 503, code: "INVALID_MEMBERSHIP_CONFIGURATION" });
+      expect(mock.rpc).not.toHaveBeenCalled();
+    },
+  );
+
+  it("refuses a membership reservation without a route", async () => {
+    vi.stubEnv("CONUO_MEMBERSHIP_ENFORCEMENT", "on");
+    await expect(reserveRequest(client, ownerId, requestId, fingerprint)).rejects.toMatchObject({
+      status: 503,
+      code: "INVALID_MEMBERSHIP_CONFIGURATION",
+    });
+    expect(mock.rpc).not.toHaveBeenCalled();
+  });
+});
+
 describe("finalizing model request records", () => {
   it("stores a completed answer only against the matching owner's running request", async () => {
     mock.rpc.mockResolvedValue({ data: { requestId }, error: null });

@@ -161,7 +161,10 @@ export async function POST(request: Request) {
       )
       .digest("hex");
     const store = createRequestStore();
-    const saved = await reserveRequest(store, user.id, input.requestId, fingerprint);
+    const saved = await reserveRequest(store, user.id, input.requestId, fingerprint, {
+      route: "learning",
+      features: ["learning_ai"],
+    });
     if (saved.kind === "reserved")
       reservation = { store, ownerId: user.id, requestId: input.requestId };
     const result =

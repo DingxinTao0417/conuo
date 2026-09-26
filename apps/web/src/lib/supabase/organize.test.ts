@@ -852,6 +852,7 @@ describe("organization API account, evidence, and shared-ledger boundaries", () 
       owner,
       "organize-attempt-1",
       expect.stringMatching(/^[a-f0-9]{64}$/),
+      { route: "organize", features: ["organization"] },
     );
     expect(mock.finishRequest).toHaveBeenCalledExactlyOnceWith(
       store,

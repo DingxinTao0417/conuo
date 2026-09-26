@@ -124,7 +124,10 @@ export async function POST(request: Request) {
       throw new ApiError(503, "MODEL_NOT_CONFIGURED", "尚未配置生成模型，暂不能生成术语建议。");
     const fingerprint = requestFingerprint(answerRequest, selectedProfile, grounding);
     const store = createRequestStore();
-    const saved = await reserveRequest(store, user.id, requestId, fingerprint);
+    const saved = await reserveRequest(store, user.id, requestId, fingerprint, {
+      route: "glossary",
+      features: ["organization"],
+    });
     if (saved.kind === "reserved") reservation = { store, ownerId: user.id, requestId };
     const assertCurrent = async () => {
       const latest = await loadWorkspace(supabase, user.id);

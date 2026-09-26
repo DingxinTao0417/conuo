@@ -480,6 +480,14 @@ export async function POST(request: Request) {
     const mode = tutorModeEnabled && question.mode === "tutor" ? "tutor" : "answer";
     const depth =
       question.depth === "deep" && aiFeatureEnabled("DEEP_THINKING") ? "deep" : "standard";
+    const reservationOptions = {
+      route: "ask" as const,
+      features: [
+        ...(depth === "deep" ? (["deep_thinking"] as const) : []),
+        ...(mode === "tutor" ? (["tutor_mode"] as const) : []),
+      ],
+      ...(depth === "deep" ? { ttlSeconds: 330 } : {}),
+    };
     deadlineAt = startedAt + (depth === "deep" ? 280_000 : ANSWER_STREAM_LIMITS.durationMs);
     if (depth === "deep" && !streaming)
       throw new ApiError(
@@ -777,7 +785,7 @@ export async function POST(request: Request) {
             user.id,
             question.requestId!,
             rewriteFingerprint,
-            ...(depth === "deep" ? [{ ttlSeconds: 330 }] : []),
+            reservationOptions,
           );
           if (rewriteReservation.kind === "reserved")
             reservation = { store, ownerId: user.id, requestId: question.requestId! };
@@ -1015,7 +1023,7 @@ export async function POST(request: Request) {
                 ]),
               )
               .digest("hex"),
-            ...(depth === "deep" ? [{ ttlSeconds: 330 }] : []),
+            reservationOptions,
           ));
         if (saved.kind === "reserved" && !reservation)
           reservation = { store, ownerId: user.id, requestId: question.requestId };

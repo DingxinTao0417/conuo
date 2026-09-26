@@ -9,6 +9,21 @@ export const AI_USAGE_CHANGED_EVENT = "conuo-ai-usage-changed";
 
 const count = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const utcTimestamp = z.iso.datetime({ precision: 3 });
+/** Resolved plan summary; present only when membership enforcement is shadow or on. */
+const membershipSummary = z
+  .object({
+    planCode: z.string().regex(/^[a-z][a-z0-9-]{0,31}$/),
+    planName: z.string().min(1).max(100),
+    source: z.enum(["manual", "promotion", "trial", "system", "payment"]).nullable(),
+    endsAt: utcTimestamp.nullable(),
+    afterEnd: z
+      .string()
+      .regex(/^[a-z][a-z0-9-]{0,31}$/)
+      .nullable(),
+    enforced: z.boolean(),
+  })
+  .strict();
+
 const tokenUsage = z
   .object({
     promptTokens: count,
@@ -29,6 +44,7 @@ export const aiRequestUsageSchema = z
     counting: z.literal("reserved_requests"),
     includesFailedAndCancelled: z.literal(true),
     tokens: tokenUsage,
+    membership: membershipSummary.optional(),
   })
   .strict()
   .superRefine((usage, context) => {

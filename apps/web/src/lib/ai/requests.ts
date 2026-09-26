@@ -54,6 +54,22 @@ export function readAiDailyTokenLimit(): number {
     throw new ApiError(503, "INVALID_AI_LIMIT", "模型每日 token 限制配置无效。");
   return daily;
 }
+/** Ledger routes recorded by the membership reservation (see the membership migration). */
+export type AiRequestRoute =
+  "ask" | "organize" | "organization-job" | "vision" | "learning" | "glossary";
+/** Plan feature switches; keep in sync with docs/MEMBERSHIP_SYSTEM_PLAN.md §4.3. */
+export type MembershipFeature =
+  "vision_region" | "organization" | "learning_ai" | "deep_thinking" | "tutor_mode";
+export type MembershipEnforcement = "off" | "shadow" | "on";
+
+/** off keeps the legacy global quota; shadow observes plan limits; on enforces them. */
+export function readMembershipEnforcement(): MembershipEnforcement {
+  const raw = process.env.CONUO_MEMBERSHIP_ENFORCEMENT?.trim() ?? "";
+  if (raw === "" || raw === "off") return "off";
+  if (raw === "shadow" || raw === "on") return raw;
+  throw new ApiError(503, "INVALID_MEMBERSHIP_CONFIGURATION", "会员额度配置无效，本次未调用模型。");
+}
+
 const reservationSchema = z.object({
   status: z.enum([
     "reserved",
@@ -64,10 +80,27 @@ const reservationSchema = z.object({
     "busy",
     "limited",
     "token_limited",
+    "feature_unavailable",
   ]),
   result: z.unknown().optional(),
   errorCode: z.string().nullable().optional(),
+  shadow: z
+    .object({
+      planCode: z.string().optional(),
+      planLimit: z.number().optional(),
+      wouldLimit: z.boolean().optional(),
+      featureAllowed: z.boolean().optional(),
+      error: z.string().optional(),
+    })
+    .optional(),
 });
+
+/** Aggregate-only observation for calibrating plan limits; no account or content fields. */
+function logMembershipShadow(route: AiRequestRoute, status: string, shadow: unknown) {
+  console.info(
+    JSON.stringify({ event: "membership_shadow", route, status, ...(shadow as object) }),
+  );
+}
 const completionSchema = z.object({ requestId: z.string().min(1).max(100) }).strict();
 
 export async function reserveRequest(
@@ -75,18 +108,40 @@ export async function reserveRequest(
   ownerId: string,
   requestId: string,
   fingerprint: string,
-  options: { ttlSeconds?: number } = {},
+  options: { ttlSeconds?: number; route?: AiRequestRoute; features?: MembershipFeature[] } = {},
 ): Promise<{ kind: "reserved" } | { kind: "cached"; result: unknown }> {
   const daily = readAiDailyRequestLimit();
   const dailyTokenLimit = readAiDailyTokenLimit();
-  const { data, error } = await store.rpc("reserve_ai_request", {
-    p_owner: ownerId,
-    p_request_id: requestId,
-    p_fingerprint: fingerprint,
-    p_daily_limit: daily,
-    p_daily_token_limit: dailyTokenLimit,
-    ...(Object.hasOwn(options, "ttlSeconds") ? { p_ttl_seconds: options.ttlSeconds } : {}),
-  });
+  const enforcement = readMembershipEnforcement();
+  const ttl = Object.hasOwn(options, "ttlSeconds") ? { p_ttl_seconds: options.ttlSeconds } : {};
+  if (enforcement !== "off" && !options.route)
+    throw new ApiError(
+      503,
+      "INVALID_MEMBERSHIP_CONFIGURATION",
+      "会员额度配置无效，本次未调用模型。",
+    );
+  // off keeps the legacy RPC so this code is safe before the membership migration is applied.
+  const { data, error } =
+    enforcement === "off"
+      ? await store.rpc("reserve_ai_request", {
+          p_owner: ownerId,
+          p_request_id: requestId,
+          p_fingerprint: fingerprint,
+          p_daily_limit: daily,
+          p_daily_token_limit: dailyTokenLimit,
+          ...ttl,
+        })
+      : await store.rpc("reserve_membership_ai_request", {
+          p_owner: ownerId,
+          p_request_id: requestId,
+          p_fingerprint: fingerprint,
+          p_route: options.route,
+          p_features: options.features?.length ? options.features : null,
+          p_global_cap: daily,
+          p_enforcement: enforcement,
+          p_daily_token_limit: dailyTokenLimit,
+          ...ttl,
+        });
   if (error)
     throw new ApiError(
       503,
@@ -96,7 +151,15 @@ export async function reserveRequest(
   const parsed = reservationSchema.safeParse(data);
   if (!parsed.success)
     throw new ApiError(503, "MODEL_LEDGER_UNAVAILABLE", "模型请求记录返回异常，本次未调用模型。");
+  if (parsed.data.shadow && options.route)
+    logMembershipShadow(options.route, parsed.data.status, parsed.data.shadow);
   switch (parsed.data.status) {
+    case "feature_unavailable":
+      throw new ApiError(
+        403,
+        "MEMBERSHIP_FEATURE_REQUIRED",
+        "当前会员等级未开放这项 AI 功能；阅读、搜索、笔记和导出不受影响。",
+      );
     case "reserved":
       return { kind: "reserved" };
     case "completed":

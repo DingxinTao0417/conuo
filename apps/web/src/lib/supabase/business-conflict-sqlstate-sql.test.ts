@@ -12,6 +12,7 @@ const postConflictMigrationNames = new Set([
   "20260923000300_pdf_ink_realtime.sql",
   "20260925000500_learning_foundation.sql",
   "20260926000100_learning_overview_weak_concepts.sql",
+  "20260927000100_membership_foundation.sql",
 ]);
 const migrations = new URL("../../../../../supabase/migrations/", import.meta.url);
 

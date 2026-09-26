@@ -335,6 +335,7 @@ async function processClaim(
       job.ownerId,
       context.request.requestId,
       fingerprint,
+      { route: "organization-job", features: ["organization"] },
     );
     // Reserve may wait behind a shared request. Re-check the lease and source
     // scope before a provider call so an old worker never discloses evidence.

@@ -162,6 +162,15 @@ Web 首版只处理用户在 PDF 当前物理页明确框选的固定区域。�
 
 失败、取消和超时只要已预占新请求就计入；同 ID、同指纹的缓存读取不新增次数。这里是 Conuo 的请求次数限制，不是供应商费用上限或会员余额。`CONUO_AI_DAILY_TOKEN_LIMIT` 默认 `0`（关闭），可设为 1 至 100,000,000；启用时服务端按 UTC 当日追踪中的 token 近似汇总原子拒绝新的预占。追踪写入是尽力而为，供应商缺少用量或写入失败时 token 余额可能低估，设置页标注“近似”。降低上限后保留真实已用数，剩余不低于零。缺少账本密钥、限额配置错误、网络失败或返回格式异常时显示“用量暂不可用”，不制造零余额，也不继续显示旧数字为当前用量。用量读取不要求 AI 开关打开；但仍要求有效登录身份。
 
+### 会员额度（`CONUO_MEMBERSHIP_ENFORCEMENT`）
+
+会员方案见 [MEMBERSHIP_SYSTEM_PLAN.md](MEMBERSHIP_SYSTEM_PLAN.md)。`CONUO_MEMBERSHIP_ENFORCEMENT` 默认 `off`：行为与上文完全相同，服务端仍调用 `reserve_ai_request` 并按 `CONUO_AI_DAILY_REQUEST_LIMIT` 计数，不依赖会员迁移。`shadow` 与 `on` 需要先应用 `20260927000100_membership_foundation.sql`，改用 `reserve_membership_ai_request`，在同一账号锁内由数据库解析会员等级并记录路由：
+
+- `shadow`：仍按全局上限执行，不拦截任何请求；服务端输出不含账号或正文的 `membership_shadow` 结构化日志（等级、会员上限、是否本会被拒、功能是否开放），用于校准数值。
+- `on`：每日次数为 min(会员额度, `CONUO_AI_DAILY_REQUEST_LIMIT`)，此时全局值只是紧急上限，切换前应设为 500；会员未开放的功能返回 403 `MEMBERSHIP_FEATURE_REQUIRED`，且不消耗次数。
+
+两种模式下用量接口改用 `ai_membership_usage`，与预占使用同一规则，并附带当前等级、来源和到期时间。无效取值返回 503，不调用模型。Token 上限第一版仍是全局配置，不随会员变化。
+
 本地回归已覆盖正式 PostgREST HEAD 请求、账号和 UTC 过滤、未知计数、权限／注销闸门、上下文竞态与重置。登录后真实账本读取仍待 Supabase 服务端 secret 配置后在线验收；此功能没有新增表权限或 migration。
 
 ### 预占与结果缓存

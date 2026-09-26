@@ -167,7 +167,10 @@ export async function POST(request: Request) {
     const fingerprint = createHash("sha256").update(JSON.stringify(fingerprintParts)).digest("hex");
     const store = createRequestStore();
     // Shares the same account quota/concurrency ledger with questions.
-    const saved = await reserveRequest(store, user.id, input.requestId, fingerprint);
+    const saved = await reserveRequest(store, user.id, input.requestId, fingerprint, {
+      route: "organize",
+      features: ["organization"],
+    });
     if (saved.kind === "reserved")
       reservation = { store, ownerId: user.id, requestId: input.requestId };
     const assertCurrent = async () => {

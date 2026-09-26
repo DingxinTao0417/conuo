@@ -504,6 +504,7 @@ describe("region visual-learning route", () => {
       owner,
       input.requestId,
       expect.stringMatching(/^[a-f0-9]{64}$/),
+      { route: "vision", features: ["vision_region"] },
     );
     expect(mock.callVisionModel).toHaveBeenCalledWith(
       config,

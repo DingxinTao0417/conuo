@@ -64,6 +64,12 @@ export async function PUT(request: Request) {
         "REVISION_CONFLICT",
         "云端已有新版本。已保留本地修改，请先解决冲突。",
       );
+    if (error?.code === "PT403")
+      throw new ApiError(
+        403,
+        "LEARNING_SPACE_LIMIT",
+        "当前会员可用的学习空间已满，请先归档不再使用的空间；已有内容仍然保留。",
+      );
     if (error?.code === "22023")
       throw new ApiError(400, "INVALID_WORKSPACE", "工作区格式或容量不符合云端要求。");
     if (error?.code === "55P03")

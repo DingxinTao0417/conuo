@@ -382,6 +382,7 @@ describe("runOrganizationTasks", () => {
       ownerId,
       organizationRequest.requestId,
       expect.stringMatching(/^[a-f0-9]{64}$/),
+      { route: "organization-job", features: ["organization"] },
     );
     expect(mock.callModel).toHaveBeenCalledOnce();
     expect(mock.finishRequest).toHaveBeenCalledWith(

@@ -391,6 +391,7 @@ describe("generated answer route with canonical source and request-ledger bounda
       owner,
       "question-attempt-1",
       expect.stringMatching(/^[a-f0-9]{64}$/),
+      { route: "ask", features: [] },
     );
     expect(GROUNDING_CONTRACT_VERSION).toBe("grounding-v11");
     const actualFingerprint = mock.reserveRequest.mock.calls[0][3];
@@ -617,7 +618,11 @@ describe("generated answer route with canonical source and request-ledger bounda
     await response.text();
     expect(mock.callModelStream).toHaveBeenCalledOnce();
     expect(mock.readModelProfile).toHaveBeenCalledWith("reasoning");
-    expect(mock.reserveRequest.mock.calls[0][4]).toEqual({ ttlSeconds: 330 });
+    expect(mock.reserveRequest.mock.calls[0][4]).toEqual({
+      route: "ask",
+      features: ["deep_thinking"],
+      ttlSeconds: 330,
+    });
     expect(mock.reserveRequest.mock.calls[0][3]).toEqual(expect.stringMatching(/^[a-f0-9]{64}$/));
   });
 

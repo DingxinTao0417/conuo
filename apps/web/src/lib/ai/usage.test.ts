@@ -74,6 +74,54 @@ describe("AI reservation usage through the actual PostgREST client", () => {
     });
   });
 
+  it("reads plan limits from the membership RPC when enforcement is on", async () => {
+    vi.stubEnv("CONUO_MEMBERSHIP_ENFORCEMENT", "on");
+    vi.stubEnv("CONUO_AI_DAILY_REQUEST_LIMIT", "500");
+    fetchMock
+      .mockReset()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            usedCount: 7,
+            dailyLimit: 100,
+            membership: {
+              planCode: "pro",
+              planName: "专业版",
+              source: "promotion",
+              endsAt: "2026-10-01T00:00:00+00:00",
+              afterEnd: "free",
+              grantId: "00000000-0000-4000-8000-000000000000",
+            },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ promptTokens: 0, completionTokens: 0 })),
+      );
+    const usage = await readAiRequestUsage(store, ownerId, new AbortController().signal);
+    expect(usage).toMatchObject({
+      usedCount: 7,
+      dailyLimit: 100,
+      remainingCount: 93,
+      membership: {
+        planCode: "pro",
+        planName: "专业版",
+        source: "promotion",
+        endsAt: "2026-10-01T00:00:00.000Z",
+        afterEnd: "free",
+        enforced: true,
+      },
+    });
+    expect(JSON.stringify(usage)).not.toContain("grantId");
+    const [address, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(address).pathname).toBe("/rest/v1/rpc/ai_membership_usage");
+    expect(JSON.parse(String(init.body))).toEqual({
+      p_owner: ownerId,
+      p_global_cap: 500,
+      p_enforcement: "on",
+    });
+  });
+
   it("keeps the real used count when the configured limit was lowered", async () => {
     vi.stubEnv("CONUO_AI_DAILY_REQUEST_LIMIT", "3");
     fetchMock

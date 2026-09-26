@@ -204,7 +204,10 @@ export async function POST(request: Request) {
         ]),
       )
       .digest("hex");
-    const saved = await reserveRequest(store, user.id, input.requestId, fingerprint);
+    const saved = await reserveRequest(store, user.id, input.requestId, fingerprint, {
+      route: "vision",
+      features: ["vision_region"],
+    });
     if (saved.kind === "reserved")
       reservation = { store, ownerId: user.id, requestId: input.requestId };
 
