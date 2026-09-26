@@ -12,6 +12,7 @@ export type SpaceSettingsCardProps = {
   busy: boolean;
   update: WorkspaceStore["update"];
   setToast: (message: string) => void;
+  ensureCanActivateSpace?: (additional?: number) => Promise<boolean>;
   openExport: (scope: WorkspaceExportScope) => void;
   setSpaceToDeleteId: (spaceId: string) => void;
   setModal: (modal: "delete-space") => void;
@@ -28,6 +29,7 @@ export default function SpaceSettingsCard({
   busy,
   update,
   setToast,
+  ensureCanActivateSpace,
   openExport,
   setSpaceToDeleteId,
   setModal,
@@ -85,14 +87,19 @@ export default function SpaceSettingsCard({
           </button>
           <button
             className="btn"
-            onClick={() =>
-              update((d) => ({
-                ...d,
-                spaces: d.spaces.map((x) =>
-                  x.id === space.id ? { ...x, archived: !x.archived } : x,
-                ),
-              }))
-            }
+            onClick={async () => {
+              if (space.archived && ensureCanActivateSpace && !(await ensureCanActivateSpace(1)))
+                return;
+              if (
+                !update((d) => ({
+                  ...d,
+                  spaces: d.spaces.map((x) =>
+                    x.id === space.id ? { ...x, archived: !x.archived } : x,
+                  ),
+                }))
+              )
+                setToast("空间状态未保存，请稍后重试；当前内容仍然保留。");
+            }}
           >
             {space.archived ? "恢复空间" : "归档空间"}
           </button>

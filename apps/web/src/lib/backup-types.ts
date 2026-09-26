@@ -40,4 +40,6 @@ export interface RestorePlan {
     conceptRelations: number;
   };
   warnings: string[];
+  /** Number of incoming active spaces archived to fit the current account quota. */
+  archivedSpaceCount?: number;
 }

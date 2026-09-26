@@ -1,28 +1,33 @@
 "use client";
 import Modal from "../../modal";
 import { isUntouchedStarterWorkspace } from "../shared";
+import type { WorkspaceData } from "@/lib/types";
 import type { WorkspaceStore } from "../types";
 
 export type SpaceCreationIntent = "browse" | "import";
 
 export type SpaceCreationModalProps = {
   spaceCreationIntent: SpaceCreationIntent;
+  data: WorkspaceData;
   update: WorkspaceStore["update"];
   setToast: (message: string) => void;
   setSpaceCreationIntent: (intent: SpaceCreationIntent) => void;
   setImportTargetSpaceId: (spaceId: string) => void;
   setModal: (modal: "import" | null) => void;
+  ensureCanActivateSpace?: (additional?: number) => Promise<boolean>;
   chooseSpace: (id: string) => void;
   closeSpaceCreation: () => void;
 };
 
 export default function SpaceCreationModal({
   spaceCreationIntent,
+  data,
   update,
   setToast,
   setSpaceCreationIntent,
   setImportTargetSpaceId,
   setModal,
+  ensureCanActivateSpace,
   chooseSpace,
   closeSpaceCreation,
 }: SpaceCreationModalProps) {
@@ -33,7 +38,7 @@ export default function SpaceCreationModal({
     >
       <form
         className="modal-body"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
           const name = String(f.get("name") || "").trim();
@@ -43,6 +48,14 @@ export default function SpaceCreationModal({
             if (nameInput instanceof HTMLInputElement) nameInput.focus();
             return;
           }
+          const continueToImport = spaceCreationIntent === "import";
+          if (
+            ensureCanActivateSpace &&
+            !(await ensureCanActivateSpace(
+              continueToImport && isUntouchedStarterWorkspace(data) ? 0 : 1,
+            ))
+          )
+            return;
           const id = crypto.randomUUID();
           const created = {
             id,
@@ -52,14 +65,18 @@ export default function SpaceCreationModal({
             archived: false,
             createdAt: new Date().toISOString(),
           };
-          const continueToImport = spaceCreationIntent === "import";
-          update((d) => ({
-            ...d,
-            spaces:
-              continueToImport && isUntouchedStarterWorkspace(d)
-                ? [created]
-                : [...d.spaces, created],
-          }));
+          if (
+            !update((d) => ({
+              ...d,
+              spaces:
+                continueToImport && isUntouchedStarterWorkspace(d)
+                  ? [created]
+                  : [...d.spaces, created],
+            }))
+          ) {
+            setToast("学习空间未创建，请稍后重试；当前内容仍然保留。");
+            return;
+          }
           setSpaceCreationIntent("browse");
           chooseSpace(id);
           if (continueToImport) {

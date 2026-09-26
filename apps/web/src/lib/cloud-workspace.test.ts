@@ -79,6 +79,21 @@ describe("workspace cloud adapter", () => {
     );
   });
 
+  it("turns a learning-space limit response into a dedicated retained-draft error", async () => {
+    mock.fetch.mockResolvedValue(
+      Response.json(
+        { error: "当前会员可用的学习空间已满。", code: "LEARNING_SPACE_LIMIT" },
+        { status: 403 },
+      ),
+    );
+
+    await expect(saveCloudWorkspace(createEmptyWorkspace(), 3, ownerId)).rejects.toMatchObject({
+      status: 403,
+      code: "LEARNING_SPACE_LIMIT",
+      message: "学习空间已满：当前修改仍保留在此浏览器，请先归档不再使用的空间后重新连接。",
+    });
+  });
+
   it.each([
     { revision: 0 },
     { revision: 2.5 },

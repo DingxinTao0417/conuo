@@ -7,8 +7,10 @@ export type SpacesPaneProps = {
   data: WorkspaceData;
   update: WorkspaceStore["update"];
   setSpaceToDeleteId: (spaceId: string) => void;
+  setToast?: (message: string) => void;
   setModal: (modal: "delete-space") => void;
   openSpaceCreation: () => void;
+  ensureCanActivateSpace?: (additional?: number) => Promise<boolean>;
   chooseSpace: (spaceId: string) => void;
 };
 
@@ -21,8 +23,10 @@ export default function SpacesPane({
   data,
   update,
   setSpaceToDeleteId,
+  setToast,
   setModal,
   openSpaceCreation,
+  ensureCanActivateSpace,
   chooseSpace,
 }: SpacesPaneProps) {
   const active = data.spaces.filter((space) => !space.archived);
@@ -67,14 +71,18 @@ export default function SpacesPane({
               <div className="setting-actions">
                 <button
                   className="btn"
-                  onClick={() =>
-                    update((d) => ({
-                      ...d,
-                      spaces: d.spaces.map((x) =>
-                        x.id === space.id ? { ...x, archived: false } : x,
-                      ),
-                    }))
-                  }
+                  onClick={async () => {
+                    if (ensureCanActivateSpace && !(await ensureCanActivateSpace(1))) return;
+                    if (
+                      !update((d) => ({
+                        ...d,
+                        spaces: d.spaces.map((x) =>
+                          x.id === space.id ? { ...x, archived: false } : x,
+                        ),
+                      }))
+                    )
+                      setToast?.("空间状态未保存，请稍后重试；当前内容仍然保留。");
+                  }}
                 >
                   恢复空间
                 </button>

@@ -881,3 +881,35 @@ export function mergeBackupRestore(current: WorkspaceData, plan: RestorePlan): W
     throw new Error("并入完整备份后会超过工作区 3 MiB 容量；未删减历史或修改已有资料。");
   return next;
 }
+
+/**
+ * Keeps a restore additive while making its active-space projection fit the
+ * account's current quota. Existing spaces are never archived here: a
+ * downgrade must remain editable, and only incoming restore copies are
+ * demoted before the first save attempt.
+ */
+export function archiveExcessRestoreSpaces(
+  current: WorkspaceData,
+  plan: RestorePlan,
+  limit: number,
+): number {
+  if (!Number.isInteger(limit) || limit < 1) return 0;
+  let remaining = Math.max(0, limit - current.spaces.filter((space) => !space.archived).length);
+  let archived = 0;
+  const spaces = plan.data.spaces.map((space) => {
+    if (space.archived || remaining > 0) {
+      if (!space.archived) remaining -= 1;
+      return space;
+    }
+    archived += 1;
+    return { ...space, archived: true };
+  });
+  if (!archived) return 0;
+  plan.data = { ...plan.data, spaces };
+  plan.archivedSpaceCount = (plan.archivedSpaceCount ?? 0) + archived;
+  plan.warnings = [
+    ...plan.warnings,
+    `当前账号的活跃学习空间额度不足，已将恢复副本中的 ${archived} 个空间转为归档；资料和笔记仍然保留。`,
+  ];
+  return archived;
+}

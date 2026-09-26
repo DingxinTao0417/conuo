@@ -1,4 +1,5 @@
 import { subscribeConfirmedAccountDeletions } from "../account-deletion-observer";
+import * as cloud from "../cloud";
 import {
   askCloud,
   cancelImportParse,
@@ -41,6 +42,13 @@ import { workspaceSchema } from "../supabase/validation";
 import type { WorkspaceData } from "../types";
 import { webSessionStore } from "../web-session-store";
 import type { ImportPipeline, StoredWorkspace, SyncMeta, User, WorkspaceIO } from "./types";
+
+// A few focused tests provide a deliberately small cloud mock from the
+// pre-membership contract. Avoid touching the optional export on those mocks;
+// production's real module always provides it.
+const accountMembershipReader = Object.prototype.hasOwnProperty.call(cloud, "getAccountMembership")
+  ? cloud.getAccountMembership
+  : undefined;
 
 export const defaultImportPipeline: ImportPipeline = {
   prepare: prepareImportFile,
@@ -126,6 +134,7 @@ export const defaultIO: WorkspaceIO = {
   reconcileOrganizationJobs: reconcileOrganizationJobsCloud,
   askCloud,
   organizeCloud,
+  getAccountMembership: accountMembershipReader,
   getModelStatus,
   readLegacyMeta,
 };

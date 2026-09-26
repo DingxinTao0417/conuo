@@ -143,6 +143,9 @@ export default function BackupRestorePanel({
                   {plan.counts.recoverableDrafts
                     ? `同时保留 ${plan.counts.recoverableDrafts} 份可恢复草稿。`
                     : ""}
+                  {plan.archivedSpaceCount
+                    ? `其中 ${plan.archivedSpaceCount} 个超出额度的学习空间已转为归档。`
+                    : ""}
                   {storageMode === "cloud"
                     ? "原件与资料库已得到云端确认。"
                     : accountEmail

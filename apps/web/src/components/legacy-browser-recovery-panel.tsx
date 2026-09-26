@@ -163,6 +163,9 @@ export default function LegacyBrowserRecoveryPanel({
                 <p>
                   已为 {accountEmail} 新增 {recovery.plan.counts.sources} 份资料、
                   {recovery.plan.counts.notes} 篇笔记与知识页。旧版浏览器副本仍保留。
+                  {recovery.plan.archivedSpaceCount
+                    ? `其中 ${recovery.plan.archivedSpaceCount} 个超出额度的学习空间已转为归档。`
+                    : ""}
                 </p>
               </div>
             </div>

@@ -26,6 +26,7 @@ vi.mock("./cloud", () => ({
   retryImportParse: vi.fn(),
   organizeCloud: vi.fn(),
   getModelStatus: vi.fn(),
+  getAccountMembership: vi.fn(),
   downloadSourceBlob: vi.fn(),
   isCloudConfigured: () => false,
   loadCloudWorkspace: vi.fn(),

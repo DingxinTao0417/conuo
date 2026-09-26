@@ -191,7 +191,14 @@ async function cloudRequest<T>(
       body && typeof body === "object" && "code" in body && typeof body.code === "string"
         ? body.code
         : "CLOUD_ERROR";
-    const error = new CloudError(message, response.status, code);
+    const error =
+      code === "LEARNING_SPACE_LIMIT"
+        ? new CloudError(
+            "学习空间已满：当前修改仍保留在此浏览器，请先归档不再使用的空间后重新连接。",
+            403,
+            code,
+          )
+        : new CloudError(message, response.status, code);
     const observation = await observeAccountDeletionFailure(error, expectedUserId);
     error.localCleanupFailed = observation.cleanupFailed;
     throw error;

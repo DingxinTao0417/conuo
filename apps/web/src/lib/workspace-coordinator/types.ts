@@ -8,6 +8,7 @@ import type {
   enqueueOrganizationJob,
   finishImportParse,
   getModelStatus,
+  getAccountMembership,
   heartbeatImportParse,
   loadCloudWorkspace,
   loadCloudWorkspaceRevision,
@@ -275,5 +276,7 @@ export interface WorkspaceIO {
   askCloud: typeof askCloud;
   organizeCloud: typeof organizeCloud;
   getModelStatus: typeof getModelStatus;
+  /** Reads the account quota before a UI operation that can add active spaces. */
+  getAccountMembership?: typeof getAccountMembership;
   readLegacyMeta: (id: string) => SyncMeta | null;
 }

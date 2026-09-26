@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { prepareBackupRestore, mergeBackupRestore } from "./backup-restore";
+import {
+  archiveExcessRestoreSpaces,
+  prepareBackupRestore,
+  mergeBackupRestore,
+} from "./backup-restore";
 import type { PreparedBackup } from "./backup-types";
 import type { Citation, Note, Source, SourceVersion, WorkspaceData } from "./types";
 import type { OrganizationJob } from "./organization-types";
@@ -1194,6 +1198,27 @@ describe("backup restore identity mapping", () => {
 });
 
 describe("backup restore merge", () => {
+  it("archives only incoming active spaces that exceed the account quota", () => {
+    const current = workspace();
+    current.spaces[0].archived = false;
+    const plan = prepareBackupRestore(fixture());
+    plan.data.spaces[0].archived = false;
+    plan.data.spaces.push({
+      id: "extra-space",
+      name: "另一个空间",
+      goal: "",
+      color: "#7865cf",
+      archived: false,
+      createdAt: now,
+    });
+    const archived = archiveExcessRestoreSpaces(current, plan, 1);
+    expect(archived).toBe(2);
+    expect(plan.archivedSpaceCount).toBe(2);
+    expect(plan.data.spaces.every((space) => space.archived)).toBe(true);
+    expect(plan.warnings.at(-1)).toContain("转为归档");
+    expect(current.spaces[0].archived).toBe(false);
+  });
+
   it("appends a complete copy, keeps globals and current edits, and is idempotent for one plan", () => {
     const current = workspace();
     current.sources = [source("existing")];

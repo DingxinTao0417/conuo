@@ -44,6 +44,7 @@ export type HomeSectionProps = {
   navigate: (section: "library" | "questions") => void;
   openImport: () => void;
   openSpaceCreation: (intent?: "browse" | "import") => void;
+  ensureCanActivateSpace?: (additional?: number) => Promise<boolean>;
   openSource: (id: string, versionId?: string, citation?: Citation) => void;
   openNote: (id: string) => void;
   openConversation: (conversation: Conversation) => void;
@@ -70,6 +71,7 @@ export default function HomeSection({
   navigate,
   openImport,
   openSpaceCreation,
+  ensureCanActivateSpace,
   openSource,
   openNote,
   openConversation,
@@ -433,6 +435,7 @@ export default function HomeSection({
           busy={busy}
           update={update}
           setToast={setToast}
+          ensureCanActivateSpace={ensureCanActivateSpace}
           openExport={openExport}
           setSpaceToDeleteId={setSpaceToDeleteId}
           setModal={setModal}

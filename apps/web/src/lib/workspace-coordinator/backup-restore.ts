@@ -1,4 +1,4 @@
-import { mergeBackupRestore } from "../backup-restore";
+import { archiveExcessRestoreSpaces, mergeBackupRestore } from "../backup-restore";
 import type { RestorePlan } from "../backup-types";
 import { getSourceVersion } from "../source-versions";
 import type { WorkspaceCoordinator } from "./coordinator";
@@ -39,14 +39,22 @@ export class BackupRestoreController {
     if (!session?.ready || session.token !== token)
       throw new Error("当前账号已改变，请重新打开备份恢复面板。");
     this.core.assertWorkspaceWritable(session);
-    const key = JSON.stringify([session.token, plan.id]);
+    const prepared = structuredClone(plan);
+    await this.applySpaceQuota(prepared, session);
+    const key = JSON.stringify([session.token, prepared.id]);
     const pending = this.pendingBackupRestores.get(key);
     if (pending) {
-      if (pending.fingerprint !== plan.fingerprint)
+      if (pending.fingerprint !== prepared.fingerprint)
         throw new Error("备份确认内容已改变，请重新选择备份文件。");
       return pending.promise;
     }
-    const prepared = structuredClone(plan);
+    // Keep the preview object in sync with the durable plan so the panel can
+    // explain which incoming spaces were archived after a successful retry.
+    if (prepared.archivedSpaceCount) {
+      plan.data = structuredClone(prepared.data);
+      plan.archivedSpaceCount = prepared.archivedSpaceCount;
+      plan.warnings = [...prepared.warnings];
+    }
     const promise = (async () => {
       await this.commitBackupRestore(prepared, session);
       if (this.core.cloudOnly) {
@@ -65,6 +73,21 @@ export class BackupRestoreController {
       if (this.pendingBackupRestores.get(key)?.promise === promise)
         this.pendingBackupRestores.delete(key);
     }
+  }
+
+  private async applySpaceQuota(plan: RestorePlan, session: Session): Promise<void> {
+    if (!session.user || !this.core.io.getAccountMembership) return;
+    let membership;
+    try {
+      membership = await this.core.io.getAccountMembership(session.user.id);
+    } catch {
+      throw new Error("暂时无法读取会员额度，未恢复备份；请稍后重新连接后重试。");
+    }
+    // off/shadow deliberately retain the current system-wide ceiling. The
+    // membership API still reports the plan's 500-space display value, but it
+    // must not make either mode enforce a future membership target.
+    const limit = membership.enforcement === "on" ? membership.limits.learningSpaces : 500;
+    archiveExcessRestoreSpaces(session.data, plan, limit);
   }
 
   private async commitBackupRestore(plan: RestorePlan, session: Session): Promise<void> {

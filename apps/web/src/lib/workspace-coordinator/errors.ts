@@ -14,6 +14,17 @@ export function errorText(cause: unknown): string {
   return cause instanceof Error ? cause.message : "保存失败，请重试。";
 }
 
+export function workspaceSaveErrorText(cause: unknown): string {
+  if (
+    cause &&
+    typeof cause === "object" &&
+    "code" in cause &&
+    cause.code === "LEARNING_SPACE_LIMIT"
+  )
+    return "学习空间已满：当前修改仍保留在此浏览器，请先归档不再使用的空间后重新连接。";
+  return errorText(cause);
+}
+
 export function exceedsCloudWorkspaceCapacity(data: WorkspaceData): boolean {
   return new TextEncoder().encode(JSON.stringify(data)).byteLength > MAX_WORKSPACE_BYTES;
 }

@@ -29,6 +29,7 @@ export type SettingsSectionProps = {
   navigate: (section: "tasks" | "trash") => void;
   setModal: (modal: "account" | "restore" | "legacy-recovery" | "delete-space") => void;
   setToast: (message: string) => void;
+  ensureCanActivateSpace?: (additional?: number) => Promise<boolean>;
   setSpaceToDeleteId: (spaceId: string) => void;
   openExport: () => void;
   openSpaceCreation: () => void;
@@ -54,6 +55,7 @@ export default function SettingsSection({
   navigate,
   setModal,
   setToast,
+  ensureCanActivateSpace,
   setSpaceToDeleteId,
   openExport,
   openSpaceCreation,
@@ -119,8 +121,10 @@ export default function SettingsSection({
           data={data}
           update={update}
           setSpaceToDeleteId={setSpaceToDeleteId}
+          setToast={setToast}
           setModal={setModal}
           openSpaceCreation={openSpaceCreation}
+          ensureCanActivateSpace={ensureCanActivateSpace}
           chooseSpace={chooseSpace}
         />
       )}

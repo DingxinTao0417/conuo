@@ -19,6 +19,7 @@ import {
   errorText,
   exceedsCloudWorkspaceCapacity,
   OriginalSyncError,
+  workspaceSaveErrorText,
   workspaceSaveNeedsReadBack,
 } from "./errors";
 import { AccountController } from "./account";
@@ -1347,7 +1348,7 @@ export class WorkspaceCoordinator {
             }
             if (!conflictError(cause)) {
               session.blocked = "error";
-              session.error = errorText(cause);
+              session.error = workspaceSaveErrorText(cause);
               continue;
             }
             try {
