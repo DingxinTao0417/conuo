@@ -14,19 +14,19 @@ const plans: AccountMembership["plans"] = [
     code: "free",
     name: "免费版",
     description: "",
-    limits: { aiDailyRequests: 20, learningSpaces: 1 },
+    limits: { aiDailyRequests: 20, learningSpaces: 500 },
   },
   {
     code: "pro",
     name: "专业版",
     description: "",
-    limits: { aiDailyRequests: 100, learningSpaces: 5 },
+    limits: { aiDailyRequests: 100, learningSpaces: 500 },
   },
   {
     code: "max",
     name: "旗舰版",
     description: "",
-    limits: { aiDailyRequests: 300, learningSpaces: 20 },
+    limits: { aiDailyRequests: 300, learningSpaces: 500 },
   },
 ];
 function membership(overrides: Partial<AccountMembership> = {}): AccountMembership {
@@ -38,7 +38,7 @@ function membership(overrides: Partial<AccountMembership> = {}): AccountMembersh
     endsAt: null,
     afterEnd: null,
     enforcement: "on",
-    limits: { aiDailyRequests: 20, learningSpaces: 1 },
+    limits: { aiDailyRequests: 20, learningSpaces: 500 },
     features: {
       vision_region: true,
       organization: true,
@@ -79,6 +79,8 @@ describe("membership panel", () => {
     expect(host.querySelector(".membership-badge")?.textContent).toBe("免费版");
     expect(host.textContent).toContain("未开通会员，默认免费版");
     expect(host.textContent).toContain("20 次");
+    expect(host.textContent).toContain("暂不限制");
+    expect(host.textContent).not.toContain("500 个");
     const learning = [...host.querySelectorAll(".membership-features li")].find((item) =>
       item.textContent?.includes("学习 AI"),
     );
@@ -101,7 +103,7 @@ describe("membership panel", () => {
         startsAt: "2026-09-25T00:00:00.000Z",
         endsAt: "2026-10-25T00:00:00.000Z",
         afterEnd: "pro",
-        limits: { aiDailyRequests: 300, learningSpaces: 20 },
+        limits: { aiDailyRequests: 300, learningSpaces: 500 },
       }),
     );
     await render("owner-a");
@@ -114,6 +116,15 @@ describe("membership panel", () => {
     mock.getAccountMembership.mockResolvedValue(membership({ enforcement: "shadow" }));
     await render("owner-a");
     expect(host.textContent).toContain("会员额度试运行中");
+  });
+
+  it("explains that shadow mode keeps the current system space limit", async () => {
+    mock.getAccountMembership.mockResolvedValue(
+      membership({ enforcement: "shadow", limits: { aiDailyRequests: 20, learningSpaces: 500 } }),
+    );
+    await render("owner-a");
+    expect(host.textContent).toContain("学习空间仍按当前系统上限");
+    expect(host.textContent).toContain("暂不限制");
   });
 
   it("reports an unavailable membership without guessing a plan", async () => {

@@ -28,10 +28,15 @@ function localDateTime(timestamp: string) {
 }
 
 const ENFORCEMENT_NOTES = {
-  off: "会员额度尚未启用：当前所有账号按全站统一的每日次数计算，下表为会员启用后的额度。",
-  shadow: "会员额度试运行中：暂时仍按全站统一的每日次数计算，下表为会员启用后的额度。",
+  off: "会员额度尚未启用：AI 请求仍按全站统一的每日次数计算，学习空间仍按当前系统上限；下表为会员启用后的额度。",
+  shadow:
+    "会员额度试运行中：AI 请求暂时仍按全站统一的每日次数计算，学习空间仍按当前系统上限；下表为会员启用后的额度。",
   on: null,
 } as const;
+
+function formatLearningSpaceLimit(limit: number): string {
+  return limit === 500 ? "暂不限制" : `${limit} 个`;
+}
 
 function AccountMembershipView({ userId }: { userId: string }) {
   const [state, setState] = useState<State>({ kind: "checking" });
@@ -132,10 +137,7 @@ function AccountMembershipView({ userId }: { userId: string }) {
               </div>
               <div>
                 <dt>活跃学习空间</dt>
-                <dd>
-                  {membership.limits.learningSpaces}
-                  <small> 个</small>
-                </dd>
+                <dd>{formatLearningSpaceLimit(membership.limits.learningSpaces)}</dd>
               </div>
             </dl>
             <ul className="membership-features" aria-label="AI 功能">
@@ -168,7 +170,7 @@ function AccountMembershipView({ userId }: { userId: string }) {
                           {plan.code === membership.planCode && <small>（当前）</small>}
                         </th>
                         <td>{plan.limits.aiDailyRequests} 次</td>
-                        <td>{plan.limits.learningSpaces} 个</td>
+                        <td>{formatLearningSpaceLimit(plan.limits.learningSpaces)}</td>
                       </tr>
                     ))}
                   </tbody>
