@@ -242,6 +242,8 @@ async function processClaim(
   let traceErrorCode: string | undefined;
   let traceModelName: string | undefined;
   let traceModelProfile: ModelProfileName | undefined;
+  let promptTokens = 0;
+  let completionTokens = 0;
   try {
     const context = await rpc(
       store,
@@ -349,7 +351,13 @@ async function processClaim(
       traceRecorder.mark("modelStart");
       result = bindOrganizationResult(
         await callModel(config, organizationMessages(grounding, context.request), input.signal, {
-          onUsage: (usage) => traceRecorder?.addUsage(usage),
+          onUsage: (usage) => {
+            traceRecorder?.addUsage(usage);
+            if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
+              promptTokens += usage.promptTokens!;
+            if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
+              completionTokens += usage.completionTokens!;
+          },
         }),
         grounding,
         context.request,
@@ -380,7 +388,12 @@ async function processClaim(
     // completed answer or retrying the provider call.
     if (reserved.kind === "reserved") {
       try {
-        await finishRequest(ledger, job.ownerId, context.request.requestId, result);
+        if (promptTokens || completionTokens)
+          await finishRequest(ledger, job.ownerId, context.request.requestId, result, undefined, {
+            promptTokens,
+            completionTokens,
+          });
+        else await finishRequest(ledger, job.ownerId, context.request.requestId, result);
       } catch {
         return;
       }

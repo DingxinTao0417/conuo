@@ -91,6 +91,22 @@ export async function POST(request: Request) {
   let traceErrorCode: string | undefined;
   let traceModelName: string | undefined;
   let traceModelProfile: ModelProfileName | undefined;
+  let promptTokens = 0;
+  let completionTokens = 0;
+  const finishLedger = (
+    store: ReturnType<typeof createRequestStore>,
+    ownerId: string,
+    requestId: string,
+    result: ReturnType<typeof bindOrganizationResult> | undefined,
+    errorCode?: string,
+  ) => {
+    const usage = promptTokens || completionTokens ? { promptTokens, completionTokens } : undefined;
+    return usage
+      ? finishRequest(store, ownerId, requestId, result, errorCode, usage)
+      : errorCode !== undefined
+        ? finishRequest(store, ownerId, requestId, result, errorCode)
+        : finishRequest(store, ownerId, requestId, result);
+  };
   try {
     const { supabase, user } = await requireUser(request);
     const parsed = organizationRequestSchema.safeParse(await readJson(request, 50_000));
@@ -224,7 +240,15 @@ export async function POST(request: Request) {
           config,
           organizationMessages(grounding, input, target, compare),
           request.signal,
-          { onUsage: (usage) => traceRecorder?.addUsage(usage) },
+          {
+            onUsage: (usage) => {
+              traceRecorder?.addUsage(usage);
+              if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
+                promptTokens += usage.promptTokens!;
+              if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
+                completionTokens += usage.completionTokens!;
+            },
+          },
         ),
         grounding,
         input,
@@ -238,7 +262,7 @@ export async function POST(request: Request) {
     traceModelProfile = selectedProfile.profile;
     await assertCurrent();
     if (reservation) {
-      await finishRequest(store, user.id, input.requestId, result);
+      await finishLedger(store, user.id, input.requestId, result);
       reservation = undefined;
       // Also guard the time spent writing the shared ledger cache.
       await assertCurrent();
@@ -263,7 +287,7 @@ export async function POST(request: Request) {
       });
     if (reservation) {
       try {
-        await finishRequest(
+        await finishLedger(
           reservation.store,
           reservation.ownerId,
           reservation.requestId,

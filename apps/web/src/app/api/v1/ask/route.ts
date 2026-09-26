@@ -430,6 +430,31 @@ export async function POST(request: Request) {
   let traceErrorCode: string | undefined;
   let traceModelName: string | undefined;
   let traceModelProfile: ModelProfileName | undefined;
+  let promptTokens = 0;
+  let completionTokens = 0;
+  const addUsage = (usage: { promptTokens?: number; completionTokens?: number }) => {
+    if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
+      promptTokens += usage.promptTokens!;
+    if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
+      completionTokens += usage.completionTokens!;
+  };
+  const tokenObserver: ModelObserver = { onUsage: addUsage };
+  const recordedUsage = () =>
+    promptTokens || completionTokens ? { promptTokens, completionTokens } : undefined;
+  const finishLedger = (
+    store: ReturnType<typeof createRequestStore>,
+    ownerId: string,
+    requestId: string,
+    result: AnswerResult | undefined,
+    errorCode?: string,
+  ) => {
+    const usage = recordedUsage();
+    return usage
+      ? finishRequest(store, ownerId, requestId, result, errorCode, usage)
+      : errorCode !== undefined
+        ? finishRequest(store, ownerId, requestId, result, errorCode)
+        : finishRequest(store, ownerId, requestId, result);
+  };
   const finishTrace = () => {
     if (traceRecorder)
       void traceRecorder.finish(traceOutcome, {
@@ -446,7 +471,7 @@ export async function POST(request: Request) {
     reservationCleanup = (async () => {
       let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
       try {
-        const saving = finishRequest(
+        const saving = finishLedger(
           pending.store,
           pending.ownerId,
           pending.requestId,
@@ -814,6 +839,7 @@ export async function POST(request: Request) {
               documentLanguage: documentLanguage(searchData.sources),
             },
             signal,
+            tokenObserver,
           );
           if (rewritten) {
             retrievalQueries = [rewritten.query, ...rewritten.alternates]
@@ -1050,7 +1076,10 @@ export async function POST(request: Request) {
           traceRecorder?.mark("modelStart");
           let lastReasoningHeartbeat = 0;
           const modelObserver: ModelObserver = {
-            onUsage: (usage) => traceRecorder?.addUsage(usage),
+            onUsage: (usage) => {
+              traceRecorder?.addUsage(usage);
+              addUsage(usage);
+            },
             onFirstDelta: () => traceRecorder?.mark("firstDraft"),
             ...(depth === "deep"
               ? {
@@ -1105,7 +1134,7 @@ export async function POST(request: Request) {
         }
         await assertAnswer(answer, signal);
         if (reservation) {
-          await finishRequest(store, user.id, question.requestId, answer);
+          await finishLedger(store, user.id, question.requestId, answer);
           reservation = undefined;
           // Protect the interval spent saving the result, too.
           await assertCurrent(signal);

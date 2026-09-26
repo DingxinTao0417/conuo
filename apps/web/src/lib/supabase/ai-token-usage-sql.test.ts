@@ -41,11 +41,12 @@ beforeAll(async () => {
   `);
   await db.exec(await migration("20260924000300_ai_request_ttl.sql"));
   await db.exec(await migration("20260926000200_ai_token_usage.sql"));
+  await db.exec(await migration("20260927000200_ai_request_token_ledger.sql"));
 }, 30_000);
 
 beforeEach(async () => {
   await db.exec(
-    "RESET ROLE; DELETE FROM conuo_private.ai_request_traces; DELETE FROM public.ai_requests;",
+    "RESET ROLE; DELETE FROM conuo_private.ai_request_traces; DELETE FROM conuo_private.ai_token_usage_ledger; DELETE FROM public.ai_requests;",
   );
   await db.exec("SET TIME ZONE 'UTC'");
 });
@@ -55,7 +56,7 @@ afterAll(async () => {
 });
 
 describe("AI token usage SQL boundary", () => {
-  it("aggregates current UTC traces for one owner and exposes it only to service_role", async () => {
+  it("aggregates request and token-only ledger rows, while ignoring optional traces", async () => {
     await asRole("service_role", async () => {
       await db.query("SELECT public.record_ai_trace($1::uuid,$2::jsonb)", [
         owner,
@@ -78,13 +79,30 @@ describe("AI token usage SQL boundary", () => {
       "UPDATE conuo_private.ai_request_traces SET created_at = now() - interval '1 day' WHERE owner_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'",
     );
     await asRole("service_role", () =>
-      db.query("SELECT public.record_ai_trace($1::uuid,$2::jsonb)", [
+      db.query("SELECT public.reserve_ai_request($1::uuid,$2,$3,$4)", [
         owner,
-        JSON.stringify({
-          route: "vision",
-          outcome: "failed",
-          metrics: { promptTokens: 4, completionTokens: 6 },
-        }),
+        "request-ledger",
+        fingerprint,
+        50,
+      ]),
+    );
+    await asRole("service_role", () =>
+      db.query("SELECT public.finish_ai_request($1::uuid,$2,$3::jsonb,$4,$5::bigint,$6::bigint)", [
+        owner,
+        "request-ledger",
+        JSON.stringify({ answer: "saved" }),
+        null,
+        10,
+        20,
+      ]),
+    );
+    await asRole("service_role", () =>
+      db.query("SELECT public.record_ai_token_usage($1::uuid,$2,$3,$4::bigint,$5::bigint)", [
+        owner,
+        "ocr-current",
+        "ocr",
+        4,
+        6,
       ]),
     );
     expect(
@@ -95,7 +113,7 @@ describe("AI token usage SQL boundary", () => {
           ]),
         )
       ).rows[0]!.value,
-    ).toEqual({ promptTokens: 4, completionTokens: 6 });
+    ).toEqual({ promptTokens: 14, completionTokens: 26 });
     await expect(
       asRole("authenticated", () =>
         db.query("SELECT public.ai_token_usage_today($1::uuid)", [owner]),
@@ -105,13 +123,12 @@ describe("AI token usage SQL boundary", () => {
 
   it("enforces token_limited while retaining legacy four and five argument reservations", async () => {
     await asRole("service_role", () =>
-      db.query("SELECT public.record_ai_trace($1::uuid,$2::jsonb)", [
+      db.query("SELECT public.record_ai_token_usage($1::uuid,$2,$3,$4::bigint,$5::bigint)", [
         owner,
-        JSON.stringify({
-          route: "ask",
-          outcome: "completed",
-          metrics: { promptTokens: 4, completionTokens: 6 },
-        }),
+        "ocr-limit",
+        "ocr",
+        4,
+        6,
       ]),
     );
     expect(
@@ -156,6 +173,25 @@ describe("AI token usage SQL boundary", () => {
           120,
           100000001,
         ]),
+      ),
+    ).rejects.toBeTruthy();
+    await expect(
+      asRole("service_role", () =>
+        db.query("SELECT public.record_ai_token_usage($1::uuid,$2,$3,$4::bigint,$5::bigint)", [
+          owner,
+          "invalid-token",
+          "ocr",
+          -1,
+          0,
+        ]),
+      ),
+    ).rejects.toBeTruthy();
+    await expect(
+      asRole("authenticated", () =>
+        db.query(
+          "SELECT public.finish_ai_request($1::uuid,$2,$3::jsonb,$4,$5::bigint,$6::bigint)",
+          [otherOwner, "legacy-four", JSON.stringify({ answer: "forbidden" }), null, 1, 1],
+        ),
       ),
     ).rejects.toBeTruthy();
   });

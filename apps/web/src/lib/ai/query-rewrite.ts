@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { callModel, type ModelConfig } from "./model";
+import { callModel, type ModelConfig, type ModelObserver } from "./model";
 import type { Source } from "../types";
 
 export const REWRITE_CONTRACT_VERSION = "rewrite-v1";
@@ -63,6 +63,7 @@ export async function rewriteQuery(
   config: ModelConfig,
   input: RewriteInput,
   signal?: AbortSignal,
+  observer?: ModelObserver,
 ): Promise<RewriteResult | null> {
   const controller = new AbortController();
   let timedOut = false;
@@ -82,6 +83,7 @@ export async function rewriteQuery(
       { role: "user", content: JSON.stringify(input) },
     ],
     controller.signal,
+    observer,
   );
   try {
     if (signal) {

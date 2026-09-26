@@ -9,6 +9,7 @@ import type { VisionStudyResult } from "../vision-region-contract";
 import type { GlossarySuggestionResult } from "./glossary";
 import type { PracticeResult } from "./practice";
 import type { GradeResult, HintResult, ExplainFeedbackResult } from "./grading";
+import type { ModelObserver, ModelUsage } from "./model";
 import {
   AI_DAILY_REQUEST_LIMIT_MIN,
   AI_DAILY_REQUEST_LIMIT_MAX,
@@ -32,6 +33,24 @@ export function createRequestStore() {
   });
 }
 type Store = ReturnType<typeof createRequestStore>;
+
+export type AiTokenUsage = {
+  promptTokens: number;
+  completionTokens: number;
+};
+
+/** Collect provider usage (or the model adapter's estimate) across one request. */
+export function createAiTokenUsageRecorder() {
+  const usage: AiTokenUsage = { promptTokens: 0, completionTokens: 0 };
+  const addUsage = (next: ModelUsage) => {
+    if (Number.isSafeInteger(next.promptTokens) && next.promptTokens! >= 0)
+      usage.promptTokens += next.promptTokens!;
+    if (Number.isSafeInteger(next.completionTokens) && next.completionTokens! >= 0)
+      usage.completionTokens += next.completionTokens!;
+  };
+  const observer: ModelObserver = { onUsage: addUsage };
+  return { observer, addUsage, usage: () => ({ ...usage }) };
+}
 export function readAiDailyRequestLimit(): number {
   const daily = Number(process.env.CONUO_AI_DAILY_REQUEST_LIMIT || AI_DEFAULT_DAILY_REQUEST_LIMIT);
   if (
@@ -204,19 +223,57 @@ export async function finishRequest(
     | HintResult
     | ExplainFeedbackResult,
   errorCode?: string,
+  usage?: AiTokenUsage,
 ) {
   // Never write the service-role table directly: the database-side completion
   // RPC rechecks the account-deletion fence before a late model result can land.
-  const { data, error } = await store.rpc("finish_ai_request", {
+  const args = {
     p_owner: ownerId,
     p_request_id: requestId,
     p_result: result ?? null,
     p_error_code: result ? null : (errorCode ?? null),
-  });
+    ...(usage
+      ? {
+          p_prompt_tokens: usage.promptTokens,
+          p_completion_tokens: usage.completionTokens,
+        }
+      : {}),
+  };
+  let { data, error } = await store.rpc("finish_ai_request", args);
+  // Keep the pre-token-ledger deployment usable during a rolling migration.
+  // Once the new RPC exists this branch is never taken; the legacy four-arg
+  // call simply records the result without token columns.
+  if (usage && error && ["42883", "PGRST202", "PGRST203"].includes(error.code ?? "")) {
+    ({ data, error } = await store.rpc("finish_ai_request", {
+      p_owner: ownerId,
+      p_request_id: requestId,
+      p_result: result ?? null,
+      p_error_code: result ? null : (errorCode ?? null),
+    }));
+  }
   if (error || !completionSchema.safeParse(data).success)
     throw new ApiError(
       503,
       "MODEL_RESULT_NOT_SAVED",
       "模型结果未能确认保存，请稍后重试原请求以检查结果。",
     );
+}
+
+/** Records a model call that intentionally has no ai_requests reservation. */
+export async function recordAiTokenUsage(
+  store: Store,
+  ownerId: string,
+  requestId: string,
+  route: "ocr" | "summary",
+  usage: AiTokenUsage,
+) {
+  const { error } = await store.rpc("record_ai_token_usage", {
+    p_owner: ownerId,
+    p_request_id: requestId,
+    p_route: route,
+    p_prompt_tokens: usage.promptTokens,
+    p_completion_tokens: usage.completionTokens,
+  });
+  if (error)
+    throw new ApiError(503, "MODEL_RESULT_NOT_SAVED", "模型用量未能确认保存，请稍后重试。");
 }

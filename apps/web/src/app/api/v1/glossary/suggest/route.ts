@@ -108,6 +108,16 @@ export async function POST(request: Request) {
     | { store: ReturnType<typeof createRequestStore>; ownerId: string; requestId: string }
     | undefined;
   let requestId = "";
+  let promptTokens = 0;
+  let completionTokens = 0;
+  const modelObserver = {
+    onUsage: (usage: { promptTokens?: number; completionTokens?: number }) => {
+      if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
+        promptTokens += usage.promptTokens!;
+      if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
+        completionTokens += usage.completionTokens!;
+    },
+  };
   try {
     const { supabase, user } = await requireUser(request);
     const parsed = inputSchema.safeParse(await readJson(request, 16_000));
@@ -150,23 +160,39 @@ export async function POST(request: Request) {
               selectedProfile.config,
               glossaryMessages(grounding.evidence),
               request.signal,
+              modelObserver,
             ),
             grounding.evidence,
           );
     await assertCurrent();
     if (reservation) {
-      await finishRequest(store, user.id, requestId, result);
+      if (promptTokens || completionTokens)
+        await finishRequest(store, user.id, requestId, result, undefined, {
+          promptTokens,
+          completionTokens,
+        });
+      else await finishRequest(store, user.id, requestId, result);
       reservation = undefined;
     }
     return json(result);
   } catch (error) {
     if (reservation) {
-      await finishRequest(
-        reservation.store,
-        reservation.ownerId,
-        reservation.requestId,
-        undefined,
-        error instanceof ApiError ? error.code : "GLOSSARY_FAILED",
+      (promptTokens || completionTokens
+        ? finishRequest(
+            reservation.store,
+            reservation.ownerId,
+            reservation.requestId,
+            undefined,
+            error instanceof ApiError ? error.code : "GLOSSARY_FAILED",
+            { promptTokens, completionTokens },
+          )
+        : finishRequest(
+            reservation.store,
+            reservation.ownerId,
+            reservation.requestId,
+            undefined,
+            error instanceof ApiError ? error.code : "GLOSSARY_FAILED",
+          )
       ).catch(() => undefined);
     }
     return failure(error);

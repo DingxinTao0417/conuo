@@ -400,6 +400,7 @@ async function readStreamResponse(
   let stopped = false;
   let done = false;
   let usage: ModelUsage | undefined;
+  let usageReported = false;
 
   const dispatch = async () => {
     if (!data.length) {
@@ -512,12 +513,16 @@ async function readStreamResponse(
       }
     }
     if (signal.aborted) throw cancelledError();
-    if (usage) observer?.onUsage?.(usage);
+    if (usage) {
+      observer?.onUsage?.(usage);
+      usageReported = true;
+    }
     return text.trim();
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw responseError();
   } finally {
+    if (usage && !usageReported) observer?.onUsage?.(usage);
     cancel();
     signal.removeEventListener("abort", cancel);
     reader.releaseLock();
@@ -551,6 +556,17 @@ async function sendModelRequest(
     validated.timeoutMs,
   );
   let response: Response | undefined;
+  let reportedUsage: ModelUsage | undefined;
+  const usageObserver: ModelObserver | undefined = observer
+    ? {
+        ...observer,
+        onUsage: (usage) => {
+          reportedUsage = usage;
+          observer.onUsage?.(usage);
+        },
+      }
+    : undefined;
+  const estimateTokens = (value: string) => Math.max(1, Math.ceil([...value].length / 4));
   try {
     return await Promise.race([
       stopped,
@@ -587,13 +603,24 @@ async function sendModelRequest(
             controller.signal,
             onDelta,
             validated.streamUsage === true,
-            observer,
+            usageObserver,
           );
         else {
           const value = await readResponse(response, controller.signal);
-          result = completionText(value);
           const usage = readModelUsage(value);
-          if (usage) observer?.onUsage?.(usage);
+          if (usage) usageObserver?.onUsage?.(usage);
+          result = completionText(value);
+        }
+        if (observer) {
+          const estimated: ModelUsage = {
+            ...(reportedUsage?.promptTokens === undefined
+              ? { promptTokens: estimateTokens(body) }
+              : {}),
+            ...(reportedUsage?.completionTokens === undefined
+              ? { completionTokens: estimateTokens(result) }
+              : {}),
+          };
+          if (Object.keys(estimated).length) observer.onUsage?.(estimated);
         }
         if (stopError) throw stopError;
         return result;

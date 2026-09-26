@@ -514,6 +514,7 @@ describe("region visual-learning route", () => {
         base64: expect.not.stringContaining("data:"),
       }),
       expect.any(AbortSignal),
+      expect.any(Object),
     );
     expect(mock.finishRequest).toHaveBeenCalledExactlyOnceWith(
       ledger,
@@ -753,6 +754,7 @@ describe("region visual-learning route", () => {
         expect.any(Array),
         { mimeType: "image/png", base64: input.image.dataUrl.split(",")[1] },
         expect.any(AbortSignal),
+        expect.any(Object),
       );
       expect(mock.finishRequest).toHaveBeenCalledExactlyOnceWith(
         ledger,

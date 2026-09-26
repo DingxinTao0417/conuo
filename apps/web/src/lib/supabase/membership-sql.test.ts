@@ -121,6 +121,7 @@ beforeEach(async () => {
   await db.exec(`
     RESET ROLE;
     DELETE FROM conuo_private.membership_grants;
+    DELETE FROM conuo_private.ai_token_usage_ledger;
     DELETE FROM public.ai_requests;
     UPDATE public.membership_plans SET learning_space_limit = 500, is_grantable = true,
       features = '{"vision_region":true,"organization":true,"learning_ai":true,"deep_thinking":true,"tutor_mode":true}';
@@ -464,6 +465,78 @@ describe("membership AI reservation", () => {
       membership: { planCode: "pro" },
     });
     expect(await usage("on", 500)).toMatchObject({ usedCount: 3, dailyLimit: 100 });
+  });
+});
+
+describe("AI token ledger", () => {
+  it("accumulates repeated model calls and token-only routes in the UTC total", async () => {
+    expect(await reserve(owner, "token-request", "off")).toEqual({ status: "reserved" });
+    await asRole("service_role", () =>
+      db.query(
+        "select public.finish_ai_request($1::uuid,$2,$3::jsonb,$4,$5::bigint,$6::bigint)",
+        [owner, "token-request", null, null, 12, 8],
+      ),
+    );
+    await asRole("service_role", () =>
+      db.query(
+        "select public.finish_ai_request($1::uuid,$2,$3::jsonb,$4,$5::bigint,$6::bigint)",
+        [owner, "token-request", null, null, 3, 4],
+      ),
+    );
+    await asRole("service_role", () =>
+      db.query(
+        "select public.finish_ai_request($1::uuid,$2,$3::jsonb,$4,$5::bigint,$6::bigint)",
+        [owner, "token-request", JSON.stringify({ answer: "saved" }), null, 5, 6],
+      ),
+    );
+    await asRole("service_role", () =>
+      db.query("select public.record_ai_token_usage($1::uuid,$2,$3,$4::bigint,$5::bigint)", [
+        owner,
+        "ocr-request",
+        "ocr",
+        2,
+        3,
+      ]),
+    );
+    expect(
+      (
+        await db.query(
+          "select state,prompt_tokens,completion_tokens from public.ai_requests where request_id='token-request'",
+        )
+      ).rows,
+    ).toEqual([{ state: "completed", prompt_tokens: 20, completion_tokens: 18 }]);
+    expect(await value<Json>("select public.ai_token_usage_today($1::uuid) as value", [owner])).toEqual({
+      promptTokens: 22,
+      completionTokens: 21,
+    });
+  });
+
+  it("keeps the legacy completion signature and service-role boundary", async () => {
+    expect(await reserve(owner, "legacy-finish", "off")).toEqual({ status: "reserved" });
+    await asRole("service_role", () =>
+      db.query("select public.finish_ai_request($1::uuid,$2,$3::jsonb,$4)", [
+        owner,
+        "legacy-finish",
+        JSON.stringify({ answer: "legacy" }),
+        null,
+      ]),
+    );
+    expect(
+      (
+        await db.query(
+          "select state,prompt_tokens,completion_tokens from public.ai_requests where request_id='legacy-finish'",
+        )
+      ).rows,
+    ).toEqual([{ state: "completed", prompt_tokens: 0, completion_tokens: 0 }]);
+    await expect(
+      asRole("authenticated", () =>
+        db.query("select public.record_ai_token_usage($1::uuid,$2,$3,1,1)", [
+          owner,
+          "forbidden",
+          "ocr",
+        ]),
+      ),
+    ).rejects.toBeTruthy();
   });
 });
 

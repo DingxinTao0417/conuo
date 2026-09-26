@@ -19,7 +19,6 @@ import {
 } from "@/lib/ai/vision-region";
 import { createRequestStore, finishRequest, reserveRequest } from "@/lib/ai/requests";
 import { createTraceRecorder } from "@/lib/ai/traces";
-import { aiFeatureEnabled } from "@/lib/ai/features";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -119,6 +118,31 @@ export async function POST(request: Request) {
   let traceErrorCode: string | undefined;
   let traceModelName: string | undefined;
   let traceModelProfile: ModelProfileName | undefined;
+  let promptTokens = 0;
+  let completionTokens = 0;
+  const modelObserver = {
+    onUsage: (usage: { promptTokens?: number; completionTokens?: number }) => {
+      traceRecorder?.addUsage(usage);
+      if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
+        promptTokens += usage.promptTokens!;
+      if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
+        completionTokens += usage.completionTokens!;
+    },
+  };
+  const finishLedger = (
+    store: ReturnType<typeof createRequestStore>,
+    ownerId: string,
+    requestId: string,
+    result: ReturnType<typeof bindVisionStudyResult> | undefined,
+    errorCode?: string,
+  ) => {
+    const usage = promptTokens || completionTokens ? { promptTokens, completionTokens } : undefined;
+    return usage
+      ? finishRequest(store, ownerId, requestId, result, errorCode, usage)
+      : errorCode !== undefined
+        ? finishRequest(store, ownerId, requestId, result, errorCode)
+        : finishRequest(store, ownerId, requestId, result);
+  };
   const failReservation = (error: unknown): Promise<void> => {
     if (reservationCleanup) return reservationCleanup;
     const pending = reservation;
@@ -128,7 +152,7 @@ export async function POST(request: Request) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         await Promise.race([
-          finishRequest(
+          finishLedger(
             pending.store,
             pending.ownerId,
             pending.requestId,
@@ -245,20 +269,13 @@ export async function POST(request: Request) {
       traceOutcome = "cached";
     } else {
       traceRecorder.mark("modelStart");
-      const raw = aiFeatureEnabled("AI_TRACES")
-        ? await callVisionModel(
-            config,
-            visionStudyMessages(input, pageText),
-            { mimeType: image.mimeType, base64: image.base64 },
-            request.signal,
-            { onUsage: (usage) => traceRecorder?.addUsage(usage) },
-          )
-        : await callVisionModel(
-            config,
-            visionStudyMessages(input, pageText),
-            { mimeType: image.mimeType, base64: image.base64 },
-            request.signal,
-          );
+      const raw = await callVisionModel(
+        config,
+        visionStudyMessages(input, pageText),
+        { mimeType: image.mimeType, base64: image.base64 },
+        request.signal,
+        modelObserver,
+      );
       result = bindVisionStudyResult(raw, input);
       traceRecorder.mark("modelEnd");
       traceOutcome = "completed";
@@ -267,7 +284,7 @@ export async function POST(request: Request) {
     traceModelProfile = selectedProfile.profile;
     await assertCurrent();
     if (reservation) {
-      await finishRequest(store, user.id, input.requestId, result);
+      await finishLedger(store, user.id, input.requestId, result);
       reservation = undefined;
       await assertCurrent();
     }

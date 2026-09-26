@@ -29,6 +29,16 @@ export async function POST(request: Request) {
   let reservation:
     | { store: ReturnType<typeof createRequestStore>; ownerId: string; requestId: string }
     | undefined;
+  let promptTokens = 0;
+  let completionTokens = 0;
+  const modelObserver = {
+    onUsage: (usage: { promptTokens?: number; completionTokens?: number }) => {
+      if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
+        promptTokens += usage.promptTokens!;
+      if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
+        completionTokens += usage.completionTokens!;
+    },
+  };
   try {
     const { supabase, user } = await requireUser(request);
     requireLearningFeature();
@@ -88,6 +98,7 @@ export async function POST(request: Request) {
                 citations,
               ),
               request.signal,
+              modelObserver,
             ),
             answerText,
             input.level,
@@ -100,18 +111,33 @@ export async function POST(request: Request) {
     });
     if (error) throw error;
     if (reservation) {
-      await finishRequest(store, user.id, input.requestId, result);
+      if (promptTokens || completionTokens)
+        await finishRequest(store, user.id, input.requestId, result, undefined, {
+          promptTokens,
+          completionTokens,
+        });
+      else await finishRequest(store, user.id, input.requestId, result);
       reservation = undefined;
     }
     return json(result);
   } catch (error) {
     if (reservation)
-      await finishRequest(
-        reservation.store,
-        reservation.ownerId,
-        reservation.requestId,
-        undefined,
-        error instanceof ApiError ? error.code : "HINT_FAILED",
+      (promptTokens || completionTokens
+        ? finishRequest(
+            reservation.store,
+            reservation.ownerId,
+            reservation.requestId,
+            undefined,
+            error instanceof ApiError ? error.code : "HINT_FAILED",
+            { promptTokens, completionTokens },
+          )
+        : finishRequest(
+            reservation.store,
+            reservation.ownerId,
+            reservation.requestId,
+            undefined,
+            error instanceof ApiError ? error.code : "HINT_FAILED",
+          )
       ).catch(() => undefined);
     return failure(error);
   }

@@ -283,7 +283,24 @@ async function processJob(
       );
       if (!quota.allowed) throw new QuotaError();
       const section = sections[index]!;
-      const raw = await callModel(config, modelMessages(section), input.signal);
+      let promptTokens = 0;
+      let completionTokens = 0;
+      const raw = await callModel(config, modelMessages(section), input.signal, {
+        onUsage: (usage) => {
+          if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
+            promptTokens += usage.promptTokens!;
+          if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
+            completionTokens += usage.completionTokens!;
+        },
+      });
+      if (promptTokens || completionTokens)
+        await rpc(store, "record_ai_token_usage", {
+          p_owner: job.ownerId,
+          p_request_id: `${job.jobId}-section-${index}`,
+          p_route: "summary",
+          p_prompt_tokens: promptTokens,
+          p_completion_tokens: completionTokens,
+        }).catch(() => undefined);
       const parsed = parseSummaryOutput(raw);
       const bound = bindSummaryOutput(
         {
@@ -319,7 +336,24 @@ async function processJob(
       summary: summaries.get(index)!,
       chunks: section.chunks,
     }));
-    const raw = await callModel(config, reduceMessages(reduceInput), input.signal);
+    let promptTokens = 0;
+    let completionTokens = 0;
+    const raw = await callModel(config, reduceMessages(reduceInput), input.signal, {
+      onUsage: (usage) => {
+        if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
+          promptTokens += usage.promptTokens!;
+        if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
+          completionTokens += usage.completionTokens!;
+      },
+    });
+    if (promptTokens || completionTokens)
+      await rpc(store, "record_ai_token_usage", {
+        p_owner: job.ownerId,
+        p_request_id: `${job.jobId}-document`,
+        p_route: "summary",
+        p_prompt_tokens: promptTokens,
+        p_completion_tokens: completionTokens,
+      }).catch(() => undefined);
     const parsedDocument = parseDocumentSummaryOutput(raw);
     const documentEvidence = reduceEvidence(reduceInput);
     const document = bindDocumentSummaryOutput(

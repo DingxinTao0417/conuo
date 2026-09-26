@@ -18,6 +18,7 @@ const postConflictMigrationNames = new Set([
   "20260925000500_learning_foundation.sql",
   "20260926000100_learning_overview_weak_concepts.sql",
   "20260927000100_membership_foundation.sql",
+  "20260927000200_ai_request_token_ledger.sql",
 ]);
 const migrations = new URL("../../../../../supabase/migrations/", import.meta.url);
 const sourceText = "# 起点\n\n😀学习 **梯度下降**。\n\n😀学习 **梯度下降**。\n";
