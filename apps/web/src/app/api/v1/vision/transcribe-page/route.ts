@@ -1,7 +1,7 @@
 import { ApiError, failure, json, readJson, requireUser } from "@/lib/supabase/api";
 import { workspaceSchema } from "@/lib/supabase/validation";
 import { callVisionModel, readModelProfile } from "@/lib/ai/model";
-import { createRequestStore } from "@/lib/ai/requests";
+import { createRequestStore, recordAiTokenUsage } from "@/lib/ai/requests";
 import {
   bindPageTranscriptionResult,
   pageTranscriptionMessages,
@@ -86,29 +86,36 @@ export async function POST(request: Request) {
     await reserveOcrPages(user.id, input.requestId, ledger);
     let promptTokens = 0;
     let completionTokens = 0;
-    const raw = await callVisionModel(
-      config,
-      pageTranscriptionMessages(),
-      { mimeType: image.mimeType, base64: image.base64 },
-      request.signal,
-      {
-        onUsage: (usage) => {
-          if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
-            promptTokens += usage.promptTokens!;
-          if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
-            completionTokens += usage.completionTokens!;
+    let modelCompleted = false;
+    try {
+      const raw = await callVisionModel(
+        config,
+        pageTranscriptionMessages(),
+        { mimeType: image.mimeType, base64: image.base64 },
+        request.signal,
+        {
+          onUsage: (usage) => {
+            if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
+              promptTokens += usage.promptTokens!;
+            if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
+              completionTokens += usage.completionTokens!;
+          },
         },
-      },
-    );
-    if (promptTokens || completionTokens)
-      await ledger.rpc("record_ai_token_usage", {
-        p_owner: user.id,
-        p_request_id: input.requestId,
-        p_route: "ocr",
-        p_prompt_tokens: promptTokens,
-        p_completion_tokens: completionTokens,
-      });
-    return json({ page: input.page, markdown: bindPageTranscriptionResult(raw) });
+      );
+      modelCompleted = true;
+      return json({ page: input.page, markdown: bindPageTranscriptionResult(raw) });
+    } finally {
+      if (promptTokens || completionTokens) {
+        try {
+          await recordAiTokenUsage(ledger, user.id, input.requestId, "ocr", {
+            promptTokens,
+            completionTokens,
+          });
+        } catch (recordError) {
+          if (modelCompleted) throw recordError;
+        }
+      }
+    }
   } catch (error) {
     return failure(error);
   }

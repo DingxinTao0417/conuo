@@ -121,6 +121,51 @@ async function rpc(store: OrganizationTaskStore, name: string, args: Record<stri
   if (result.error) throw new RpcError(result.error.code);
   return result.data;
 }
+
+type SummaryMessages = Parameters<typeof callModel>[1];
+
+/** Records usage even when a provider returns usage before an invalid result or stream failure. */
+async function callSummaryModel(
+  store: OrganizationTaskStore,
+  ownerId: string,
+  requestId: string,
+  config: Parameters<typeof callModel>[0],
+  messages: SummaryMessages,
+  signal?: AbortSignal,
+) {
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let modelCompleted = false;
+  try {
+    const raw = await callModel(config, messages, signal, {
+      onUsage: (usage) => {
+        if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
+          promptTokens += usage.promptTokens!;
+        if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
+          completionTokens += usage.completionTokens!;
+      },
+    });
+    modelCompleted = true;
+    return raw;
+  } finally {
+    if (promptTokens || completionTokens) {
+      try {
+        await rpc(store, "record_ai_token_usage", {
+          p_owner: ownerId,
+          p_request_id: requestId,
+          p_route: "summary",
+          p_prompt_tokens: promptTokens,
+          p_completion_tokens: completionTokens,
+        });
+      } catch (error) {
+        // Preserve the provider failure if it already failed; a successful
+        // model call must surface a ledger failure instead of hiding usage.
+        if (modelCompleted) throw error;
+      }
+    }
+  }
+}
+
 function validateInput(input: SummaryTaskRunnerInput) {
   if (
     !/^[a-zA-Z0-9_-]{1,80}$/.test(input.workerId) ||
@@ -283,24 +328,14 @@ async function processJob(
       );
       if (!quota.allowed) throw new QuotaError();
       const section = sections[index]!;
-      let promptTokens = 0;
-      let completionTokens = 0;
-      const raw = await callModel(config, modelMessages(section), input.signal, {
-        onUsage: (usage) => {
-          if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
-            promptTokens += usage.promptTokens!;
-          if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
-            completionTokens += usage.completionTokens!;
-        },
-      });
-      if (promptTokens || completionTokens)
-        await rpc(store, "record_ai_token_usage", {
-          p_owner: job.ownerId,
-          p_request_id: `${job.jobId}-section-${index}`,
-          p_route: "summary",
-          p_prompt_tokens: promptTokens,
-          p_completion_tokens: completionTokens,
-        }).catch(() => undefined);
+      const raw = await callSummaryModel(
+        store,
+        job.ownerId,
+        `${job.jobId}-section-${index}`,
+        config,
+        modelMessages(section),
+        input.signal,
+      );
       const parsed = parseSummaryOutput(raw);
       const bound = bindSummaryOutput(
         {
@@ -336,24 +371,14 @@ async function processJob(
       summary: summaries.get(index)!,
       chunks: section.chunks,
     }));
-    let promptTokens = 0;
-    let completionTokens = 0;
-    const raw = await callModel(config, reduceMessages(reduceInput), input.signal, {
-      onUsage: (usage) => {
-        if (Number.isSafeInteger(usage.promptTokens) && usage.promptTokens! >= 0)
-          promptTokens += usage.promptTokens!;
-        if (Number.isSafeInteger(usage.completionTokens) && usage.completionTokens! >= 0)
-          completionTokens += usage.completionTokens!;
-      },
-    });
-    if (promptTokens || completionTokens)
-      await rpc(store, "record_ai_token_usage", {
-        p_owner: job.ownerId,
-        p_request_id: `${job.jobId}-document`,
-        p_route: "summary",
-        p_prompt_tokens: promptTokens,
-        p_completion_tokens: completionTokens,
-      }).catch(() => undefined);
+    const raw = await callSummaryModel(
+      store,
+      job.ownerId,
+      `${job.jobId}-document`,
+      config,
+      reduceMessages(reduceInput),
+      input.signal,
+    );
     const parsedDocument = parseDocumentSummaryOutput(raw);
     const documentEvidence = reduceEvidence(reduceInput);
     const document = bindDocumentSummaryOutput(
