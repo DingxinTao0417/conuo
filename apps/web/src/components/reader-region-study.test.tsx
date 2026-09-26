@@ -6,8 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Reader, { type ReaderProps } from "./reader";
 import { createDemoWorkspace } from "@/lib/seed";
 import type { PdfCaptureResult } from "./pdf-capture";
+import { resetMembershipFeatureCache } from "@/lib/use-membership-features";
 
-const bridge = vi.hoisted(() => ({ pdfProps: null as Record<string, unknown> | null }));
+const bridge = vi.hoisted(() => ({
+  pdfProps: null as Record<string, unknown> | null,
+  getAccountMembership: vi.fn(),
+}));
+
+vi.mock("@/lib/cloud", () => ({ getAccountMembership: bridge.getAccountMembership }));
 
 vi.mock("./model-status", () => ({ default: () => null }));
 vi.mock("./web-version-panel", () => ({ default: () => null }));
@@ -39,6 +45,16 @@ describe("Reader region study integration", () => {
 
   beforeEach(async () => {
     bridge.pdfProps = null;
+    resetMembershipFeatureCache();
+    bridge.getAccountMembership.mockImplementation(async () => ({
+      features: {
+        vision_region: true,
+        organization: true,
+        learning_ai: true,
+        deep_thinking: true,
+        tutor_mode: true,
+      },
+    }));
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
       callback(0);
@@ -99,6 +115,8 @@ describe("Reader region study integration", () => {
       Object.defineProperty(Element.prototype, "scrollIntoView", scrollDescriptor);
     else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
     vi.unstubAllGlobals();
+    resetMembershipFeatureCache();
+    bridge.getAccountMembership.mockReset();
   });
 
   async function render(overrides: Partial<ReaderProps> = {}) {

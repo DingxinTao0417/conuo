@@ -201,6 +201,7 @@ export default function LibrarySection({
         <CrossLibraryAskPanel
           key={crossLibraryAskPanelKey}
           data={data}
+          expectedUserId={user?.id}
           initialConversationId={crossLibraryAsk.conversationId}
           initialQuestion={crossLibrarySearchDraft?.question}
           initialSourceIds={crossLibrarySearchDraft?.sourceIds}

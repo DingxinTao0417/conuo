@@ -9,12 +9,16 @@ import type { VisionStudyResult } from "@/lib/vision-region-contract";
 const mock = vi.hoisted(() => ({
   availability: vi.fn(),
   request: vi.fn(),
+  getAccountMembership: vi.fn(),
 }));
 
 vi.mock("@/lib/vision-region-client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/vision-region-client")>()),
   getVisionRegionAvailability: mock.availability,
   requestVisionRegionStudy: mock.request,
+}));
+vi.mock("@/lib/cloud", () => ({
+  getAccountMembership: mock.getAccountMembership,
 }));
 
 import RegionStudyPanel from "./region-study-panel";
@@ -62,6 +66,25 @@ describe("RegionStudyPanel", () => {
     });
     mock.availability.mockReset();
     mock.request.mockReset();
+    mock.getAccountMembership.mockReset();
+    mock.getAccountMembership.mockResolvedValue({
+      planCode: "free",
+      planName: "免费版",
+      source: null,
+      startsAt: null,
+      endsAt: null,
+      afterEnd: null,
+      enforcement: "on",
+      limits: { aiDailyRequests: 20, learningSpaces: 1 },
+      features: {
+        vision_region: true,
+        organization: true,
+        learning_ai: true,
+        deep_thinking: true,
+        tutor_mode: true,
+      },
+      plans: [],
+    });
     fetch = vi.fn<typeof globalThis.fetch>(
       async () => new Response(JSON.stringify({}), { status: 200 }),
     );

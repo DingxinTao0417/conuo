@@ -33,6 +33,7 @@ import type {
 } from "@/lib/types";
 import { useAskConversation } from "./ai/use-ask-conversation";
 import { citationProblem } from "./reader-utils";
+import { useMembershipFeature } from "@/lib/use-membership-features";
 import "./comparison-ai-panel.css";
 
 export interface ComparisonAskInput {
@@ -61,6 +62,7 @@ export interface ComparisonAskPanelProps {
   onConversationChange: (conversation: Conversation) => void;
   onOpenSource: (sourceId: string, versionId?: string, citation?: Citation) => void;
   onClose: () => void;
+  expectedUserId?: string;
 }
 
 const phaseLabels: Record<Extract<AnswerProgress, { type: "progress" }>["phase"], string> = {
@@ -217,6 +219,7 @@ export default function ComparisonAskPanel({
   onConversationChange,
   onOpenSource,
   onClose,
+  expectedUserId,
 }: ComparisonAskPanelProps) {
   const route = useMemo(
     () => comparisonRoute(leftSource, rightSource, space),
@@ -234,6 +237,7 @@ export default function ComparisonAskPanel({
   // every other question surface so stop, abort and late-event handling behave
   // identically here.
   const ask = useAskConversation();
+  const tutorModeFeature = useMembershipFeature(expectedUserId, "tutor_mode");
   const {
     input,
     setInput,
@@ -275,6 +279,9 @@ export default function ComparisonAskPanel({
     consumedInitialConversationId.current = null;
     resetAsk();
   }, [identity, resetAsk]);
+  useEffect(() => {
+    if (!tutorModeFeature.allowed && tutorMode) setTutorMode(false);
+  }, [setTutorMode, tutorMode, tutorModeFeature.allowed]);
   useEffect(() => {
     if (!initialConversationId) {
       consumedInitialConversationId.current = null;
@@ -588,14 +595,18 @@ export default function ComparisonAskPanel({
           <div>
             <span>{busy ? "范围已锁定为两份资料" : "⌘ / Ctrl + Enter 发送"}</span>
             {process.env.NEXT_PUBLIC_CONUO_FEATURE_TUTOR_MODE === "on" && (
-              <label className="comparison-ai-tutor-toggle">
+              <label
+                className="comparison-ai-tutor-toggle"
+                title={tutorModeFeature.reason || "引导我思考，而不是一次给出完整答案"}
+              >
                 <input
                   type="checkbox"
                   checked={tutorMode}
-                  disabled={busy || !!unavailableReason}
+                  disabled={busy || !!unavailableReason || !tutorModeFeature.allowed}
                   onChange={(event) => setTutorMode(event.target.checked)}
                 />
                 <span>回答方式：{tutorMode ? "引导我思考" : "直接解答"}</span>
+                {!tutorModeFeature.allowed && <small>（{tutorModeFeature.reason}）</small>}
               </label>
             )}
             {busy ? (

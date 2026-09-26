@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   ArrowUp,
   BookOpen,
@@ -34,6 +34,7 @@ import {
 import { EMPTY_NOTE_EVIDENCE, answerPhases } from "../reader/reader-constants";
 import AnswerFeedback from "./answer-feedback";
 import type { AskConversation } from "./use-ask-conversation";
+import { useMembershipFeature } from "@/lib/use-membership-features";
 import "../reader.css";
 
 /** Copy and identity of the surface hosting the panel. */
@@ -134,6 +135,8 @@ export interface AskPanelProps {
   answerActions?: AskPanelAnswerActions;
   /** Verified cloud identity used for answer feedback requests. */
   feedbackUserId?: string;
+  /** Cloud account used to gate optional deep-thinking and tutor controls. */
+  membershipUserId?: string;
   onClose: () => void;
 }
 
@@ -158,6 +161,7 @@ export default function AskPanel({
   composer,
   answerActions,
   feedbackUserId,
+  membershipUserId,
   onClose,
 }: AskPanelProps) {
   const {
@@ -188,6 +192,14 @@ export default function AskPanel({
   const blocked = scope.blockedMessage;
   const eligibilityId = surface.eligibilityId ?? `${surface.id}-eligibility`;
   const knowledgePages = answerActions?.knowledgePages ?? [];
+  const deepThinkingFeature = useMembershipFeature(membershipUserId, "deep_thinking");
+  const tutorModeFeature = useMembershipFeature(membershipUserId, "tutor_mode");
+  useEffect(() => {
+    if (!deepThinkingFeature.allowed && deepThinking) setDeepThinking(false);
+  }, [deepThinking, deepThinkingFeature.allowed, setDeepThinking]);
+  useEffect(() => {
+    if (!tutorModeFeature.allowed && tutorMode) setTutorMode(false);
+  }, [setTutorMode, tutorMode, tutorModeFeature.allowed]);
   const singleScope = scope.options.length <= 1;
   const composerDisabled =
     busy ||
@@ -759,25 +771,37 @@ export default function AskPanel({
               </label>
             )}
             {process.env.NEXT_PUBLIC_CONUO_FEATURE_DEEP_THINKING === "on" && (
-              <label className="reader-depth-toggle" title="回答更慢，适合推导和比较类问题">
+              <label
+                className="reader-depth-toggle"
+                title={deepThinkingFeature.reason || "回答更慢，适合推导和比较类问题"}
+              >
                 <input
                   type="checkbox"
                   checked={deepThinking}
-                  disabled={composerDisabled}
+                  disabled={composerDisabled || !deepThinkingFeature.allowed}
                   onChange={(event) => setDeepThinking(event.target.checked)}
                 />
                 <span>深度思考</span>
+                {!deepThinkingFeature.allowed && (
+                  <small className="reader-feature-lock">（{deepThinkingFeature.reason}）</small>
+                )}
               </label>
             )}
             {process.env.NEXT_PUBLIC_CONUO_FEATURE_TUTOR_MODE === "on" && (
-              <label className="reader-tutor-toggle" title="引导我思考，而不是一次给出完整答案">
+              <label
+                className="reader-tutor-toggle"
+                title={tutorModeFeature.reason || "引导我思考，而不是一次给出完整答案"}
+              >
                 <input
                   type="checkbox"
                   checked={tutorMode}
-                  disabled={composerDisabled}
+                  disabled={composerDisabled || !tutorModeFeature.allowed}
                   onChange={(event) => setTutorMode(event.target.checked)}
                 />
                 <span>回答方式：{tutorMode ? "引导我思考" : "直接解答"}</span>
+                {!tutorModeFeature.allowed && (
+                  <small className="reader-feature-lock">（{tutorModeFeature.reason}）</small>
+                )}
               </label>
             )}
             {busy ? (

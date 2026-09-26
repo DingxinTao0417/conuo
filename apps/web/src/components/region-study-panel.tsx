@@ -22,6 +22,7 @@ import {
   type VisionRegionAvailability,
 } from "@/lib/vision-region-client";
 import type { VisionStudyResult } from "@/lib/vision-region-contract";
+import { useMembershipFeature } from "@/lib/use-membership-features";
 import RegionStudyMarkdown from "./region-study-markdown";
 import "katex/dist/katex.min.css";
 import "./region-study-panel.css";
@@ -95,6 +96,7 @@ export default function RegionStudyPanel({
   const [history, setHistory] = useState<Array<{ question: string; answer: string }>>([]);
   const [savedQuestions, setSavedQuestions] = useState<Set<number>>(new Set());
   const [previewUrl, setPreviewUrl] = useState("");
+  const visionFeature = useMembershipFeature(expectedUserId, "vision_region");
   const requestController = useRef<AbortController | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
 
@@ -179,6 +181,10 @@ export default function RegionStudyPanel({
 
   async function run() {
     if (busy) return;
+    if (!visionFeature.allowed) {
+      setError(visionFeature.reason || "当前会员等级未开放区域截图学习。请查看会员信息。 ");
+      return;
+    }
     if (availability.state !== "ready" || !availability.value.available) {
       setError(
         availability.state === "ready"
@@ -284,7 +290,8 @@ export default function RegionStudyPanel({
     setSavedQuestions((current) => new Set(current).add(index));
   }
 
-  const available = availability.state === "ready" && availability.value.available;
+  const available =
+    visionFeature.allowed && availability.state === "ready" && availability.value.available;
   return (
     <div className="region-study-layer">
       <button
@@ -404,8 +411,14 @@ export default function RegionStudyPanel({
                   </button>
                 </span>
               ) : (
-                <span className={availability.value.available ? "" : "region-study-unavailable"}>
-                  {availability.value.message}
+                <span
+                  className={
+                    !visionFeature.allowed || !availability.value.available
+                      ? "region-study-unavailable"
+                      : ""
+                  }
+                >
+                  {visionFeature.allowed ? availability.value.message : visionFeature.reason}
                 </span>
               )}
             </div>

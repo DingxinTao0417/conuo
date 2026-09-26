@@ -31,10 +31,12 @@ import {
   type OrganizationProcessorState,
 } from "@/lib/organization-processor-capability";
 import { sourceCoverageLabel } from "@/lib/source-coverage";
+import { useMembershipFeature } from "@/lib/use-membership-features";
 import "./organization.css";
 
 export interface OrganizationPanelProps {
   data: WorkspaceData;
+  expectedUserId?: string;
   spaceId: string;
   initialSourceIds?: string[];
   status: { ready: boolean; message: string; running: boolean };
@@ -477,6 +479,7 @@ export default function OrganizationPanel(props: OrganizationPanelProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [sourceBatchResult, setSourceBatchResult] = useState<SourceBatchResult | null>(null);
+  const organizationFeature = useMembershipFeature(props.expectedUserId, "organization");
   const [tab, setTab] = useState<"all" | "source" | "knowledge">("all");
   const sources = useMemo(
     () =>
@@ -530,6 +533,7 @@ export default function OrganizationPanel(props: OrganizationPanelProps) {
     spaceId === "inbox" || data.spaces.some((space) => space.id === spaceId && !space.archived);
   const canGenerate =
     isAvailableSpace &&
+    organizationFeature.allowed &&
     sourceKnowledgeExecutionEnabled &&
     status.ready &&
     data.aiEnabled &&
@@ -539,13 +543,15 @@ export default function OrganizationPanel(props: OrganizationPanelProps) {
   const activeJobs = jobs.filter((job) => job.status === "running" || job.status === "queued");
   const disabledReason = !sourceKnowledgeExecutionEnabled
     ? organizationProcessorAvailabilityMessage(durableProcessorState)
-    : !data.aiEnabled
-      ? "请先在设置中开启 AI。"
-      : !status.ready
-        ? status.message
-        : !isAvailableSpace
-          ? "先选择要整理的知识库。"
-          : "";
+    : !organizationFeature.allowed
+      ? organizationFeature.reason || "当前会员等级未开放资料整理。"
+      : !data.aiEnabled
+        ? "请先在设置中开启 AI。"
+        : !status.ready
+          ? status.message
+          : !isAvailableSpace
+            ? "先选择要整理的知识库。"
+            : "";
   const displayedStatusMessage =
     localDevelopmentRunnerEnabled && status.ready
       ? localDevelopmentOrganizationRunnerAvailabilityMessage()

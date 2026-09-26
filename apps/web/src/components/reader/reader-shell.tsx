@@ -134,6 +134,7 @@ import type {
   SelectionToolbarPosition,
 } from "./reader-types";
 import { sourceOutlineCache, type OutlineItem } from "@/lib/source-outline";
+import { useMembershipFeature } from "@/lib/use-membership-features";
 
 function highlightGlossaryTerms(container: HTMLElement, terms: readonly GlossaryTerm[]) {
   container.querySelectorAll("mark[data-glossary-term]").forEach((mark) => {
@@ -228,6 +229,7 @@ export default function Reader(props: ReaderProps) {
   } = props;
   const liveSource = props.currentSource ?? sources.find((item) => item.id === source.id) ?? source;
   const historical = liveSource.versionId !== source.versionId;
+  const visionRegionFeature = useMembershipFeature(props.cloudUserId, "vision_region");
   const contextualBackLabel = props.backLabel?.trim();
   const backLabel = contextualBackLabel || "返回资料库";
   const mobileBackLabel = contextualBackLabel?.replace(/^返回/u, "").trim() || "资料";
@@ -2130,11 +2132,13 @@ export default function Reader(props: ReaderProps) {
         ? "请等待当前资料完成云端确认。"
         : !aiEnabled
           ? "资料问答已关闭，请先在设置中开启。"
-          : !source.aiAllowed
-            ? "这份资料尚未允许用于 AI。"
-            : source.originalMissing
-              ? "当前版本缺少原文件，无法截取区域。"
-              : "";
+          : !visionRegionFeature.ready || !visionRegionFeature.allowed
+            ? visionRegionFeature.reason || "当前会员等级未开放区域截图学习。"
+            : !source.aiAllowed
+              ? "这份资料尚未允许用于 AI。"
+              : source.originalMissing
+                ? "当前版本缺少原文件，无法截取区域。"
+                : "";
 
   const currentRegionCaptureStart =
     regionCaptureStart &&
@@ -2970,6 +2974,7 @@ export default function Reader(props: ReaderProps) {
             <AskPanel
               ask={askConversation}
               feedbackUserId={props.cloudUserId}
+              membershipUserId={props.cloudUserId}
               surface={{
                 id: "reader-ai-panel",
                 eligibilityId: "reader-ask-eligibility",

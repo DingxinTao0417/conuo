@@ -32,11 +32,13 @@ import "./organization.css";
 import "./knowledge-update.css";
 import KnowledgeUpdateWithdrawal from "./knowledge-update-withdrawal";
 import type { KnowledgeUpdateWithdrawalSelection } from "@/lib/knowledge-update-withdrawal";
+import { useMembershipFeature } from "@/lib/use-membership-features";
 
 export type { KnowledgeUpdateReviewDraft } from "@/lib/knowledge-update-review-drafts";
 
 export interface KnowledgeUpdatePanelProps {
   data: WorkspaceData;
+  expectedUserId?: string;
   noteId: string;
   status: { ready: boolean; running: boolean; message: string };
   onGenerate: (input: {
@@ -394,6 +396,7 @@ export function KnowledgeUpdatePanel({
   onRetryReviewDraftSave,
   withdrawalContextKey = "current-workspace",
   onWithdraw,
+  expectedUserId,
 }: KnowledgeUpdatePanelProps) {
   const note = data.notes.find(
     (item) => item.id === noteId && item.kind === "knowledge" && !item.deletedAt,
@@ -406,6 +409,7 @@ export function KnowledgeUpdatePanel({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [showDismissed, setShowDismissed] = useState(false);
+  const organizationFeature = useMembershipFeature(expectedUserId, "organization");
   async function run(action: () => void | Promise<void>) {
     if (pending) return;
     setPending(true);
@@ -478,19 +482,21 @@ export function KnowledgeUpdatePanel({
   };
   const generationReason = !data.aiEnabled
     ? "AI 使用已关闭，请先在设置中开启。"
-    : !status.ready
-      ? status.message || "云端模型服务尚未就绪。"
-      : status.running
-        ? "已有模型任务正在执行，请等待完成或停止后再生成。"
-        : selected.length === 0
-          ? "请选择 1–10 份同库资料。"
-          : selected.length > 10
-            ? "最多选择 10 份资料，请手动调整选集。"
-            : selectedProblems.length
-              ? "所选资料包含不可用项，请核对下方资料状态。"
-              : missingCited.length
-                ? "请保留知识页现有引用涉及的全部资料。"
-                : organizationUnavailableReason(data, request);
+    : !organizationFeature.allowed
+      ? organizationFeature.reason || "当前会员等级未开放资料整理。"
+      : !status.ready
+        ? status.message || "云端模型服务尚未就绪。"
+        : status.running
+          ? "已有模型任务正在执行，请等待完成或停止后再生成。"
+          : selected.length === 0
+            ? "请选择 1–10 份同库资料。"
+            : selected.length > 10
+              ? "最多选择 10 份资料，请手动调整选集。"
+              : selectedProblems.length
+                ? "所选资料包含不可用项，请核对下方资料状态。"
+                : missingCited.length
+                  ? "请保留知识页现有引用涉及的全部资料。"
+                  : organizationUnavailableReason(data, request);
   const dismissedCount = (data.organizationJobs || []).filter(
     (job) =>
       job.request.kind === "update" &&
@@ -768,7 +774,12 @@ export function KnowledgeUpdatePanel({
               })),
             };
             const retryReason = organizationUnavailableReason(data, retryRequest);
-            const modelDisabled = pending || status.running || !status.ready || !data.aiEnabled;
+            const modelDisabled =
+              pending ||
+              status.running ||
+              !status.ready ||
+              !data.aiEnabled ||
+              !organizationFeature.allowed;
             return (
               <article className="organization-result-card" key={job.id}>
                 <div className="organization-result-heading">

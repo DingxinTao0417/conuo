@@ -38,11 +38,13 @@ import { relationDraftSchema } from "@/lib/concept-relation-schema";
 import { knowledgeNoteKey, snapshotKnowledgeNote } from "@/lib/knowledge-update";
 import { organizationUnavailableReason } from "@/lib/organization";
 import { resolveCitation } from "@/lib/retrieval";
+import { useMembershipFeature } from "@/lib/use-membership-features";
 import "./organization.css";
 import "./concept-relations.css";
 
 export interface ConceptRelationsPanelProps {
   data: WorkspaceData;
+  expectedUserId?: string;
   noteId: string;
   status: { ready: boolean; running: boolean; message: string };
   onGenerate: (input: {
@@ -814,11 +816,15 @@ function GenerateRelations({
   pending,
   run,
   onGenerate,
+  featureAllowed,
+  featureReason,
 }: Pick<ConceptRelationsPanelProps, "data" | "status" | "onGenerate"> & {
   from: Note;
   to: Note;
   pending: boolean;
   run: Run;
+  featureAllowed: boolean;
+  featureReason?: string;
 }) {
   const cited = [
     ...new Set([...from.citations, ...to.citations].map((citation) => citation.sourceId)),
@@ -876,19 +882,21 @@ function GenerateRelations({
   };
   const reason = !data.aiEnabled
     ? "AI 使用已关闭；仍可手动建立和核对关系。"
-    : !status.ready
-      ? status.message || "云端模型尚未配置，暂时无法生成 AI 建议。"
-      : status.running
-        ? "已有模型任务正在执行，请等待完成或停止。"
-        : !selected.length
-          ? "请选择 1–10 份资料作为分析依据。"
-          : selected.length > 10
-            ? "最多选择 10 份资料，请手动调整选集。"
-            : invalid.length
-              ? "选集中有不可用资料，请核对下方状态。"
-              : missing.length
-                ? "请保留两页现有引用涉及的全部资料。"
-                : organizationUnavailableReason(data, request);
+    : !featureAllowed
+      ? featureReason || "当前会员等级未开放资料整理。"
+      : !status.ready
+        ? status.message || "云端模型尚未配置，暂时无法生成 AI 建议。"
+        : status.running
+          ? "已有模型任务正在执行，请等待完成或停止。"
+          : !selected.length
+            ? "请选择 1–10 份资料作为分析依据。"
+            : selected.length > 10
+              ? "最多选择 10 份资料，请手动调整选集。"
+              : invalid.length
+                ? "选集中有不可用资料，请核对下方状态。"
+                : missing.length
+                  ? "请保留两页现有引用涉及的全部资料。"
+                  : organizationUnavailableReason(data, request);
   const shownIds = ids.filter(
     (id) =>
       selected.includes(id) ||
@@ -1047,6 +1055,7 @@ export function ConceptRelationsPanel({
   onOpenNote,
   onOpenCitation,
   onBack,
+  expectedUserId,
 }: ConceptRelationsPanelProps) {
   const note = currentNote(data, noteId);
   const [compareId, setCompareId] = useState("");
@@ -1054,6 +1063,7 @@ export function ConceptRelationsPanel({
   const [showDeleted, setShowDeleted] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const organizationFeature = useMembershipFeature(expectedUserId, "organization");
   async function run(action: () => void | Promise<void>) {
     if (pending) return;
     setPending(true);
@@ -1292,6 +1302,8 @@ export function ConceptRelationsPanel({
               to={availableCompare}
               status={status}
               pending={pending}
+              featureAllowed={organizationFeature.allowed}
+              featureReason={organizationFeature.reason}
               run={(action) => void run(action)}
               onGenerate={onGenerate}
             />
@@ -1338,7 +1350,12 @@ export function ConceptRelationsPanel({
             };
             const retryReason = organizationUnavailableReason(data, retryRequest);
             const checkReason = organizationUnavailableReason(data, job.request);
-            const modelDisabled = pending || status.running || !status.ready || !data.aiEnabled;
+            const modelDisabled =
+              pending ||
+              status.running ||
+              !status.ready ||
+              !data.aiEnabled ||
+              !organizationFeature.allowed;
             return (
               <article className="organization-result-card relations-job" key={job.id}>
                 <div className="organization-result-heading">

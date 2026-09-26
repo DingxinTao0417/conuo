@@ -23,7 +23,8 @@ import "./comparison-reader.css";
 export type ComparisonAskConfig = Pick<
   ComparisonAskPanelProps,
   "conversations" | "unavailableReason" | "onAsk" | "onConversationChange" | "initialConversationId"
->;
+> &
+  Pick<ComparisonAskPanelProps, "expectedUserId">;
 
 export type ComparisonReadingPatch = Partial<
   Pick<Source, "readPage" | "readOffset" | "lastReadAt">

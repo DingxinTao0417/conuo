@@ -22,6 +22,7 @@ import type {
 } from "@/lib/types";
 import { sourceCoverageLabel } from "@/lib/source-coverage";
 import { priorUserQuestions } from "@/lib/answer-context";
+import { useMembershipFeature } from "@/lib/use-membership-features";
 import {
   CROSS_LIBRARY_SCOPE,
   CROSS_LIBRARY_MAX_SOURCES,
@@ -107,6 +108,7 @@ export interface CrossLibraryAskPanelProps {
    */
   onFindSourcesByQuestion?: () => void;
   onClose: () => void;
+  expectedUserId?: string;
 }
 
 /**
@@ -127,6 +129,7 @@ export default function CrossLibraryAskPanel({
   onOpenSource,
   onFindSourcesByQuestion,
   onClose,
+  expectedUserId,
 }: CrossLibraryAskPanelProps) {
   const initialConversation = initialConversationId
     ? (data.conversations.find(
@@ -149,6 +152,7 @@ export default function CrossLibraryAskPanel({
     initialConversation || initialConversationId ? "" : (initialQuestion ?? "").slice(0, 4000),
   );
   const [tutorMode, setTutorMode] = useState(false);
+  const tutorModeFeature = useMembershipFeature(expectedUserId, "tutor_mode");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const controller = useRef<AbortController | null>(null);
@@ -156,6 +160,8 @@ export default function CrossLibraryAskPanel({
   const onBusyChangeRef = useRef(onBusyChange);
   const rejectedInitialConversationId = useRef<string | null>(null);
   const appliedInitialConversationId = useRef<string | undefined>(initialConversationId);
+
+  const effectiveTutorMode = tutorMode && tutorModeFeature.allowed;
 
   const history = useMemo(
     () => data.conversations.filter(isCrossLibraryConversation),
@@ -336,7 +342,7 @@ export default function CrossLibraryAskPanel({
         {
           ...request,
           conversationId: thread.id,
-          ...(tutorMode ? { mode: "tutor" as const } : {}),
+          ...(effectiveTutorMode ? { mode: "tutor" as const } : {}),
         },
         signal.signal,
       );
@@ -621,14 +627,20 @@ export default function CrossLibraryAskPanel({
                 {conversation ? "会沿用保存的资料与版本" : "首次发送后将锁定当前资料版本"}
               </span>
               {process.env.NEXT_PUBLIC_CONUO_FEATURE_TUTOR_MODE === "on" && (
-                <label className="cross-library-tutor-toggle">
+                <label
+                  className="cross-library-tutor-toggle"
+                  title={tutorModeFeature.reason || "引导我思考，而不是一次给出完整答案"}
+                >
                   <input
                     type="checkbox"
-                    checked={tutorMode}
-                    disabled={busy || !data.aiEnabled || Boolean(unavailable)}
+                    checked={effectiveTutorMode}
+                    disabled={
+                      busy || !data.aiEnabled || Boolean(unavailable) || !tutorModeFeature.allowed
+                    }
                     onChange={(event) => setTutorMode(event.target.checked)}
                   />
                   <span>回答方式：{tutorMode ? "引导我思考" : "直接解答"}</span>
+                  {!tutorModeFeature.allowed && <small>（{tutorModeFeature.reason}）</small>}
                 </label>
               )}
               {busy ? (

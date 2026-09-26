@@ -7,6 +7,7 @@ import MembershipPanel from "../../../membership-panel";
 import ModelStatus from "../../../model-status";
 import { OrganizationHistoryControl } from "../../lazy-panels";
 import type { WorkspaceStore, WorkspaceUser } from "../../types";
+import { useMembershipFeature } from "@/lib/use-membership-features";
 
 export type AiPaneProps = {
   data: WorkspaceData;
@@ -25,6 +26,8 @@ export default function AiPane({
   durableProcessorEnabled,
   setToast,
 }: AiPaneProps) {
+  const organizationFeature = useMembershipFeature(user?.id, "organization");
+  const organizationReason = organizationFeature.reason || "当前会员等级未开放资料整理。";
   return (
     <>
       <div className="settings-card">
@@ -75,6 +78,7 @@ export default function AiPane({
                 ? "开启后，在页面打开期间分析整个工作区已有及新导入的可用资料，生成摘要、标签和主题建议。与问答共用模型次数；不会自动应用标签或改写知识页。"
                 : "后台自动整理等待部署。当前构建不会创建新任务；已有整理记录仍可刷新、查看或停止。"}
             </p>
+            {!organizationFeature.allowed && <p>{organizationReason}</p>}
           </div>
           <input
             aria-label="自动整理资料"
@@ -83,11 +87,12 @@ export default function AiPane({
             role="switch"
             checked={data.autoOrganize === true}
             disabled={
-              !data.autoOrganize &&
-              (!durableProcessorEnabled ||
-                !user ||
-                !data.aiEnabled ||
-                !store.organizationStatus.ready)
+              !organizationFeature.allowed ||
+              (!data.autoOrganize &&
+                (!durableProcessorEnabled ||
+                  !user ||
+                  !data.aiEnabled ||
+                  !store.organizationStatus.ready))
             }
             onChange={(e) =>
               update((workspace) => ({ ...workspace, autoOrganize: e.target.checked }))

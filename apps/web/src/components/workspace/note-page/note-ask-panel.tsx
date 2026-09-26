@@ -192,6 +192,7 @@ export default function NoteAskPanel({
     <AskPanel
       ask={ask}
       feedbackUserId={expectedUserId}
+      membershipUserId={expectedUserId}
       surface={{
         id: "note-ask-panel",
         label: "基于原始依据提问",

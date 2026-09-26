@@ -17,6 +17,7 @@ import type { Citation, WorkspaceData } from "@/lib/types";
 import type { LearningItem, ReviewRating } from "@/lib/learning/types";
 import type { PdfCaptureRegion } from "@/components/pdf-capture";
 import type { WorkspaceUser } from "../types";
+import { useMembershipFeature } from "@/lib/use-membership-features";
 
 export type ReviewSectionProps = {
   data: WorkspaceData;
@@ -128,6 +129,8 @@ export default function ReviewSection({
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const learningFeature = useMembershipFeature(user.id, "learning_ai");
+  const learningAiReason = learningFeature.reason || "当前会员等级未开放学习 AI。";
   const [grade, setGrade] = useState<LearningGradeResult | null>(null);
   const item = queue[0];
 
@@ -194,6 +197,10 @@ export default function ReviewSection({
 
   async function gradeAnswer() {
     if (!item || !answer.trim()) return;
+    if (!learningFeature.allowed) {
+      setMessage(learningAiReason);
+      return;
+    }
     setBusy(true);
     setMessage("");
     try {
@@ -399,11 +406,13 @@ export default function ReviewSection({
                   <button
                     type="button"
                     className="text-button"
-                    disabled={busy}
+                    title={learningFeature.allowed ? undefined : learningAiReason}
+                    disabled={busy || !learningFeature.allowed}
                     onClick={() => void gradeAnswer()}
                   >
                     {busy ? "正在批改…" : "AI 批改（可选）"}
                   </button>
+                  {!learningFeature.allowed && <small>{learningAiReason}</small>}
                   {grade && (
                     <p role="status">
                       {grade.feedback}

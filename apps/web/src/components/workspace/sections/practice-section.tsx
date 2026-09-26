@@ -5,6 +5,7 @@ import type { LearningItem } from "@/lib/learning/types";
 import type { GradeResult, HintResult } from "@/lib/ai/grading";
 import type { Source, WorkspaceData } from "@/lib/types";
 import type { WorkspaceUser } from "../types";
+import { useMembershipFeature } from "@/lib/use-membership-features";
 
 type Draft = Omit<LearningItem, "itemId" | "status" | "card" | "dueAt" | "createdAt" | "updatedAt">;
 export type PracticeSectionProps = {
@@ -33,6 +34,8 @@ export default function PracticeSection({ data, spaceId, user, target }: Practic
   const [hints, setHints] = useState<Record<string, HintResult>>({});
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const source = useMemo(() => sourceFor(data, spaceId), [data, spaceId]);
+  const learningFeature = useMembershipFeature(user.id, "learning_ai");
+  const learningAiReason = learningFeature.reason || "当前会员等级未开放学习 AI。";
   const headers = useCallback(
     () => ({ "Content-Type": "application/json", "X-Conuo-User": user.id }),
     [user.id],
@@ -60,6 +63,10 @@ export default function PracticeSection({ data, spaceId, user, target }: Practic
     };
   }, [fetchItems]);
   async function generate() {
+    if (!learningFeature.allowed) {
+      setMessage(learningAiReason);
+      return;
+    }
     if (!source) {
       setMessage("当前空间还没有允许 AI 使用的资料。");
       return;
@@ -123,6 +130,10 @@ export default function PracticeSection({ data, spaceId, user, target }: Practic
     );
   }
   async function grade(item: LearningItem) {
+    if (!learningFeature.allowed) {
+      setMessage(learningAiReason);
+      return;
+    }
     const answer = answers[item.itemId]?.trim();
     if (!answer) return;
     const response = await fetch("/api/v1/learning/grade", {
@@ -146,6 +157,10 @@ export default function PracticeSection({ data, spaceId, user, target }: Practic
     setGrades((current) => ({ ...current, [item.itemId]: body }));
   }
   async function hint(item: LearningItem) {
+    if (!learningFeature.allowed) {
+      setMessage(learningAiReason);
+      return;
+    }
     const response = await fetch("/api/v1/learning/hint", {
       method: "POST",
       headers: headers(),
@@ -181,12 +196,18 @@ export default function PracticeSection({ data, spaceId, user, target }: Practic
         </div>
         <button
           className="btn btn-primary"
-          disabled={busy || !data.aiEnabled}
+          title={learningFeature.allowed ? undefined : learningAiReason}
+          disabled={busy || !data.aiEnabled || !learningFeature.allowed}
           onClick={() => void generate()}
         >
           {busy ? "正在出题…" : "为当前资料出题"}
         </button>
       </div>
+      {!learningFeature.allowed && (
+        <div className="notice notice-warning" role="status">
+          {learningAiReason}
+        </div>
+      )}
       {message && (
         <div className="notice notice-warning" role="status">
           {message}
@@ -228,12 +249,18 @@ export default function PracticeSection({ data, spaceId, user, target }: Practic
               />
               <button
                 className="btn"
-                disabled={!answers[item.itemId]?.trim()}
+                title={learningFeature.allowed ? undefined : learningAiReason}
+                disabled={!answers[item.itemId]?.trim() || !learningFeature.allowed}
                 onClick={() => void grade(item)}
               >
                 AI 批改
               </button>
-              <button className="text-button" onClick={() => void hint(item)}>
+              <button
+                className="text-button"
+                title={learningFeature.allowed ? undefined : learningAiReason}
+                disabled={!learningFeature.allowed}
+                onClick={() => void hint(item)}
+              >
                 给我提示
               </button>
               {hints[item.itemId] && <p role="status">提示：{hints[item.itemId].hint}</p>}
