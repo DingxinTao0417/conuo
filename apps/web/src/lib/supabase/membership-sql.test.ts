@@ -472,22 +472,34 @@ describe("AI token ledger", () => {
   it("accumulates repeated model calls and token-only routes in the UTC total", async () => {
     expect(await reserve(owner, "token-request", "off")).toEqual({ status: "reserved" });
     await asRole("service_role", () =>
-      db.query(
-        "select public.finish_ai_request($1::uuid,$2,$3::jsonb,$4,$5::bigint,$6::bigint)",
-        [owner, "token-request", null, null, 12, 8],
-      ),
+      db.query("select public.finish_ai_request($1::uuid,$2,$3::jsonb,$4,$5::bigint,$6::bigint)", [
+        owner,
+        "token-request",
+        null,
+        null,
+        12,
+        8,
+      ]),
     );
     await asRole("service_role", () =>
-      db.query(
-        "select public.finish_ai_request($1::uuid,$2,$3::jsonb,$4,$5::bigint,$6::bigint)",
-        [owner, "token-request", null, null, 3, 4],
-      ),
+      db.query("select public.finish_ai_request($1::uuid,$2,$3::jsonb,$4,$5::bigint,$6::bigint)", [
+        owner,
+        "token-request",
+        null,
+        null,
+        3,
+        4,
+      ]),
     );
     await asRole("service_role", () =>
-      db.query(
-        "select public.finish_ai_request($1::uuid,$2,$3::jsonb,$4,$5::bigint,$6::bigint)",
-        [owner, "token-request", JSON.stringify({ answer: "saved" }), null, 5, 6],
-      ),
+      db.query("select public.finish_ai_request($1::uuid,$2,$3::jsonb,$4,$5::bigint,$6::bigint)", [
+        owner,
+        "token-request",
+        JSON.stringify({ answer: "saved" }),
+        null,
+        5,
+        6,
+      ]),
     );
     await asRole("service_role", () =>
       db.query("select public.record_ai_token_usage($1::uuid,$2,$3,$4::bigint,$5::bigint)", [
@@ -505,7 +517,9 @@ describe("AI token ledger", () => {
         )
       ).rows,
     ).toEqual([{ state: "completed", prompt_tokens: 20, completion_tokens: 18 }]);
-    expect(await value<Json>("select public.ai_token_usage_today($1::uuid) as value", [owner])).toEqual({
+    expect(
+      await value<Json>("select public.ai_token_usage_today($1::uuid) as value", [owner]),
+    ).toEqual({
       promptTokens: 22,
       completionTokens: 21,
     });
