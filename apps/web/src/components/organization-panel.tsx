@@ -1029,6 +1029,7 @@ export default function OrganizationPanel(props: OrganizationPanelProps) {
                       status.running ||
                       !status.ready ||
                       !data.aiEnabled ||
+                      (!job.durable && !organizationFeature.allowed) ||
                       job.restoredFromBackup ||
                       (job.durable && !["queued", "running"].includes(job.status))
                     }
@@ -1042,6 +1043,7 @@ export default function OrganizationPanel(props: OrganizationPanelProps) {
                     disabled={
                       pending ||
                       !durableProcessorEnabled ||
+                      !organizationFeature.allowed ||
                       status.running ||
                       !status.ready ||
                       !data.aiEnabled
