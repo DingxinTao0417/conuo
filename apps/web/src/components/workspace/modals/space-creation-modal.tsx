@@ -65,15 +65,14 @@ export default function SpaceCreationModal({
             archived: false,
             createdAt: new Date().toISOString(),
           };
-          if (
-            !update((d) => ({
-              ...d,
-              spaces:
-                continueToImport && isUntouchedStarterWorkspace(d)
-                  ? [created]
-                  : [...d.spaces, created],
-            }))
-          ) {
+          const updated = update((d) => ({
+            ...d,
+            spaces:
+              continueToImport && isUntouchedStarterWorkspace(d)
+                ? [created]
+                : [...d.spaces, created],
+          }));
+          if (updated === false) {
             setToast("学习空间未创建，请稍后重试；当前内容仍然保留。");
             return;
           }

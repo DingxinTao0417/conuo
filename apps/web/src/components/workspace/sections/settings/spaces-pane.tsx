@@ -73,14 +73,13 @@ export default function SpacesPane({
                   className="btn"
                   onClick={async () => {
                     if (ensureCanActivateSpace && !(await ensureCanActivateSpace(1))) return;
-                    if (
-                      !update((d) => ({
-                        ...d,
-                        spaces: d.spaces.map((x) =>
-                          x.id === space.id ? { ...x, archived: false } : x,
-                        ),
-                      }))
-                    )
+                    const updated = update((d) => ({
+                      ...d,
+                      spaces: d.spaces.map((x) =>
+                        x.id === space.id ? { ...x, archived: false } : x,
+                      ),
+                    }));
+                    if (updated === false)
                       setToast?.("空间状态未保存，请稍后重试；当前内容仍然保留。");
                   }}
                 >

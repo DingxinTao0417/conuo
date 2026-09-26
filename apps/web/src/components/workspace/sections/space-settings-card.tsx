@@ -90,15 +90,13 @@ export default function SpaceSettingsCard({
             onClick={async () => {
               if (space.archived && ensureCanActivateSpace && !(await ensureCanActivateSpace(1)))
                 return;
-              if (
-                !update((d) => ({
-                  ...d,
-                  spaces: d.spaces.map((x) =>
-                    x.id === space.id ? { ...x, archived: !x.archived } : x,
-                  ),
-                }))
-              )
-                setToast("空间状态未保存，请稍后重试；当前内容仍然保留。");
+              const updated = update((d) => ({
+                ...d,
+                spaces: d.spaces.map((x) =>
+                  x.id === space.id ? { ...x, archived: !x.archived } : x,
+                ),
+              }));
+              if (updated === false) setToast("空间状态未保存，请稍后重试；当前内容仍然保留。");
             }}
           >
             {space.archived ? "恢复空间" : "归档空间"}

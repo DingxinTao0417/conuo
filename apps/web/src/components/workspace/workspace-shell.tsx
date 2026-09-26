@@ -18,6 +18,7 @@ import {
   permanentSourceDeletionFingerprint,
   previewPermanentSourceDeletionContent,
 } from "@/lib/permanent-deletion";
+import * as cloud from "@/lib/cloud";
 import { isCloudConfigured, type SourcePurgePreview } from "@/lib/cloud";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -2153,7 +2154,36 @@ export default function Workspace({
     // Keep one history entry, with the default pane explicit for reloads.
     window.history.replaceState(null, "", "#settings/account");
   }
-  function openSpaceCreation(intent: "browse" | "import" = "browse") {
+  async function ensureCanActivateSpace(additional = 1): Promise<boolean> {
+    if (!user?.id) return true;
+    // Keep focused local/test cloud adapters that predate the membership
+    // endpoint usable. The production adapter always provides this reader;
+    // an actual reader error still blocks the mutation below.
+    const membershipReader = Object.prototype.hasOwnProperty.call(cloud, "getAccountMembership")
+      ? cloud.getAccountMembership
+      : undefined;
+    if (typeof membershipReader !== "function") return true;
+    try {
+      const membership = await membershipReader(user.id);
+      const limit = membership.enforcement === "on" ? membership.limits.learningSpaces : 500;
+      const active = data.spaces.filter((space) => !space.archived).length;
+      if (active + additional > limit) {
+        setToast("学习空间已满：请先归档不再使用的空间，再继续操作。已有内容仍然保留。");
+        return false;
+      }
+      return true;
+    } catch (cause) {
+      setToast(
+        cause instanceof Error
+          ? cause.message
+          : "暂时无法读取会员额度，未创建或恢复学习空间。请稍后重试。",
+      );
+      return false;
+    }
+  }
+  async function openSpaceCreation(intent: "browse" | "import" = "browse") {
+    const replacesStarter = intent === "import" && isUntouchedStarterWorkspace(data);
+    if (!(await ensureCanActivateSpace(replacesStarter ? 0 : 1))) return;
     setSpaceCreationIntent(intent);
     setModal("space");
   }
@@ -2177,6 +2207,7 @@ export default function Workspace({
       <ConceptRelationsPanel
         key={`${user?.id || "local"}:${currentNote.id}`}
         data={data}
+        expectedUserId={user?.id}
         noteId={currentNote.id}
         status={store.organizationStatus}
         onRefreshStatus={store.refreshOrganizationStatus}
@@ -2231,6 +2262,7 @@ export default function Workspace({
         key={`${user?.id || "local"}:${store.token}:${localCacheMode}:${currentNote.id}`}
         withdrawalContextKey={`${user?.id || "local"}:${store.token}:${localCacheMode}`}
         data={data}
+        expectedUserId={user?.id}
         noteId={currentNote.id}
         status={store.organizationStatus}
         onRefreshStatus={store.refreshOrganizationStatus}
@@ -2638,6 +2670,7 @@ export default function Workspace({
             }
             ask={{
               conversations: data.conversations,
+              expectedUserId: user?.id,
               initialConversationId: pendingComparisonConversationId ?? undefined,
               unavailableReason: comparisonAskUnavailableReason,
               onConversationChange: (conversation) =>
@@ -2987,6 +3020,7 @@ export default function Workspace({
                 }
                 openImport={openImport}
                 openSpaceCreation={openSpaceCreation}
+                ensureCanActivateSpace={ensureCanActivateSpace}
                 openSource={openSource}
                 openNote={openNote}
                 openConversation={openConversation}
@@ -3064,6 +3098,7 @@ export default function Workspace({
               <OrganizationPanel
                 key={`${user?.id || "local"}:${spaceId}`}
                 data={data}
+                expectedUserId={user?.id}
                 spaceId={spaceId}
                 initialSourceIds={selected}
                 status={store.organizationStatus}
@@ -3253,6 +3288,7 @@ export default function Workspace({
                 navigate={navigate}
                 setModal={setModal}
                 setToast={setToast}
+                ensureCanActivateSpace={ensureCanActivateSpace}
                 setSpaceToDeleteId={setSpaceToDeleteId}
                 openExport={openExport}
                 openSpaceCreation={openSpaceCreation}
@@ -3409,11 +3445,13 @@ export default function Workspace({
       {modal === "space" && (
         <SpaceCreationModal
           spaceCreationIntent={spaceCreationIntent}
+          data={data}
           update={update}
           setToast={setToast}
           setSpaceCreationIntent={setSpaceCreationIntent}
           setImportTargetSpaceId={setImportTargetSpaceId}
           setModal={setModal}
+          ensureCanActivateSpace={ensureCanActivateSpace}
           chooseSpace={chooseSpace}
           closeSpaceCreation={closeSpaceCreation}
         />
