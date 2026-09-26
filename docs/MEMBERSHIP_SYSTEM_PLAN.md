@@ -52,7 +52,7 @@ Conuo 先建立一套由数据库驱动的会员等级和权益模型。管理�
 | 额度 | 环境变量与默认值 | 执行位置 | 覆盖的调用 |
 | --- | --- | --- | --- |
 | AI 请求次数 | `CONUO_AI_DAILY_REQUEST_LIMIT`=50（1–500） | `reserve_ai_request` | 问答、整理、区域视觉、学习 AI、术语建议、后台整理任务 |
-| AI Token | `CONUO_AI_DAILY_TOKEN_LIMIT`=0（关闭，最大 1 亿） | `reserve_ai_request` + `ai_token_usage_today` | 只统计写入追踪表的调用，见 §2.3 |
+| AI Token | `CONUO_AI_DAILY_TOKEN_LIMIT`=0（关闭，最大 1 亿） | `reserve_ai_request` + `ai_token_usage_today` | 汇总请求账本和 OCR／摘要的 Token-only 账本，见 §2.3 |
 | OCR 页数 | `CONUO_OCR_DAILY_PAGE_LIMIT`=100（1–2000） | `reserve_ocr_pages` | 扫描页转写；不占 AI 请求次数 |
 | 向量化字符 | `CONUO_EMBEDDING_DAILY_CHAR_LIMIT`=200,000 | `reserve_embedding_usage` | 资料向量化 |
 | 章节摘要 | `CONUO_SUMMARY_DAILY_SECTION_LIMIT`=60（1–500） | `reserve_summary_section` | 章节摘要任务 |
@@ -61,12 +61,12 @@ Conuo 先建立一套由数据库驱动的会员等级和权益模型。管理�
 
 ### 2.3 Token 统计现状
 
-`ai_token_usage_today` 只汇总 `conuo_private.ai_request_traces` 中的 token 字段，目前不适合作为会员权益：
+阶段 T 已把 `ai_token_usage_today` 改为汇总 `public.ai_requests` 的请求列，以及 OCR／章节摘要使用的私有 Token-only 账本，不再读取可选的 `conuo_private.ai_request_traces`：
 
-- 追踪写入受 `CONUO_FEATURE_AI_TRACES` 控制，默认关闭；关闭时 Token 用量恒为 0，Token 上限不会报错，只是不生效。
-- 追踪写入是尽力而为：等待 1 秒后放弃，错误被忽略，用量可能少算。
-- 只有问答主调用、整理、区域视觉、后台整理上报用量；学习的四个生成类路由、术语建议、问答的查询改写、OCR 转写和章节摘要都不计入。
-- [AI_ENHANCEMENT_PROGRESS.md](AI_ENHANCEMENT_PROGRESS.md) 已记录“评审前不要启用 `CONUO_AI_DAILY_TOKEN_LIMIT`”。
+- `ai_requests.prompt_tokens` 与 `completion_tokens` 由新的六参数 `finish_ai_request` 累加；查询改写、主回答和回答校验等同一请求 ID 下的多次模型调用合并计算，旧四参数签名仍可用。
+- 所有文本、视觉、学习、整理和术语模型调用经过统一用量回调。供应商没有返回字段时按请求／结果字符数使用固定的有界近似值，避免关闭 `CONUO_FEATURE_AI_TRACES` 使 Token 上限失效。
+- OCR 和章节摘要没有请求次数账本记录，改写入 `conuo_private.ai_token_usage_ledger`；统计和权限仍只由服务端函数提供。
+- `CONUO_AI_DAILY_TOKEN_LIMIT` 仍是全局上限，不作为会员等级权益；会员分档和两周数据标定继续留待产品决定。
 
 ## 3. 设计原则
 
@@ -383,11 +383,11 @@ select conuo_private.revoke_membership_grant(
 
 满足以下条件后，再用迁移给等级表增加 `ai_daily_token_limit`（`integer`，0–100,000,000，与现有 RPC 的参数类型一致）：
 
-1. Token 用量写进账本本身。例如 `finish_ai_request` 同时记录 prompt 和 completion 用量，同一请求 ID 下的多次模型调用（查询改写、主回答、校验）合并计算。不再依赖可关闭、尽力写入、保留 30 天的追踪表。
-2. 所有模型调用都经过同一个计量封装，包括学习、术语建议、查询改写、OCR 转写和章节摘要；供应商不返回用量时，有明确的计量策略。
-3. 收集两周数据，按账号日用量 P95 标定各等级数值，并核对“请求次数 × 单次典型用量”与 Token 上限的比例。
+1. ✅ `20260927000200_ai_request_token_ledger.sql` 已把 Token 用量写进账本：`finish_ai_request` 同时记录 prompt 和 completion 用量，同一请求 ID 下的多次模型调用（查询改写、主回答、校验）合并计算；旧四参数签名继续可用。
+2. ✅ 所有模型调用都经过统一计量回调，包括学习、术语建议、查询改写、OCR 转写和章节摘要；供应商不返回用量时按固定字符近似策略补齐，OCR／摘要使用 Token-only 账本。
+3. 收集两周数据，按账号日用量 P95 标定各等级数值，并核对“请求次数 × 单次典型用量”与 Token 上限的比例；本阶段不做数值标定。
 
-在此之前，Token 只保留全局上限，界面继续标注“近似”，不作为会员权益展示。
+当前 Token 只保留全局上限，界面继续标注“近似”，不作为会员权益展示。
 
 ## 9. RLS 和访问边界
 
@@ -541,3 +541,11 @@ select conuo_private.revoke_membership_grant(
 - 设置 →「资料与 AI」新增会员面板：当前等级、来源、有效期与到期后等级（本机时间）、每日 AI 请求与活跃学习空间额度、各 AI 功能是否可用、公开等级对比，以及禁用状态的“升级（暂未开放）”。执行模式为 `off`/`shadow` 时明确提示仍按全站统一次数计算。
 - 测试：路由 4 项、面板 5 项；`apps/web` 全量 4580 项通过。
 - 尚未做：按最终权益隐藏或置灰各 AI 入口（目前三档功能全开，暂无行为差异）、iOS/iPadOS 端展示、设置页用量面板改读会员额度文案。
+
+### 2026-09-25：阶段 C + T（本地功能分支）
+
+- 会员面板与空间流程：学习空间上限为 500 时显示“暂不限制”；`off`／`shadow` 说明仍按当前系统上限。新建空间和取消归档前按会员接口预检；`/api/v1/workspace` 返回 `LEARNING_SPACE_LIMIT` 时提示“学习空间已满”，保留浏览器中的未保存内容。备份恢复和旧版导入在首次保存前按最终额度把超出的新增空间转为归档，并保留资料、笔记和警告提示；已有超额空间的普通编辑仍可保存。
+- 最终权益控制：问答深度思考／导师模式、比较和跨库导师模式、区域截图学习、资料整理与知识更新、学习出题／批改／提示及复习批改入口同时检查 `NEXT_PUBLIC_CONUO_FEATURE_*` 与 `/api/v1/account/membership` 的 `features`。会员接口暂不可用时入口置灰并说明原因；阅读、搜索、笔记、导出和复习队列不受影响。没有在 iOS/iPadOS 增加付费升级入口。
+- Token 账本：新增 `supabase/migrations/20260927000200_ai_request_token_ledger.sql`，为 `ai_requests` 增加 `prompt_tokens`／`completion_tokens`，新增可累加多次模型调用的六参数 `finish_ai_request`、保留旧四参数签名、服务端 Token-only 账本和按 UTC 当日汇总的 `ai_token_usage_today`。问答（含查询改写和回答校验）、整理、后台整理、区域视觉、学习四路由、术语建议、OCR 转写和章节摘要均写入账本；供应商无用量字段时使用固定字符近似策略。`CONUO_AI_DAILY_TOKEN_LIMIT` 仍是全局配置，没有加入会员等级数值。
+- 测试：三个按顺序加载迁移的 PGlite 测试已登记新迁移；`membership-sql.test.ts` 与 `ai-token-usage-sql.test.ts` 覆盖正常累加、Token-only、拒绝、权限、旧签名和 `off` 路径不变；新增会员入口、空间预检、备份降级保存组件／单元测试。迁移和代码只在本地功能分支验证，未对 Supabase、Vercel 或部署环境执行操作；生产／staging 应在上线前按顺序人工应用新迁移。
+- 未改变会员数值、既有账号授权、执行模式或每日重置时区；Token P95 标定和按等级分档仍待产品负责人决定。

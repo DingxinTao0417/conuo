@@ -156,15 +156,15 @@ Web 首版只处理用户在 PDF 当前物理页明确框选的固定区域。�
 
 ### 用户可见的请求用量
 
-设置页“资料与 AI”提供今日已用、剩余次数和每日上限，问答、PDF 区域视觉及资料整理共用。`GET /api/v1/ai/usage` 在验证 cookie 身份、`X-Conuo-User` 和账号注销闸门后，用现有服务端账本客户端按确切账号与 UTC 日范围读取精确 HEAD 计数，并读取追踪表当天的 prompt／completion token 汇总；返回前再次复核账号状态。它不返回请求 ID、问题、回答正文或资料信息，不预占请求，也不调用模型。响应禁止缓存，浏览器同时校验计数、token 与日期合同。
+设置页“资料与 AI”提供今日已用、剩余次数和每日上限，问答、PDF 区域视觉及资料整理共用。`GET /api/v1/ai/usage` 在验证 cookie 身份、`X-Conuo-User` 和账号注销闸门后，用现有服务端账本客户端按确切账号与 UTC 日范围读取精确 HEAD 计数，并读取新 Token 账本当天的 prompt／completion 汇总；返回前再次复核账号状态。它不返回请求 ID、问题、回答正文或资料信息，不预占请求，也不调用模型。响应禁止缓存，浏览器同时校验计数、token 与日期合同。
 
 面板显示每天 UTC 00:00 重置，并把下次重置和采样时间换算为用户本机时间；计数是采样结果，不宣称实时。打开设置、明确刷新、回到可见标签或窗口，以及本页模型请求结束时会重新读取；UTC 重置后旧日数字失效，隐藏标签不进行重置请求。账号、工作区 token 或缓存模式变化立即替换面板上下文，旧回调不发布数字。
 
-失败、取消和超时只要已预占新请求就计入；同 ID、同指纹的缓存读取不新增次数。这里是 Conuo 的请求次数限制，不是供应商费用上限或会员余额。`CONUO_AI_DAILY_TOKEN_LIMIT` 默认 `0`（关闭），可设为 1 至 100,000,000；启用时服务端按 UTC 当日追踪中的 token 近似汇总原子拒绝新的预占。追踪写入是尽力而为，供应商缺少用量或写入失败时 token 余额可能低估，设置页标注“近似”。降低上限后保留真实已用数，剩余不低于零。缺少账本密钥、限额配置错误、网络失败或返回格式异常时显示“用量暂不可用”，不制造零余额，也不继续显示旧数字为当前用量。用量读取不要求 AI 开关打开；但仍要求有效登录身份。
+失败、取消和超时只要已预占新请求就计入；同 ID、同指纹的缓存读取不新增次数。这里是 Conuo 的请求次数限制，不是供应商费用上限或会员余额。`CONUO_AI_DAILY_TOKEN_LIMIT` 默认 `0`（关闭），可设为 1 至 100,000,000；启用时服务端按 UTC 当日请求账本和 OCR／章节摘要 Token-only 账本的汇总原子拒绝新的预占。Token 写入不再依赖 `CONUO_FEATURE_AI_TRACES`；供应商返回用量时使用其字段，否则按请求／结果字符数采用固定近似值，设置页继续标注“近似”。降低上限后保留真实已用数，剩余不低于零。缺少账本密钥、限额配置错误、网络失败或返回格式异常时显示“用量暂不可用”，不制造零余额，也不继续显示旧数字为当前用量。用量读取不要求 AI 开关打开；但仍要求有效登录身份。新代码需要按顺序应用至 `20260927000200_ai_request_token_ledger.sql`。
 
 ### 会员额度（`CONUO_MEMBERSHIP_ENFORCEMENT`）
 
-会员方案见 [MEMBERSHIP_SYSTEM_PLAN.md](MEMBERSHIP_SYSTEM_PLAN.md)。`CONUO_MEMBERSHIP_ENFORCEMENT` 默认 `off`：行为与上文完全相同，服务端仍调用 `reserve_ai_request` 并按 `CONUO_AI_DAILY_REQUEST_LIMIT` 计数，不依赖会员迁移。`shadow` 与 `on` 需要先应用 `20260927000100_membership_foundation.sql`，改用 `reserve_membership_ai_request`，在同一账号锁内由数据库解析会员等级并记录路由：
+会员方案见 [MEMBERSHIP_SYSTEM_PLAN.md](MEMBERSHIP_SYSTEM_PLAN.md)。`CONUO_MEMBERSHIP_ENFORCEMENT` 默认 `off`：会员额度和功能门禁不生效，服务端仍调用 `reserve_ai_request` 并按 `CONUO_AI_DAILY_REQUEST_LIMIT` 计数。`shadow` 与 `on` 需要先应用 `20260927000100_membership_foundation.sql`，改用 `reserve_membership_ai_request`，在同一账号锁内由数据库解析会员等级并记录路由；Token 账本还需要继续应用 `20260927000200_ai_request_token_ledger.sql`：
 
 - `shadow`：仍按全局上限执行，不拦截任何请求；服务端输出不含账号或正文的 `membership_shadow` 结构化日志（等级、会员上限、是否本会被拒、功能是否开放），用于校准数值。
 - `on`：每日次数为 min(会员额度, `CONUO_AI_DAILY_REQUEST_LIMIT`)，此时全局值只是紧急上限，切换前应设为 500；会员未开放的功能返回 403 `MEMBERSHIP_FEATURE_REQUIRED`，且不消耗次数。
