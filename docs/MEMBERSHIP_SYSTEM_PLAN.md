@@ -535,3 +535,9 @@ select conuo_private.revoke_membership_grant(
 - 生产数据库（Supabase `conuo`）已由项目负责人应用本迁移，迁移历史登记为 `20260927000100 membership_foundation`；已只读核验等级配置、函数授权、`save_workspace` 替换、`route` 列、RLS 与触发器，以及无授权账号回落为免费版。staging 数据库尚缺此前 7 份迁移，未应用。
 - 尚未做：生产 Vercel 设置 `CONUO_MEMBERSHIP_ENFORCEMENT=shadow` 与真实影子观察、B1 数值切换与现有账号补授权、阶段 C 的界面和权益接口、阶段 T 的 Token 计量。
 
+### 2026-09-25：阶段 C 第一部分（会员展示）
+
+- 新增 `GET /api/v1/account/membership`：用调用者自己的会话调用 `my_membership()`，并按 RLS 读取公开等级；返回等级、来源、生效与到期时间、到期后等级、执行模式、会员额度和最终可用的功能（部署开关叠加会员开关，仅 `on` 时叠加会员开关），不返回授权 ID。读取失败返回 503 `MEMBERSHIP_UNAVAILABLE`，不假定为免费版。Web 与 iOS/iPadOS 可共用。
+- 设置 →「资料与 AI」新增会员面板：当前等级、来源、有效期与到期后等级（本机时间）、每日 AI 请求与活跃学习空间额度、各 AI 功能是否可用、公开等级对比，以及禁用状态的“升级（暂未开放）”。执行模式为 `off`/`shadow` 时明确提示仍按全站统一次数计算。
+- 测试：路由 4 项、面板 5 项；`apps/web` 全量 4580 项通过。
+- 尚未做：按最终权益隐藏或置灰各 AI 入口（目前三档功能全开，暂无行为差异）、iOS/iPadOS 端展示、设置页用量面板改读会员额度文案。

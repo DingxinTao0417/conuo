@@ -21,6 +21,7 @@ vi.mock("@/lib/cloud", () => ({
 vi.mock("./model-status", () => ({ default: () => null }));
 vi.mock("./workspace-search", () => ({ default: () => null }));
 vi.mock("./indexing-panel", () => ({ default: () => null }));
+vi.mock("./membership-panel", () => ({ default: () => null }));
 vi.mock("./web-import-form", () => ({ default: () => null }));
 
 import Workspace from "./workspace";

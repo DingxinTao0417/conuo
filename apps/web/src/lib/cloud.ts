@@ -49,6 +49,7 @@ import {
 } from "./answer-stream";
 import type { OnAnswerProgress } from "./answer-stream-types";
 import { aiRequestUsageSchema, notifyAiUsageChanged } from "./ai-request-usage";
+import { accountMembershipSchema } from "./membership";
 import { observeAccountDeletionFailure } from "./account-deletion-observer";
 import { citationSchema } from "./citation-schema";
 import {
@@ -239,6 +240,31 @@ export async function getAiRequestUsage(expectedUserId: string, signal?: AbortSi
   const parsed = aiRequestUsageSchema.safeParse(result);
   if (!parsed.success)
     throw new CloudError("AI 用量返回了无效数据，请稍后刷新。", 502, "INVALID_AI_USAGE_RESPONSE");
+  return parsed.data;
+}
+
+export async function getAccountMembership(expectedUserId: string, signal?: AbortSignal) {
+  const timeout = AbortSignal.timeout(15_000);
+  const readSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  let result: unknown;
+  try {
+    result = await cloudRequest<unknown>("/api/v1/account/membership", expectedUserId, {
+      signal: readSignal,
+    });
+  } catch (error) {
+    if (timeout.aborted && !signal?.aborted)
+      throw new CloudError("会员信息读取超时，请稍后刷新。", 504, "MEMBERSHIP_TIMEOUT");
+    throw error;
+  }
+  if (readSignal.aborted)
+    throw new CloudError("会员信息读取已停止，请重新刷新。", 499, "REQUEST_CANCELLED");
+  const parsed = accountMembershipSchema.safeParse(result);
+  if (!parsed.success)
+    throw new CloudError(
+      "会员信息返回了无效数据，请稍后刷新。",
+      502,
+      "INVALID_MEMBERSHIP_RESPONSE",
+    );
   return parsed.data;
 }
 

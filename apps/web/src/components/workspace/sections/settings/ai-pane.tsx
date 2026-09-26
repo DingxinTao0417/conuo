@@ -3,6 +3,7 @@ import type { WorkspaceData } from "@/lib/types";
 import { cleanupOrganizationHistory } from "@/lib/organization-history";
 import AiUsagePanel from "../../../ai-usage-panel";
 import IndexingPanel from "../../../indexing-panel";
+import MembershipPanel from "../../../membership-panel";
 import ModelStatus from "../../../model-status";
 import { OrganizationHistoryControl } from "../../lazy-panels";
 import type { WorkspaceStore, WorkspaceUser } from "../../types";
@@ -46,6 +47,11 @@ export default function AiPane({
             onChange={(e) => update((d) => ({ ...d, aiEnabled: e.target.checked }))}
           />
         </div>
+        <MembershipPanel
+          userId={user?.id}
+          contextKey={`${store.token}:${store.localCacheMode}`}
+          enabled={store.ready}
+        />
         <ModelStatus key={user?.id || "local"} userId={user?.id} />
         <AiUsagePanel
           userId={user?.id}
