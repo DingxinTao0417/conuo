@@ -49,13 +49,13 @@ Conuo 先建立一套由数据库驱动的会员等级和权益模型。管理�
 
 所有额度都按 UTC 日计算，数值来自部署级环境变量，由服务端作为参数传给对应 RPC：
 
-| 额度 | 环境变量与默认值 | 执行位置 | 覆盖的调用 |
-| --- | --- | --- | --- |
-| AI 请求次数 | `CONUO_AI_DAILY_REQUEST_LIMIT`=50（1–500） | `reserve_ai_request` | 问答、整理、区域视觉、学习 AI、术语建议、后台整理任务 |
-| AI Token | `CONUO_AI_DAILY_TOKEN_LIMIT`=0（关闭，最大 1 亿） | `reserve_ai_request` + `ai_token_usage_today` | 汇总请求账本和 OCR／摘要的 Token-only 账本，见 §2.3 |
-| OCR 页数 | `CONUO_OCR_DAILY_PAGE_LIMIT`=100（1–2000） | `reserve_ocr_pages` | 扫描页转写；不占 AI 请求次数 |
-| 向量化字符 | `CONUO_EMBEDDING_DAILY_CHAR_LIMIT`=200,000 | `reserve_embedding_usage` | 资料向量化 |
-| 章节摘要 | `CONUO_SUMMARY_DAILY_SECTION_LIMIT`=60（1–500） | `reserve_summary_section` | 章节摘要任务 |
+| 额度        | 环境变量与默认值                                  | 执行位置                                      | 覆盖的调用                                            |
+| ----------- | ------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------- |
+| AI 请求次数 | `CONUO_AI_DAILY_REQUEST_LIMIT`=50（1–500）        | `reserve_ai_request`                          | 问答、整理、区域视觉、学习 AI、术语建议、后台整理任务 |
+| AI Token    | `CONUO_AI_DAILY_TOKEN_LIMIT`=0（关闭，最大 1 亿） | `reserve_ai_request` + `ai_token_usage_today` | 汇总请求账本和 OCR／摘要的 Token-only 账本，见 §2.3   |
+| OCR 页数    | `CONUO_OCR_DAILY_PAGE_LIMIT`=100（1–2000）        | `reserve_ocr_pages`                           | 扫描页转写；不占 AI 请求次数                          |
+| 向量化字符  | `CONUO_EMBEDDING_DAILY_CHAR_LIMIT`=200,000        | `reserve_embedding_usage`                     | 资料向量化                                            |
+| 章节摘要    | `CONUO_SUMMARY_DAILY_SECTION_LIMIT`=60（1–500）   | `reserve_summary_section`                     | 章节摘要任务                                          |
 
 另有单文件 30 MiB、每账号原件 512 MiB、工作区快照 3 MiB 等安全上限。现有文档已说明它们不是对外套餐承诺，本方案继续把它们作为全局安全上限。
 
@@ -84,11 +84,11 @@ Conuo 先建立一套由数据库驱动的会员等级和权益模型。管理�
 
 下面的数值是可调整的初始建议，不是已承诺的商业价格或最终 PRD。
 
-| 等级 | 代码 | 每日 AI 请求 | 活跃学习空间 | 定位 |
-| --- | --- | ---: | ---: | --- |
-| 免费版 | `free` | 20 | 1 | 阅读、搜索、基础 AI 体验 |
-| 专业版 | `pro` | 100 | 5 | 高频学习、资料整理、学习 AI |
-| 旗舰版 | `max` | 300 | 20 | 重度使用和更高额度 |
+| 等级   | 代码   | 每日 AI 请求 | 活跃学习空间 | 定位                        |
+| ------ | ------ | -----------: | -----------: | --------------------------- |
+| 免费版 | `free` |           20 |            1 | 阅读、搜索、基础 AI 体验    |
+| 专业版 | `pro`  |          100 |            5 | 高频学习、资料整理、学习 AI |
+| 旗舰版 | `max`  |          300 |           20 | 重度使用和更高额度          |
 
 说明：
 
@@ -99,29 +99,29 @@ Conuo 先建立一套由数据库驱动的会员等级和权益模型。管理�
 
 ### 4.2 各项额度在第一版的处理
 
-| 额度 | 第一版 | 说明 |
-| --- | --- | --- |
-| AI 请求次数 | 按会员 | 由新的预占 RPC 解析 |
-| AI Token | 保持全局 | 沿用 `CONUO_AI_DAILY_TOKEN_LIMIT`；按会员分档依赖 §8.5 |
-| 区域视觉 | 共用请求次数 | 开始记录 `route`，暂不单独限额 |
-| OCR 页数 | 保持全局，所有等级相同 | 部署启用视觉模型后所有用户都已可用，第一版不收回 |
-| 向量化字符 | 保持全局 | — |
-| 章节摘要 | 保持全局 | — |
-| 学习空间 | 按会员 | 在 `save_workspace` 中执行，只统计未归档空间 |
-| 存储与单文件 | 保持全局安全上限 | 不作为会员权益宣传 |
-| 并发 | 所有等级都是 1 | 后台任务同样占用；是否对高等级放宽见 §13 |
+| 额度         | 第一版                 | 说明                                                   |
+| ------------ | ---------------------- | ------------------------------------------------------ |
+| AI 请求次数  | 按会员                 | 由新的预占 RPC 解析                                    |
+| AI Token     | 保持全局               | 沿用 `CONUO_AI_DAILY_TOKEN_LIMIT`；按会员分档依赖 §8.5 |
+| 区域视觉     | 共用请求次数           | 开始记录 `route`，暂不单独限额                         |
+| OCR 页数     | 保持全局，所有等级相同 | 部署启用视觉模型后所有用户都已可用，第一版不收回       |
+| 向量化字符   | 保持全局               | —                                                      |
+| 章节摘要     | 保持全局               | —                                                      |
+| 学习空间     | 按会员                 | 在 `save_workspace` 中执行，只统计未归档空间           |
+| 存储与单文件 | 保持全局安全上限       | 不作为会员权益宣传                                     |
+| 并发         | 所有等级都是 1         | 后台任务同样占用；是否对高等级放宽见 §13               |
 
 ### 4.3 功能开关
 
 `features` 只允许以下键，值为布尔，缺失视为 `false`：
 
-| 键 | 覆盖的服务端入口 | 叠加的部署条件 | 免费版 | 专业版 | 旗舰版 |
-| --- | --- | --- | --- | --- | --- |
-| `vision_region` | `/api/v1/vision/region-study`（全部任务） | 已配置视觉模型 | 开 | 开 | 开 |
-| `organization` | `/api/v1/organize`、后台整理任务、术语建议 | — | 开 | 开 | 开 |
-| `learning_ai` | 学习的 `generate`、`grade`、`hint`、`explain-feedback` | `CONUO_FEATURE_LEARNING` | 开 | 开 | 开 |
-| `deep_thinking` | 问答深度思考 | `CONUO_FEATURE_DEEP_THINKING` | 开 | 开 | 开 |
-| `tutor_mode` | 问答导师模式 | `CONUO_FEATURE_TUTOR_MODE` | 开 | 开 | 开 |
+| 键              | 覆盖的服务端入口                                       | 叠加的部署条件                | 免费版 | 专业版 | 旗舰版 |
+| --------------- | ------------------------------------------------------ | ----------------------------- | ------ | ------ | ------ |
+| `vision_region` | `/api/v1/vision/region-study`（全部任务）              | 已配置视觉模型                | 开     | 开     | 开     |
+| `organization`  | `/api/v1/organize`、后台整理任务、术语建议             | —                             | 开     | 开     | 开     |
+| `learning_ai`   | 学习的 `generate`、`grade`、`hint`、`explain-feedback` | `CONUO_FEATURE_LEARNING`      | 开     | 开     | 开     |
+| `deep_thinking` | 问答深度思考                                           | `CONUO_FEATURE_DEEP_THINKING` | 开     | 开     | 开     |
+| `tutor_mode`    | 问答导师模式                                           | `CONUO_FEATURE_TUTOR_MODE`    | 开     | 开     | 开     |
 
 第一版各等级的功能开关与现状一致，等级差异只体现在请求次数和学习空间数。开关机制先建好；是否把深度思考、导师模式等设为付费能力由 §13 决定，届时只需一份迁移修改等级配置。
 
@@ -137,19 +137,19 @@ Conuo 先建立一套由数据库驱动的会员等级和权益模型。管理�
 
 保存等级配置，只通过迁移修改。
 
-| 字段 | 类型 | 约束与说明 |
-| --- | --- | --- |
-| `code` | `text` 主键 | 小写字母、数字和连字符，如 `free`、`pro`、`max` |
-| `name` | `text` | 用户看到的名称 |
-| `description` | `text` | 会员说明 |
-| `tier_rank` | `smallint` 唯一 | 等级高低，解析时取最高者；`free` 最低 |
-| `display_order` | `smallint` | 仅用于展示顺序 |
-| `is_public` | `boolean` | 是否对登录用户展示；内部测试档设为 `false` |
-| `is_grantable` | `boolean` | 是否允许新增授权；设为 `false` 后已有授权继续有效 |
-| `ai_daily_request_limit` | `integer` | `CHECK (between 1 and 500)`，与账本范围一致 |
-| `learning_space_limit` | `integer` | `CHECK (between 1 and 500)`，只统计未归档空间 |
-| `features` | `jsonb` | `CHECK`：必须是对象，键在 §4.3 白名单内，值为布尔 |
-| `created_at` / `updated_at` | `timestamptz` | — |
+| 字段                        | 类型            | 约束与说明                                        |
+| --------------------------- | --------------- | ------------------------------------------------- |
+| `code`                      | `text` 主键     | 小写字母、数字和连字符，如 `free`、`pro`、`max`   |
+| `name`                      | `text`          | 用户看到的名称                                    |
+| `description`               | `text`          | 会员说明                                          |
+| `tier_rank`                 | `smallint` 唯一 | 等级高低，解析时取最高者；`free` 最低             |
+| `display_order`             | `smallint`      | 仅用于展示顺序                                    |
+| `is_public`                 | `boolean`       | 是否对登录用户展示；内部测试档设为 `false`        |
+| `is_grantable`              | `boolean`       | 是否允许新增授权；设为 `false` 后已有授权继续有效 |
+| `ai_daily_request_limit`    | `integer`       | `CHECK (between 1 and 500)`，与账本范围一致       |
+| `learning_space_limit`      | `integer`       | `CHECK (between 1 and 500)`，只统计未归档空间     |
+| `features`                  | `jsonb`         | `CHECK`：必须是对象，键在 §4.3 白名单内，值为布尔 |
+| `created_at` / `updated_at` | `timestamptz`   | —                                                 |
 
 - `free` 不能删除，也不能修改其 `code`，用触发器保证。
 - 不设价格、币种和计费周期字段。一个等级可能同时有月付和年付，价格在阶段 D 单独建表（§10）。
@@ -160,21 +160,21 @@ Conuo 先建立一套由数据库驱动的会员等级和权益模型。管理�
 
 每次授权一行，表本身就是审计记录。
 
-| 字段 | 类型 | 约束与说明 |
-| --- | --- | --- |
-| `grant_id` | `uuid` 主键 | 默认 `gen_random_uuid()` |
-| `owner_id` | `uuid` | 引用 `auth.users(id) on delete cascade` |
-| `plan_code` | `text` | 引用 `membership_plans(code)` |
-| `source` | `text` | `manual`、`promotion`、`trial`、`system`、`payment`（`payment` 只在阶段 D 使用） |
-| `starts_at` | `timestamptz` | 生效时间，可以在未来 |
-| `ends_at` | `timestamptz null` | 到期时间；为空表示长期授权 |
-| `actor` | `text` | 操作人标识（如管理员邮箱或 `system:migration`），1–200 字符，必填 |
-| `note` | `text` | 原因或工单号，1–1000 字符，必填；不存支付敏感信息 |
-| `external_ref` | `text null` 唯一 | 预留给支付订阅或事件 ID |
-| `revoked_at` | `timestamptz null` | 撤销时间 |
-| `revoked_by` | `text null` | 撤销操作人 |
-| `revoke_reason` | `text null` | 撤销原因 |
-| `created_at` | `timestamptz` | 记录时间 |
+| 字段            | 类型               | 约束与说明                                                                       |
+| --------------- | ------------------ | -------------------------------------------------------------------------------- |
+| `grant_id`      | `uuid` 主键        | 默认 `gen_random_uuid()`                                                         |
+| `owner_id`      | `uuid`             | 引用 `auth.users(id) on delete cascade`                                          |
+| `plan_code`     | `text`             | 引用 `membership_plans(code)`                                                    |
+| `source`        | `text`             | `manual`、`promotion`、`trial`、`system`、`payment`（`payment` 只在阶段 D 使用） |
+| `starts_at`     | `timestamptz`      | 生效时间，可以在未来                                                             |
+| `ends_at`       | `timestamptz null` | 到期时间；为空表示长期授权                                                       |
+| `actor`         | `text`             | 操作人标识（如管理员邮箱或 `system:migration`），1–200 字符，必填                |
+| `note`          | `text`             | 原因或工单号，1–1000 字符，必填；不存支付敏感信息                                |
+| `external_ref`  | `text null` 唯一   | 预留给支付订阅或事件 ID                                                          |
+| `revoked_at`    | `timestamptz null` | 撤销时间                                                                         |
+| `revoked_by`    | `text null`        | 撤销操作人                                                                       |
+| `revoke_reason` | `text null`        | 撤销原因                                                                         |
+| `created_at`    | `timestamptz`      | 记录时间                                                                         |
 
 约束：
 
@@ -216,12 +216,12 @@ limit 1;
 
 ### 5.4 对外 RPC
 
-| 函数 | 调用方 | 作用 |
-| --- | --- | --- |
-| `public.my_membership()` | `authenticated` | 按 `auth.uid()` 返回解析结果，并先检查注销状态；界面只通过它读取会员，不直接查询授权表 |
-| `public.resolve_membership(p_owner uuid)` | `service_role` | 只读；供服务端判断深度思考等请求形态 |
-| `public.reserve_membership_ai_request(...)` | `service_role` | 新的 AI 预占，见 §8.1 |
-| `public.ai_membership_usage(p_owner, p_global_cap, p_enforcement)` | `service_role` | 供用量接口使用，与预占用同一套规则计算有效额度 |
+| 函数                                                               | 调用方          | 作用                                                                                   |
+| ------------------------------------------------------------------ | --------------- | -------------------------------------------------------------------------------------- |
+| `public.my_membership()`                                           | `authenticated` | 按 `auth.uid()` 返回解析结果，并先检查注销状态；界面只通过它读取会员，不直接查询授权表 |
+| `public.resolve_membership(p_owner uuid)`                          | `service_role`  | 只读；供服务端判断深度思考等请求形态                                                   |
+| `public.reserve_membership_ai_request(...)`                        | `service_role`  | 新的 AI 预占，见 §8.1                                                                  |
+| `public.ai_membership_usage(p_owner, p_global_cap, p_enforcement)` | `service_role`  | 供用量接口使用，与预占用同一套规则计算有效额度                                         |
 
 ### 5.5 管理函数
 
