@@ -520,6 +520,33 @@ describe("runOrganizationTasks", () => {
     expect(mock.taskRpc.mock.calls.map(([name]) => name)).not.toContain("publish_organization_job");
   });
 
+  it("records provider usage when a model fails after reporting tokens", async () => {
+    taskRpcWithContext();
+    mock.callModel.mockImplementation(async (...args: unknown[]) => {
+      (args[3] as { onUsage?: (usage: object) => void } | undefined)?.onUsage?.({
+        promptTokens: 12,
+        completionTokens: 7,
+      });
+      throw new ApiError(503, "MODEL_UNAVAILABLE", "模型服务暂时不可用，请稍后重试。");
+    });
+
+    const summary = await runOrganizationTasks(taskStore(), {
+      workerId: "organization-worker-1",
+      limit: 1,
+      leaseSeconds: 60,
+    });
+
+    expect(summary).toMatchObject({ claimed: 1, retrying: 1, staged: 0, published: 0 });
+    expect(mock.finishRequest).toHaveBeenCalledExactlyOnceWith(
+      ledger,
+      ownerId,
+      organizationRequest.requestId,
+      undefined,
+      "MODEL_UNAVAILABLE",
+      { promptTokens: 12, completionTokens: 7 },
+    );
+  });
+
   it("requeues a durable task when a same-owner question owns the AI ledger", async () => {
     taskRpcWithContext();
     mock.reserveRequest.mockRejectedValue(

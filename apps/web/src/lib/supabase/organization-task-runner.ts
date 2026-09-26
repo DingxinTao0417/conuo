@@ -236,6 +236,8 @@ async function processClaim(
   summary: OrganizationTaskRunnerSummary,
 ) {
   let staged = false;
+  let ledger: ReturnType<typeof createRequestStore> | undefined;
+  let reservedRequestId: string | undefined;
   let traceRecorder: ReturnType<typeof createTraceRecorder> | undefined;
   let traceOutcome:
     "completed" | "insufficient" | "failed" | "cancelled" | "cached" | "extractive" = "failed";
@@ -331,7 +333,7 @@ async function processClaim(
     ];
     if (summaryVersion) fingerprintParts.push(summaryVersion);
     const fingerprint = createHash("sha256").update(JSON.stringify(fingerprintParts)).digest("hex");
-    const ledger = createRequestStore();
+    ledger = createRequestStore();
     const reserved = await reserveRequest(
       ledger,
       job.ownerId,
@@ -339,6 +341,7 @@ async function processClaim(
       fingerprint,
       { route: "organization-job", features: ["organization"] },
     );
+    if (reserved.kind === "reserved") reservedRequestId = context.request.requestId;
     // Reserve may wait behind a shared request. Re-check the lease and source
     // scope before a provider call so an old worker never discloses evidence.
     await heartbeat(store, job.ownerId, job.jobId, job.leaseToken, input.leaseSeconds);
@@ -423,6 +426,21 @@ async function processClaim(
       modelProfile: traceModelProfile ?? "default",
       modelName: traceModelName,
     });
+    if (ledger && reservedRequestId && (promptTokens || completionTokens)) {
+      try {
+        await finishRequest(
+          ledger,
+          job.ownerId,
+          reservedRequestId,
+          undefined,
+          stableErrorCode(error),
+          { promptTokens, completionTokens },
+        );
+      } catch {
+        // Preserve the original worker failure. The durable task will retry
+        // or expire its lease if the short-lived ledger is unavailable.
+      }
+    }
     if (input.signal?.aborted || staged) return;
     try {
       const failed = await rpc(
