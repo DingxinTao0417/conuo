@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import * as cloud from "./cloud";
 import type { AccountMembership, MembershipFeatureKey } from "./membership";
 
-type MembershipEntry =
-  | { status: "loading"; membership?: undefined; error?: undefined }
-  | { status: "ready"; membership: AccountMembership; error?: undefined }
-  | { status: "error"; membership?: undefined; error: unknown };
+/** A stale membership is kept while a refresh runs or fails, so entries never flicker. */
+type MembershipEntry = { membership?: AccountMembership; error?: unknown; fetchedAt: number };
+
+/** Admin grants appear without a reload; a failed read is retried sooner. */
+const FRESH_MS = 60_000;
+const ERROR_RETRY_MS = 15_000;
 
 const cache = new Map<string, MembershipEntry>();
 const requests = new Map<string, Promise<AccountMembership>>();
@@ -43,8 +45,9 @@ function notify(userId: string) {
 
 function ensureRequest(userId: string) {
   if (requests.has(userId)) return;
-  if (cache.get(userId)?.status === "ready") return;
-  cache.set(userId, { status: "loading" });
+  const current = cache.get(userId);
+  if (current && Date.now() - current.fetchedAt < (current.error ? ERROR_RETRY_MS : FRESH_MS))
+    return;
   let membershipReader: ((expectedUserId: string) => Promise<AccountMembership>) | undefined;
   try {
     membershipReader = cloud.getAccountMembership;
@@ -52,17 +55,25 @@ function ensureRequest(userId: string) {
     membershipReader = undefined;
   }
   if (typeof membershipReader !== "function") {
-    cache.set(userId, { status: "error", error: new Error("会员接口不可用") });
+    cache.set(userId, {
+      membership: current?.membership,
+      error: new Error("会员接口不可用"),
+      fetchedAt: Date.now(),
+    });
     notify(userId);
     return;
   }
   const promise = membershipReader(userId)
     .then((membership) => {
-      cache.set(userId, { status: "ready", membership });
+      cache.set(userId, { membership, fetchedAt: Date.now() });
       return membership;
     })
     .catch((error: unknown) => {
-      cache.set(userId, { status: "error", error });
+      cache.set(userId, {
+        membership: cache.get(userId)?.membership,
+        error,
+        fetchedAt: Date.now(),
+      });
       throw error;
     })
     .finally(() => {
@@ -106,7 +117,17 @@ export function useMembershipFeature(
     if (!userId || !deploymentEnabled(feature)) return;
     const unsubscribe = subscribe(userId, () => rerender((value) => value + 1));
     ensureRequest(userId);
-    return unsubscribe;
+    // Returning to the page re-reads a stale or failed membership.
+    const refresh = () => {
+      if (document.visibilityState !== "hidden") ensureRequest(userId);
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [feature, userId]);
 
   const entry = read(userId);
@@ -122,27 +143,24 @@ export function useMembershipFeature(
         allowed: false,
         reason: "此功能尚未在当前版本开放。",
       };
-    if (!entry || entry.status === "loading")
-      return {
-        ready: false,
-        allowed: false,
-        reason: "正在读取会员权限，请稍候。",
-      };
-    if (entry.status === "error") {
-      return {
-        ready: true,
-        allowed: false,
-        reason: "会员信息暂时不可用，暂时无法确认此功能是否开放，请稍后重试。",
-      };
-    }
-    return entry.membership.features[feature]
-      ? { ready: true, allowed: true, membership: entry.membership }
-      : {
-          ready: true,
-          allowed: false,
-          membership: entry.membership,
-          reason: "当前会员等级未开放此功能。",
-        };
+    if (entry?.membership)
+      return entry.membership.features[feature]
+        ? { ready: true, allowed: true, membership: entry.membership }
+        : {
+            ready: true,
+            allowed: false,
+            membership: entry.membership,
+            reason: "当前会员等级未开放此功能。",
+          };
+    // The membership read failed and nothing is cached. The server checks the
+    // plan again on every AI request, so keep the entry usable instead of
+    // disabling every AI feature during a membership outage.
+    if (entry?.error) return { ready: true, allowed: true };
+    return {
+      ready: false,
+      allowed: false,
+      reason: "正在读取会员权限，请稍候。",
+    };
   }, [entry, feature, userId]);
 }
 

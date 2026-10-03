@@ -95,11 +95,60 @@ describe("membership AI feature gating", () => {
     expect(mock.getAccountMembership).not.toHaveBeenCalled();
   });
 
-  it("keeps a cloud entry disabled when the membership endpoint is unavailable", async () => {
+  it("falls back to the deployment switch when the membership endpoint is unavailable", async () => {
     mock.getAccountMembership.mockRejectedValue(new Error("staging migration missing"));
     await act(async () => root.render(<FeatureProbe feature="organization" />));
     await act(async () => await Promise.resolve());
-    expect(host.textContent).toContain("不可用");
-    expect(host.textContent).toContain("会员信息暂时不可用");
+    expect(host.querySelector("span")?.textContent).toBe("可用");
+    expect(host.querySelector("span")?.dataset.ready).toBe("yes");
+    expect(host.querySelector("p")?.textContent).toBe("");
+  });
+
+  it("retries a failed read and picks up a later grant when the page regains focus", async () => {
+    vi.useFakeTimers();
+    try {
+      mock.getAccountMembership.mockRejectedValueOnce(new Error("temporary"));
+      await act(async () => root.render(<FeatureProbe feature="organization" />));
+      await act(async () => await Promise.resolve());
+      expect(mock.getAccountMembership).toHaveBeenCalledTimes(1);
+
+      // Too soon after a failure: no request storm.
+      await act(async () => window.dispatchEvent(new Event("focus")));
+      expect(mock.getAccountMembership).toHaveBeenCalledTimes(1);
+
+      await act(async () => vi.advanceTimersByTime(16_000));
+      await act(async () => window.dispatchEvent(new Event("focus")));
+      await act(async () => await Promise.resolve());
+      expect(mock.getAccountMembership).toHaveBeenCalledTimes(2);
+      expect(host.textContent).toContain("当前会员等级未开放此功能");
+
+      mock.getAccountMembership.mockResolvedValue({
+        ...membership,
+        features: { ...membership.features, organization: true },
+      });
+      await act(async () => vi.advanceTimersByTime(61_000));
+      await act(async () => window.dispatchEvent(new Event("focus")));
+      await act(async () => await Promise.resolve());
+      expect(mock.getAccountMembership).toHaveBeenCalledTimes(3);
+      expect(host.querySelector("span")?.textContent).toBe("可用");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the last known plan when a refresh fails", async () => {
+    vi.useFakeTimers();
+    try {
+      await act(async () => root.render(<FeatureProbe feature="organization" />));
+      await act(async () => await Promise.resolve());
+      mock.getAccountMembership.mockRejectedValue(new Error("temporary"));
+      await act(async () => vi.advanceTimersByTime(61_000));
+      await act(async () => window.dispatchEvent(new Event("focus")));
+      await act(async () => await Promise.resolve());
+      expect(mock.getAccountMembership).toHaveBeenCalledTimes(2);
+      expect(host.textContent).toContain("当前会员等级未开放此功能");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
